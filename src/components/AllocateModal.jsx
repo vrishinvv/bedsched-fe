@@ -21,7 +21,7 @@ export default function AllocateModal({
   useEffect(() => {
     if (open) {
       setForm(
-        initialData || { name: '', phone: '', gender: 'Other', startDate: '', endDate: '' }
+        initialData || { name: '', phone: '', gender: '', startDate: '', endDate: '' }
       );
     }
   }, [open, initialData]);
@@ -85,7 +85,6 @@ export default function AllocateModal({
             >
               <option>Male</option>
               <option>Female</option>
-              <option>Other</option>
             </select>
           </div>
           <div>

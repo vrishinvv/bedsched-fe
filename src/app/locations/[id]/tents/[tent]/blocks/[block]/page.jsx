@@ -1,61 +1,162 @@
 'use client';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import TentCard from '@/components/TentCard';
-import { fetchLocationTents } from '@/lib/api';
+import BedGrid from '@/components/BedGrid';
+import AllocateModal from '@/components/AllocateModal';
+import Notification from '@/components/Notification';
+import {
+  fetchBlockDetail,
+  allocateBed,
+  editAllocation,
+  deallocateBed,
+} from '@/lib/api';
 
-export default function LocationTentsPage({ params }) {
-  const { id } = params; // location id
-  const [data, setData] = useState(null);
-  const [err, setErr] = useState('');
+export default function BlockBedsPage({ params }) {
+  const { id, tent, block } = params;
+  const [meta, setMeta] = useState(null); // { location, tent, block }
+  const [bedsState, setBedsState] = useState(null); // { capacity, beds:{} }
   const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+  const [modal, setModal] = useState({ open: false, bedNumber: null, data: null });
+  const [pending, setPending] = useState(false);
+  const [notification, setNotification] = useState(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetchLocationTents(id);
-        setData(res);
+        const res = await fetchBlockDetail(id, Number(tent), Number(block));
+        setMeta(res.meta);
+        setBedsState({ capacity: res.blockSize, beds: res.beds });
       } catch (e) {
         setErr(e.message);
       } finally {
         setLoading(false);
       }
     })();
-  }, [id]);
+  }, [id, tent, block]);
+
+  const allocatedCount = useMemo(
+    () => Object.values(bedsState?.beds || {}).filter(Boolean).length,
+    [bedsState]
+  );
 
   const stats = useMemo(() => {
-    if (!data?.tents) return { totalCapacity: 0, totalAllocated: 0, totalNotAllocated: 0, totalFreeingTomorrow: 0 };
+    if (!bedsState) return { totalCapacity: 0, totalAllocated: 0, totalNotAllocated: 0, totalFreeingTomorrow: 0 };
     
-    const totalCapacity = data.tents.reduce((s, t) => s + (t.size || 0), 0);
-    const totalAllocated = data.tents.reduce((s, t) => s + (t.allocated || 0), 0);
+    const totalCapacity = bedsState.capacity || 0;
+    const totalAllocated = allocatedCount;
     const totalNotAllocated = totalCapacity - totalAllocated;
-    const totalFreeingTomorrow = data.tents.reduce((s, t) => s + (t.freeingTomorrow || 0), 0);
+    
+    // Calculate freeing tomorrow from bed allocations
+    const totalFreeingTomorrow = Object.values(bedsState.beds || {}).filter(bed => {
+      if (!bed?.endDate) return false;
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+      return bed.endDate === tomorrowStr;
+    }).length;
+    
     return { totalCapacity, totalAllocated, totalNotAllocated, totalFreeingTomorrow };
-  }, [data]);
+  }, [bedsState, allocatedCount]);
+
+  function openAllocate(n, data) {
+    setModal({ open: true, bedNumber: n, data });
+  }
+
+  function showNotification(type, message) {
+    setNotification({ type, message });
+  }
+
+  function closeNotification() {
+    setNotification(null);
+  }
+
+  async function handleSave(payload) {
+    const n = modal.bedNumber;
+    const isEdit = Boolean(modal.data);
+    try {
+      setPending(true);
+      setBedsState((s) => ({ ...s, beds: { ...s.beds, [n]: payload } }));
+      
+      if (isEdit) {
+        await editAllocation(id, Number(tent), Number(block), n, payload);
+        showNotification('success', `Bed ${n} allocation updated successfully for ${payload.name}`);
+      } else {
+        await allocateBed(id, Number(tent), Number(block), n, payload);
+        showNotification('success', `Bed ${n} allocated successfully to ${payload.name}`);
+      }
+      
+      setModal({ open: false, bedNumber: null, data: null });
+    } catch (e) {
+      // Revert optimistic update on error
+      setBedsState((s) => {
+        const reverted = { ...s.beds };
+        if (isEdit) {
+          reverted[n] = modal.data; // Restore original data
+        } else {
+          delete reverted[n]; // Remove allocation
+        }
+        return { ...s, beds: reverted };
+      });
+      
+      const errorMessage = e.message || (isEdit ? 'Failed to update allocation' : 'Failed to allocate bed');
+      showNotification('error', errorMessage);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleDelete() {
+    const n = modal.bedNumber;
+    const guestName = modal.data?.name || 'guest';
+    
+    try {
+      setPending(true);
+      // Store original data for potential revert
+      const originalData = modal.data;
+      
+      setBedsState((s) => {
+        const next = { ...s.beds };
+        delete next[n];
+        return { ...s, beds: next };
+      });
+      
+      await deallocateBed(id, Number(tent), Number(block), n);
+      showNotification('success', `Bed ${n} deallocated successfully (${guestName})`);
+      setModal({ open: false, bedNumber: null, data: null });
+    } catch (e) {
+      // Revert optimistic update on error
+      setBedsState((s) => ({ ...s, beds: { ...s.beds, [n]: originalData } }));
+      
+      const errorMessage = e.message || 'Failed to deallocate bed';
+      showNotification('error', errorMessage);
+    } finally {
+      setPending(false);
+    }
+  }
 
   if (loading) return <div>Loading…</div>;
   if (err) return <div className="text-red-400">{err}</div>;
 
-  const { location, tents } = data;
-
   return (
-    <main className="space-y-6">
+    <main className="space-y-5">
       {/* Enhanced Header with Purple Breadcrumb */}
       <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-purple-900/20 via-purple-800/20 to-indigo-900/20 border border-purple-500/20 p-6">
         <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
         <div className="relative">
           <nav className="mb-3">
-            <Link href="/" className="inline-flex items-center text-sm text-purple-300/80 hover:text-purple-200 transition-colors">
+            <Link href={`/locations/${meta.location.id}/tents/${meta.tent.index}`} className="inline-flex items-center text-sm text-purple-300/80 hover:text-purple-200 transition-colors">
               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
-              Back to Locations
+              Back to Tent {meta.tent.index}
             </Link>
           </nav>
           <h2 className="text-3xl font-bold text-white mb-2 bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
-            {location.name}
+            {meta.location.name} | Tent {meta.tent.index} | Block {meta.block.index}
           </h2>
-          <p className="text-purple-200/80">Managing {tents.length} tent{tents.length !== 1 ? 's' : ''} • {stats.totalCapacity} total beds</p>
+          <p className="text-purple-200/80">{stats.totalCapacity} beds • {stats.totalAllocated} occupied • {stats.totalNotAllocated} available</p>
         </div>
       </section>
 
@@ -114,11 +215,25 @@ export default function LocationTentsPage({ params }) {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {tents.map((t) => (
-          <TentCard key={t.index} locationId={location.id} tent={t} />
-        ))}
-      </section>
+      <BedGrid
+        capacity={bedsState.capacity}
+        beds={bedsState.beds}
+        onSelect={openAllocate}
+      />
+
+      <AllocateModal
+        open={modal.open}
+        onClose={() => setModal({ open: false, bedNumber: null, data: null })}
+        bedNumber={modal.bedNumber}
+        initialData={modal.data}
+        onSave={handleSave}
+        onDelete={handleDelete}
+      />
+
+      <Notification 
+        notification={notification}
+        onClose={closeNotification}
+      />
     </main>
   );
 }

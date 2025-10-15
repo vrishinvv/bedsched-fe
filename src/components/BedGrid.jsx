@@ -151,31 +151,6 @@ export default function BedGrid({ capacity = 100, beds = {}, onSelect }) {
                     );
                 })}
             </div>
-
-            {/* Statistics Bar */}
-            <div className="mt-6 pt-4 border-t border-gray-700">
-                <div className="grid grid-cols-3 gap-4 text-center">
-                    <div className="bg-gray-700/50 rounded-xl p-3 backdrop-blur-sm">
-                        <div className="text-xl font-bold text-white">{capacity}</div>
-                        <div className="text-xs text-gray-400">Total Beds</div>
-                    </div>
-                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 backdrop-blur-sm">
-                        <div className="text-xl font-bold text-emerald-400">
-                            {items.filter(n => getBedStatus(beds?.[n]) === 'available').length}
-                        </div>
-                        <div className="text-xs text-emerald-300">Available</div>
-                    </div>
-                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 backdrop-blur-sm">
-                        <div className="text-xl font-bold text-blue-400">
-                            {items.filter(n => {
-                                const status = getBedStatus(beds?.[n]);
-                                return status === 'current' || status === 'future';
-                            }).length}
-                        </div>
-                        <div className="text-xs text-blue-300">Allocated</div>
-                    </div>
-                </div>
-            </div>
         </div>
     );
 }

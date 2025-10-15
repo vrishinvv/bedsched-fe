@@ -1,11 +1,11 @@
 'use client';
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import TentCard from '@/components/TentCard';
-import { fetchLocationTents } from '@/lib/api';
+import BlockCard from '@/components/BlockCard';
+import { fetchTentBlocks } from '@/lib/api';
 
-export default function LocationTentsPage({ params }) {
-  const { id } = params; // location id
+export default function TentBlocksPage({ params }) {
+  const { id, tent } = params; // location id, tent index (1-based)
   const [data, setData] = useState(null);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(true);
@@ -13,7 +13,7 @@ export default function LocationTentsPage({ params }) {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetchLocationTents(id);
+        const res = await fetchTentBlocks(id, Number(tent));
         setData(res);
       } catch (e) {
         setErr(e.message);
@@ -21,22 +21,22 @@ export default function LocationTentsPage({ params }) {
         setLoading(false);
       }
     })();
-  }, [id]);
+  }, [id, tent]);
 
   const stats = useMemo(() => {
-    if (!data?.tents) return { totalCapacity: 0, totalAllocated: 0, totalNotAllocated: 0, totalFreeingTomorrow: 0 };
+    if (!data?.blocks) return { totalCapacity: 0, totalAllocated: 0, totalNotAllocated: 0, totalFreeingTomorrow: 0 };
     
-    const totalCapacity = data.tents.reduce((s, t) => s + (t.size || 0), 0);
-    const totalAllocated = data.tents.reduce((s, t) => s + (t.allocated || 0), 0);
+    const totalCapacity = data.blocks.reduce((s, b) => s + (b.size || 0), 0);
+    const totalAllocated = data.blocks.reduce((s, b) => s + (b.allocated || 0), 0);
     const totalNotAllocated = totalCapacity - totalAllocated;
-    const totalFreeingTomorrow = data.tents.reduce((s, t) => s + (t.freeingTomorrow || 0), 0);
+    const totalFreeingTomorrow = data.blocks.reduce((s, b) => s + (b.freeingTomorrow || 0), 0);
     return { totalCapacity, totalAllocated, totalNotAllocated, totalFreeingTomorrow };
   }, [data]);
 
   if (loading) return <div>Loading…</div>;
   if (err) return <div className="text-red-400">{err}</div>;
 
-  const { location, tents } = data;
+  const { location, tent: tentMeta, blocks } = data;
 
   return (
     <main className="space-y-6">
@@ -45,17 +45,17 @@ export default function LocationTentsPage({ params }) {
         <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
         <div className="relative">
           <nav className="mb-3">
-            <Link href="/" className="inline-flex items-center text-sm text-purple-300/80 hover:text-purple-200 transition-colors">
+            <Link href={`/locations/${location.id}`} className="inline-flex items-center text-sm text-purple-300/80 hover:text-purple-200 transition-colors">
               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
-              Back to Locations
+              Back to {location.name}
             </Link>
           </nav>
           <h2 className="text-3xl font-bold text-white mb-2 bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
-            {location.name}
+            {location.name} | Tent {tentMeta.index}
           </h2>
-          <p className="text-purple-200/80">Managing {tents.length} tent{tents.length !== 1 ? 's' : ''} • {stats.totalCapacity} total beds</p>
+          <p className="text-purple-200/80">Managing {blocks.length} block{blocks.length !== 1 ? 's' : ''} • {stats.totalCapacity} total beds</p>
         </div>
       </section>
 
@@ -115,8 +115,13 @@ export default function LocationTentsPage({ params }) {
       </section>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {tents.map((t) => (
-          <TentCard key={t.index} locationId={location.id} tent={t} />
+        {blocks.map((b) => (
+          <BlockCard
+            key={b.index}
+            locationId={location.id}
+            tentIndex={tentMeta.index}
+            block={b}
+          />
         ))}
       </section>
     </main>

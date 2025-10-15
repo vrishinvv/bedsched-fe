@@ -2,11 +2,8 @@
 import Link from 'next/link';
 import StatPill from './StatPill';
 
-export default function LocationCard({ location }) {
-  const allocated = location.allocatedCount ?? 0;
-  const total = location.capacity ?? 0;
-  const pct = total ? Math.round((allocated / total) * 100) : 0;
-  const freeingTomorrow = location.freeingTomorrow ?? 0;
+export default function TentCard({ locationId, tent }) {
+  const pct = tent.size ? Math.round((tent.allocated / tent.size) * 100) : 0;
 
   // Dynamic color based on occupancy
   const getOccupancyColor = () => {
@@ -38,7 +35,7 @@ export default function LocationCard({ location }) {
   };
 
   return (
-    <Link href={`/locations/${location.id}`} className="block group">
+    <Link href={`/locations/${locationId}/tents/${tent.index}`} className="block group">
       <div className={`relative overflow-hidden rounded-2xl border-2 ${getOccupancyBgColor()} p-6 shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1`}>
         {/* Decorative gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-br from-white/50 to-transparent pointer-events-none" />
@@ -52,14 +49,14 @@ export default function LocationCard({ location }) {
 
         {/* Header */}
         <div className="relative mb-4">
-          <h3 className="text-xl font-bold text-gray-900 mb-1 pr-20">{location.name}</h3>
+          <h3 className="text-xl font-bold text-gray-900 mb-1 pr-20">Tent {tent.index}</h3>
         </div>
 
         {/* Main stats */}
         <div className="relative mb-6">
           <div className="flex items-end gap-1 mb-2">
-            <span className="text-3xl font-bold text-gray-900">{allocated}</span>
-            <span className="text-lg text-gray-500 mb-1">/ {total}</span>
+            <span className="text-3xl font-bold text-gray-900">{tent.allocated}</span>
+            <span className="text-lg text-gray-500 mb-1">/ {tent.size}</span>
           </div>
         </div>
 
@@ -80,11 +77,11 @@ export default function LocationCard({ location }) {
         {/* Bottom stats */}
         <div className="relative flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {freeingTomorrow > 0 && (
+            {tent.freeingTomorrow > 0 && (
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                 <span className="text-sm font-medium text-gray-700">
-                  {freeingTomorrow} freeing tomorrow
+                  {tent.freeingTomorrow} freeing tomorrow
                 </span>
               </div>
             )}
