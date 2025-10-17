@@ -36,7 +36,7 @@ export default function BedGrid({ capacity = 100, beds = {}, onSelect }) {
         }
     };
     
-    // Helper function to format date for display
+    // Helper function to format date for display as dd/mm/yyyy
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
         

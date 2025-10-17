@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import LocationCard from '@/components/LocationCard';
+import { CardSkeleton, StatCardSkeleton, HeaderSkeleton } from '@/components/Skeleton';
 import { fetchLocations } from '@/lib/api';
 
 export default function Page() {
@@ -29,7 +30,28 @@ export default function Page() {
     return { totalCapacity, totalAllocated, totalNotAllocated, totalFreeingTomorrow };
   }, [locations]);
 
-  if (loading) return <div>Loading…</div>;
+  if (loading) {
+    return (
+      <main className="space-y-6">
+        {/* Header skeleton */}
+        <HeaderSkeleton />
+
+        {/* Stats skeleton */}
+        <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </section>
+
+        {/* Location cards skeleton */}
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="space-y-6">

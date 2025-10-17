@@ -4,6 +4,7 @@ import Link from 'next/link';
 import BedGrid from '@/components/BedGrid';
 import AllocateModal from '@/components/AllocateModal';
 import Notification from '@/components/Notification';
+import { BedGridSkeleton, StatCardSkeleton, HeaderSkeleton } from '@/components/Skeleton';
 import {
   fetchBlockDetail,
   allocateBed,
@@ -136,7 +137,25 @@ export default function BlockBedsPage({ params }) {
     }
   }
 
-  if (loading) return <div>Loading…</div>;
+  if (loading) {
+    return (
+      <main className="space-y-5">
+        {/* Header skeleton */}
+        <HeaderSkeleton />
+
+        {/* Stats skeleton */}
+        <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </section>
+
+        {/* Bed grid skeleton */}
+        <BedGridSkeleton capacity={500} />
+      </main>
+    );
+  }
+
   if (err) return <div className="text-red-400">{err}</div>;
 
   return (
@@ -228,6 +247,7 @@ export default function BlockBedsPage({ params }) {
         initialData={modal.data}
         onSave={handleSave}
         onDelete={handleDelete}
+        pending={pending}
       />
 
       <Notification 

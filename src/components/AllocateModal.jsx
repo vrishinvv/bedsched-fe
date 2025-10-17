@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import Skeleton from '@/components/Skeleton';
 
 export default function AllocateModal({
   open,
@@ -8,39 +9,54 @@ export default function AllocateModal({
   initialData, // null for new; { name, phone, gender, startDate, endDate }
   onSave,
   onDelete,
+  pending = false, // Add pending prop
 }) {
   const [form, setForm] = useState({
     name: '',
     phone: '',
-    gender: 'Male', // Set default value instead of empty string
+    gender: 'Male',
     startDate: '',
     endDate: '',
   });
   const ref = useRef(null);
 
-  // Helper function to get today's date in YYYY-MM-DD format
+  // Helper function to get today's date in YYYY-MM-DD format (IST)
   const getTodayDate = () => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
+    // Create a new date and manually adjust for IST
+    const now = new Date();
+    const istOffset = 5.5 * 60; // IST is UTC+5:30
+    const istTime = new Date(now.getTime() + (istOffset * 60 * 1000));
+    
+    // Get the date parts in IST
+    const year = istTime.getUTCFullYear();
+    const month = String(istTime.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(istTime.getUTCDate()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}`;
+  };
+
+  // Helper function to format date for display as dd/mm/yyyy
+  const formatDateForDisplay = (dateString) => {
+    if (!dateString) return '';
+    const [year, month, day] = dateString.split('-');
+    return `${day}/${month}/${year}`;
   };
 
   useEffect(() => {
     if (open) {
       if (initialData) {
-        // When editing, use existing data
         setForm({
           name: initialData.name || '',
           phone: initialData.phone || '',
-          gender: initialData.gender || 'Male', // Ensure default if not set
+          gender: initialData.gender || 'Male',
           startDate: initialData.startDate || '',
           endDate: initialData.endDate || '',
         });
       } else {
-        // When creating new, reset to defaults
         setForm({
           name: '',
           phone: '',
-          gender: 'Male', // Explicit default
+          gender: 'Male',
           startDate: '',
           endDate: '',
         });
@@ -64,24 +80,22 @@ export default function AllocateModal({
   }
 
   function handleSave() {
-    // Lightweight client validation
     if (!form.name || !form.startDate || !form.endDate) {
       return alert('Name, start & end dates are required');
     }
 
     const today = getTodayDate();
     
-    // Check if start date is in the past
-    if (form.startDate < today) {
-      return alert('Start date cannot be in the past. Please select today or a future date.');
+    // End date must be today or in the future
+    if (form.endDate < today) {
+      return alert('End date must be today or in the future.');
     }
     
-    // Check if end date is before start date
+    // End date cannot be before start date
     if (form.endDate < form.startDate) {
       return alert('End date cannot be before start date.');
     }
 
-    // Ensure gender has a value (fallback to Male if somehow empty)
     const payload = {
       ...form,
       gender: form.gender || 'Male'
@@ -90,20 +104,48 @@ export default function AllocateModal({
     onSave(payload);
   }
 
+  const todayDate = getTodayDate();
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40" onClick={!pending ? onClose : undefined} />
       <div ref={ref} className="relative w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl">
+        {/* Enhanced loading overlay with skeleton */}
+        {pending && (
+          <div className="absolute inset-0 bg-white/95 rounded-2xl flex flex-col items-center justify-center z-10 p-8">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-6 h-6 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-gray-700 font-medium">
+                {isEdit ? 'Updating allocation...' : 'Allocating bed...'}
+              </span>
+            </div>
+            
+            {/* Skeleton form preview */}
+            <div className="w-full space-y-4">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-10 w-full" />
+              <div className="grid grid-cols-2 gap-3">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </div>
+          </div>
+        )}
+
         <h3 className="mb-4 text-lg font-semibold text-gray-900">
           {isEdit ? `Edit allocation — Bed ${bedNumber}` : `Allocate bed — Bed ${bedNumber}`}
         </h3>
         
         {/* Show current date for reference */}
         <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <p className="text-sm text-blue-800">
-            <span className="font-medium">Today's date:</span> {getTodayDate()} 
-            <span className="text-blue-600 ml-2">(Bookings cannot be made for past dates)</span>
-          </p>
+          <div className="text-sm text-blue-800">
+            <div className="font-medium">Today's date (IST): {formatDateForDisplay(todayDate)}</div>
+            <div className="text-blue-600 mt-1">(End date must be today or later)</div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -113,7 +155,8 @@ export default function AllocateModal({
               name="name" 
               value={form.name} 
               onChange={handleChange} 
-              className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none" 
+              disabled={pending}
+              className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
               placeholder="Full name" 
             />
           </div>
@@ -123,7 +166,8 @@ export default function AllocateModal({
               name="phone" 
               value={form.phone} 
               onChange={handleChange} 
-              className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none" 
+              disabled={pending}
+              className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
               placeholder="Optional" 
             />
           </div>
@@ -133,7 +177,8 @@ export default function AllocateModal({
               name="gender" 
               value={form.gender} 
               onChange={handleChange} 
-              className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none"
+              disabled={pending}
+              className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
               <option value="Male">Male</option>
               <option value="Female">Female</option>
@@ -147,9 +192,10 @@ export default function AllocateModal({
               name="startDate" 
               value={form.startDate} 
               onChange={handleChange}
-              min={getTodayDate()} // Prevent selecting past dates
-              className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none" 
+              disabled={pending}
+              className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
             />
+            <p className="text-xs text-gray-500 mt-1">Can be any date (past, present, or future)</p>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">End date*</label>
@@ -158,18 +204,40 @@ export default function AllocateModal({
               name="endDate" 
               value={form.endDate} 
               onChange={handleChange}
-              min={form.startDate || getTodayDate()} // End date should be at least start date
-              className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none" 
+              min={todayDate}
+              disabled={pending}
+              className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
             />
+            <p className="text-xs text-gray-500 mt-1">Must be today or later</p>
           </div>
         </div>
+        
         <div className="mt-5 flex items-center justify-between">
           {isEdit ? (
-            <button onClick={onDelete} className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">Deallocate</button>
+            <button 
+              onClick={onDelete} 
+              disabled={pending}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Deallocate
+            </button>
           ) : <span />}
           <div className="flex gap-2">
-            <button onClick={onClose} className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">Cancel</button>
-            <button onClick={handleSave} className="rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-black">{isEdit ? 'Save changes' : 'Allocate'}</button>
+            <button 
+              onClick={onClose} 
+              disabled={pending}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={handleSave} 
+              disabled={pending}
+              className="rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {pending && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+              {isEdit ? 'Save changes' : 'Allocate'}
+            </button>
           </div>
         </div>
       </div>

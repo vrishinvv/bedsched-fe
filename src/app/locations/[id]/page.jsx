@@ -2,6 +2,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import TentCard from '@/components/TentCard';
+import { CardSkeleton, StatCardSkeleton, HeaderSkeleton } from '@/components/Skeleton';
 import { fetchLocationTents } from '@/lib/api';
 
 export default function LocationTentsPage({ params }) {
@@ -33,7 +34,29 @@ export default function LocationTentsPage({ params }) {
     return { totalCapacity, totalAllocated, totalNotAllocated, totalFreeingTomorrow };
   }, [data]);
 
-  if (loading) return <div>Loading…</div>;
+  if (loading) {
+    return (
+      <main className="space-y-6">
+        {/* Header skeleton */}
+        <HeaderSkeleton />
+
+        {/* Stats skeleton */}
+        <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </section>
+
+        {/* Tent cards skeleton */}
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </section>
+      </main>
+    );
+  }
+
   if (err) return <div className="text-red-400">{err}</div>;
 
   const { location, tents } = data;

@@ -47,12 +47,12 @@ export default function Notification({ notification, onClose }) {
           
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <h4 className={`font-semibold text-sm ${isSuccess ? 'text-emerald-200' : 'text-red-200'}`}>
+            <div className={`font-semibold text-sm mb-1 ${isSuccess ? 'text-emerald-200' : 'text-red-200'}`}>
               {isSuccess ? 'Success!' : 'Error'}
-            </h4>
-            <p className={`text-sm mt-1 ${isSuccess ? 'text-emerald-300' : 'text-red-300'}`}>
+            </div>
+            <div className={`text-sm ${isSuccess ? 'text-emerald-300' : 'text-red-300'}`}>
               {notification.message}
-            </p>
+            </div>
           </div>
           
           {/* Close button */}
