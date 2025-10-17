@@ -12,17 +12,39 @@ export default function AllocateModal({
   const [form, setForm] = useState({
     name: '',
     phone: '',
-    gender: 'Other',
+    gender: 'Male', // Set default value instead of empty string
     startDate: '',
     endDate: '',
   });
   const ref = useRef(null);
 
+  // Helper function to get today's date in YYYY-MM-DD format
+  const getTodayDate = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+
   useEffect(() => {
     if (open) {
-      setForm(
-        initialData || { name: '', phone: '', gender: '', startDate: '', endDate: '' }
-      );
+      if (initialData) {
+        // When editing, use existing data
+        setForm({
+          name: initialData.name || '',
+          phone: initialData.phone || '',
+          gender: initialData.gender || 'Male', // Ensure default if not set
+          startDate: initialData.startDate || '',
+          endDate: initialData.endDate || '',
+        });
+      } else {
+        // When creating new, reset to defaults
+        setForm({
+          name: '',
+          phone: '',
+          gender: 'Male', // Explicit default
+          startDate: '',
+          endDate: '',
+        });
+      }
     }
   }, [open, initialData]);
 
@@ -42,9 +64,30 @@ export default function AllocateModal({
   }
 
   function handleSave() {
-    // lightweight client validation
-    if (!form.name || !form.startDate || !form.endDate) return alert('Name, start & end dates are required');
-    onSave({ ...form });
+    // Lightweight client validation
+    if (!form.name || !form.startDate || !form.endDate) {
+      return alert('Name, start & end dates are required');
+    }
+
+    const today = getTodayDate();
+    
+    // Check if start date is in the past
+    if (form.startDate < today) {
+      return alert('Start date cannot be in the past. Please select today or a future date.');
+    }
+    
+    // Check if end date is before start date
+    if (form.endDate < form.startDate) {
+      return alert('End date cannot be before start date.');
+    }
+
+    // Ensure gender has a value (fallback to Male if somehow empty)
+    const payload = {
+      ...form,
+      gender: form.gender || 'Male'
+    };
+
+    onSave(payload);
   }
 
   return (
@@ -54,6 +97,15 @@ export default function AllocateModal({
         <h3 className="mb-4 text-lg font-semibold text-gray-900">
           {isEdit ? `Edit allocation — Bed ${bedNumber}` : `Allocate bed — Bed ${bedNumber}`}
         </h3>
+        
+        {/* Show current date for reference */}
+        <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <p className="text-sm text-blue-800">
+            <span className="font-medium">Today's date:</span> {getTodayDate()} 
+            <span className="text-blue-600 ml-2">(Bookings cannot be made for past dates)</span>
+          </p>
+        </div>
+
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className="mb-1 block text-sm font-medium text-gray-700">Name*</label>
@@ -76,15 +128,16 @@ export default function AllocateModal({
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Gender</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Gender*</label>
             <select 
               name="gender" 
               value={form.gender} 
               onChange={handleChange} 
               className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none"
             >
-              <option>Male</option>
-              <option>Female</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
             </select>
           </div>
           <div>
@@ -93,7 +146,8 @@ export default function AllocateModal({
               type="date" 
               name="startDate" 
               value={form.startDate} 
-              onChange={handleChange} 
+              onChange={handleChange}
+              min={getTodayDate()} // Prevent selecting past dates
               className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none" 
             />
           </div>
@@ -103,7 +157,8 @@ export default function AllocateModal({
               type="date" 
               name="endDate" 
               value={form.endDate} 
-              onChange={handleChange} 
+              onChange={handleChange}
+              min={form.startDate || getTodayDate()} // End date should be at least start date
               className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none" 
             />
           </div>
