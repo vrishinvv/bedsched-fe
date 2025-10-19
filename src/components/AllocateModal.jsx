@@ -10,6 +10,7 @@ export default function AllocateModal({
   onSave,
   onDelete,
   pending = false, // Add pending prop
+  tentGenderRestriction = 'both', // New prop for tent's gender restriction
 }) {
   const [form, setForm] = useState({
     name: '',
@@ -53,16 +54,24 @@ export default function AllocateModal({
           endDate: initialData.endDate || '',
         });
       } else {
+        // Set default gender based on tent restriction
+        let defaultGender = 'Male';
+        if (tentGenderRestriction === 'female_only') {
+          defaultGender = 'Female';
+        } else if (tentGenderRestriction === 'male_only') {
+          defaultGender = 'Male';
+        }
+        
         setForm({
           name: '',
           phone: '',
-          gender: 'Male',
+          gender: defaultGender,
           startDate: '',
           endDate: '',
         });
       }
     }
-  }, [open, initialData]);
+  }, [open, initialData, tentGenderRestriction]);
 
   useEffect(() => {
     function onKey(e) { if (e.key === 'Escape') onClose(); }
@@ -73,6 +82,56 @@ export default function AllocateModal({
   if (!open) return null;
 
   const isEdit = Boolean(initialData);
+
+  // Helper functions for gender restriction display
+  const getGenderRestrictionInfo = () => {
+    switch (tentGenderRestriction) {
+      case 'male_only':
+        return {
+          text: 'This tent is restricted to male guests only',
+          icon: '♂️',
+          bgColor: 'bg-blue-50',
+          borderColor: 'border-blue-200',
+          textColor: 'text-blue-800'
+        };
+      case 'female_only':
+        return {
+          text: 'This tent is restricted to female guests only',
+          icon: '♀️',
+          bgColor: 'bg-pink-50',
+          borderColor: 'border-pink-200',
+          textColor: 'text-pink-800'
+        };
+      case 'both':
+      default:
+        return {
+          text: 'This tent accepts all genders',
+          icon: '👫',
+          bgColor: 'bg-green-50',
+          borderColor: 'border-green-200',
+          textColor: 'text-green-800'
+        };
+    }
+  };
+
+  const genderInfo = getGenderRestrictionInfo();
+
+  // Filter gender options based on tent restrictions
+  const getAvailableGenderOptions = () => {
+    if (tentGenderRestriction === 'male_only') {
+      return [{ value: 'Male', label: 'Male' }];
+    }
+    if (tentGenderRestriction === 'female_only') {
+      return [{ value: 'Female', label: 'Female' }];
+    }
+    return [
+      { value: 'Male', label: 'Male' },
+      { value: 'Female', label: 'Female' },
+      { value: 'Other', label: 'Other' }
+    ];
+  };
+
+  const availableGenders = getAvailableGenderOptions();
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -96,9 +155,18 @@ export default function AllocateModal({
       return alert('End date cannot be before start date.');
     }
 
+    // Validate gender restriction
+    const selectedGender = form.gender || 'Male';
+    if (tentGenderRestriction === 'male_only' && selectedGender.toLowerCase() !== 'male') {
+      return alert('This tent is restricted to male guests only. Please select Male as the gender.');
+    }
+    if (tentGenderRestriction === 'female_only' && selectedGender.toLowerCase() !== 'female') {
+      return alert('This tent is restricted to female guests only. Please select Female as the gender.');
+    }
+
     const payload = {
       ...form,
-      gender: form.gender || 'Male'
+      gender: selectedGender
     };
 
     onSave(payload);
@@ -148,6 +216,16 @@ export default function AllocateModal({
           </div>
         </div>
 
+        {/* Tent Gender Restriction Info */}
+        <div className={`mb-4 p-3 rounded-lg border ${genderInfo.bgColor} ${genderInfo.borderColor}`}>
+          <div className={`text-sm ${genderInfo.textColor}`}>
+            <div className="font-medium flex items-center gap-2">
+              <span className="text-lg">{genderInfo.icon}</span>
+              {genderInfo.text}
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className="mb-1 block text-sm font-medium text-gray-700">Name*</label>
@@ -180,10 +258,13 @@ export default function AllocateModal({
               disabled={pending}
               className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-              <option value="Other">Other</option>
+              {availableGenders.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
+            {tentGenderRestriction !== 'both' && (
+              <p className="text-xs text-gray-500 mt-1">Limited by tent restriction</p>
+            )}
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Start date*</label>

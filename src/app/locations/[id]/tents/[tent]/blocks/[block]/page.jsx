@@ -1,33 +1,44 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { use, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import BedGrid from '@/components/BedGrid';
 import AllocateModal from '@/components/AllocateModal';
+import BulkAllocateModal from '@/components/BulkAllocateModal';
 import Notification from '@/components/Notification';
 import { BedGridSkeleton, StatCardSkeleton, HeaderSkeleton } from '@/components/Skeleton';
 import {
   fetchBlockDetail,
+  fetchTentBlocks,
   allocateBed,
   editAllocation,
   deallocateBed,
+  bulkAllocateBeds,
 } from '@/lib/api';
 
 export default function BlockBedsPage({ params }) {
-  const { id, tent, block } = params;
+  const { id, tent, block } = use(params);
   const [meta, setMeta] = useState(null); // { location, tent, block }
+  const [tentInfo, setTentInfo] = useState(null); // tent details including gender restriction
   const [bedsState, setBedsState] = useState(null); // { capacity, beds:{} }
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [modal, setModal] = useState({ open: false, bedNumber: null, data: null });
+  const [bulkModal, setBulkModal] = useState(false);
   const [pending, setPending] = useState(false);
   const [notification, setNotification] = useState(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetchBlockDetail(id, Number(tent), Number(block));
-        setMeta(res.meta);
-        setBedsState({ capacity: res.blockSize, beds: res.beds });
+        // Fetch block detail
+        const blockRes = await fetchBlockDetail(id, Number(tent), Number(block));
+        setMeta(blockRes.meta);
+        setBedsState({ capacity: blockRes.blockSize, beds: blockRes.beds });
+        
+        // Fetch tent data to get gender restriction
+        const tentRes = await fetchTentBlocks(id, Number(tent));
+        console.log('Tent data fetched:', tentRes);
+        setTentInfo(tentRes.tent);
       } catch (e) {
         setErr(e.message);
       } finally {
@@ -128,12 +139,51 @@ export default function BlockBedsPage({ params }) {
       setModal({ open: false, bedNumber: null, data: null });
     } catch (e) {
       // Revert optimistic update on error
-      setBedsState((s) => ({ ...s, beds: { ...s.beds, [n]: originalData } }));
+      setBedsState((s) => ({ ...s, beds: { ...s, beds, [n]: originalData } }));
       
       const errorMessage = e.message || 'Failed to deallocate bed';
       showNotification('error', errorMessage);
     } finally {
       setPending(false);
+    }
+  }
+
+  async function handleBulkBooking(formData) {
+    const { name, phone, maleCount, femaleCount, startDate, endDate } = formData;
+    
+    try {
+      const result = await bulkAllocateBeds(id, Number(tent), Number(block), {
+        name,
+        phone: phone || null,
+        maleCount,
+        femaleCount,
+        startDate,
+        endDate,
+      });
+
+      // Update local state with successful allocations
+      if (result.success && result.success.length > 0) {
+        setBedsState((s) => {
+          const updatedBeds = { ...s.beds };
+          result.success.forEach(booking => {
+            updatedBeds[booking.bedNumber] = {
+              name,
+              phone,
+              gender: booking.gender,
+              startDate,
+              endDate,
+            };
+          });
+          return { ...s, beds: updatedBeds };
+        });
+      }
+
+      return result;
+    } catch (e) {
+      return {
+        success: [],
+        errors: [{ message: e.message || 'Failed to bulk allocate beds' }]
+      };
     }
   }
 
@@ -172,10 +222,36 @@ export default function BlockBedsPage({ params }) {
               Back to Tent {meta.tent.index}
             </Link>
           </nav>
-          <h2 className="text-3xl font-bold text-white mb-2 bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
+          <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
             {meta.location.name} | Tent {meta.tent.index} | Block {meta.block.index}
           </h2>
-          <p className="text-purple-200/80">{stats.totalCapacity} beds • {stats.totalAllocated} occupied • {stats.totalNotAllocated} available</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <p className="text-purple-200/80">{stats.totalCapacity} beds • {stats.totalAllocated} occupied • {stats.totalNotAllocated} available</p>
+              {tentInfo?.genderRestriction && (
+                <div className={`px-3 py-1.5 rounded-full text-sm font-semibold border ${
+                  tentInfo.genderRestriction === 'male_only' ? 'text-blue-200 bg-blue-600/40 border-blue-400/50' :
+                  tentInfo.genderRestriction === 'female_only' ? 'text-pink-200 bg-pink-600/40 border-pink-400/50' :
+                  'text-green-200 bg-green-600/40 border-green-400/50'
+                }`}>
+                  {
+                    tentInfo.genderRestriction === 'male_only' ? '♂️ Male Only' :
+                    tentInfo.genderRestriction === 'female_only' ? '♀️ Female Only' :
+                    '👫 All Genders'
+                  }
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setBulkModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Bulk Book Beds
+            </button>
+          </div>
         </div>
       </section>
 
@@ -248,6 +324,14 @@ export default function BlockBedsPage({ params }) {
         onSave={handleSave}
         onDelete={handleDelete}
         pending={pending}
+        tentGenderRestriction={tentInfo?.genderRestriction || 'both'}
+      />
+
+      <BulkAllocateModal
+        open={bulkModal}
+        onClose={() => setBulkModal(false)}
+        tentGenderRestriction={tentInfo?.genderRestriction || 'both'}
+        onSave={handleBulkBooking}
       />
 
       <Notification 

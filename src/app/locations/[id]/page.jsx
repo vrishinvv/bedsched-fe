@@ -1,12 +1,12 @@
 'use client';
-import { useEffect, useState, useMemo } from 'react';
+import { use, useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import TentCard from '@/components/TentCard';
 import { CardSkeleton, StatCardSkeleton, HeaderSkeleton } from '@/components/Skeleton';
 import { fetchLocationTents } from '@/lib/api';
 
 export default function LocationTentsPage({ params }) {
-  const { id } = params; // location id
+  const { id } = use(params); // location id
   const [data, setData] = useState(null);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(true);
@@ -75,7 +75,7 @@ export default function LocationTentsPage({ params }) {
               Back to Locations
             </Link>
           </nav>
-          <h2 className="text-3xl font-bold text-white mb-2 bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
+          <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
             {location.name}
           </h2>
           <p className="text-purple-200/80">Managing {tents.length} tent{tents.length !== 1 ? 's' : ''} • {stats.totalCapacity} total beds</p>

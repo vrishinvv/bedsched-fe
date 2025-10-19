@@ -1,12 +1,12 @@
 'use client';
-import { useEffect, useState, useMemo } from 'react';
+import { use, useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import BlockCard from '@/components/BlockCard';
 import { CardSkeleton, StatCardSkeleton, HeaderSkeleton } from '@/components/Skeleton';
 import { fetchTentBlocks } from '@/lib/api';
 
 export default function TentBlocksPage({ params }) {
-  const { id, tent } = params; // location id, tent index (1-based)
+  const { id, tent } = use(params); // location id, tent index (1-based)
   const [data, setData] = useState(null);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(true);
@@ -75,10 +75,25 @@ export default function TentBlocksPage({ params }) {
               Back to {location.name}
             </Link>
           </nav>
-          <h2 className="text-3xl font-bold text-white mb-2 bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
+          <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
             {location.name} | Tent {tentMeta.index}
           </h2>
-          <p className="text-purple-200/80">Managing {blocks.length} block{blocks.length !== 1 ? 's' : ''} • {stats.totalCapacity} total beds</p>
+          <div className="flex items-center gap-4">
+            <p className="text-purple-200/80">Managing {blocks.length} block{blocks.length !== 1 ? 's' : ''} • {stats.totalCapacity} total beds</p>
+            {tentMeta?.genderRestriction && (
+              <div className={`px-3 py-1.5 rounded-full text-sm font-semibold border ${
+                tentMeta.genderRestriction === 'male_only' ? 'text-blue-200 bg-blue-600/40 border-blue-400/50' :
+                tentMeta.genderRestriction === 'female_only' ? 'text-pink-200 bg-pink-600/40 border-pink-400/50' :
+                'text-green-200 bg-green-600/40 border-green-400/50'
+              }`}>
+                {
+                  tentMeta.genderRestriction === 'male_only' ? '♂️ Male Only' :
+                  tentMeta.genderRestriction === 'female_only' ? '♀️ Female Only' :
+                  '👫 All Genders'
+                }
+              </div>
+            )}
+          </div>
         </div>
       </section>
 

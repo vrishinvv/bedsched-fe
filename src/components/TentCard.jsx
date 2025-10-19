@@ -1,8 +1,14 @@
 'use client';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import StatPill from './StatPill';
+import { updateTent } from '@/lib/api';
 
 export default function TentCard({ locationId, tent }) {
+  const router = useRouter();
+  const [genderRestriction, setGenderRestriction] = useState(tent.genderRestriction || 'both');
+  const [isUpdating, setIsUpdating] = useState(false);
+  
   const pct = tent.size ? Math.round((tent.allocated / tent.size) * 100) : 0;
 
   // Dynamic color based on occupancy
@@ -34,15 +40,103 @@ export default function TentCard({ locationId, tent }) {
     return 'text-emerald-700 bg-emerald-100';
   };
 
+  const getGenderIcon = () => {
+    switch (genderRestriction) {
+      case 'male_only':
+        return '♂️';
+      case 'female_only':
+        return '♀️';
+      case 'both':
+      default:
+        return '👫';
+    }
+  };
+
+  const getGenderText = () => {
+    switch (genderRestriction) {
+      case 'male_only':
+        return 'Male Only';
+      case 'female_only':
+        return 'Female Only';
+      case 'both':
+      default:
+        return 'All Genders';
+    }
+  };
+
+  const getGenderColor = () => {
+    switch (genderRestriction) {
+      case 'male_only':
+        return 'text-blue-700 bg-blue-100';
+      case 'female_only':
+        return 'text-pink-700 bg-pink-100';
+      case 'both':
+      default:
+        return 'text-green-700 bg-green-100';
+    }
+  };
+
+  const handleGenderChange = async (newRestriction) => {
+    if (newRestriction === genderRestriction || isUpdating) return;
+
+    setIsUpdating(true);
+    try {
+      await updateTent(locationId, tent.index, {
+        genderRestriction: newRestriction,
+      });
+      setGenderRestriction(newRestriction);
+    } catch (error) {
+      console.error('Error updating tent:', error);
+      
+      // Check if it's a conflict error with existing bookings
+      if (error.response?.data?.error === 'existing_bookings_conflict') {
+        const message = error.response.data.message || 
+          'Cannot change gender restriction due to existing bookings that would violate the new restriction. Please contact the application developer if you need to make this change.';
+        alert(message);
+      } else {
+        alert(`Failed to update tent: ${error.message || 'Unknown error'}`);
+      }
+      
+      // Reset the dropdown to the current value
+      setGenderRestriction(genderRestriction);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleCardClick = () => {
+    router.push(`/locations/${locationId}/tents/${tent.index}`);
+  };
+
   return (
-    <Link href={`/locations/${locationId}/tents/${tent.index}`} className="block group">
-      <div className={`relative overflow-hidden rounded-2xl border-2 ${getOccupancyBgColor()} p-6 shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1`}>
+    <div className="block group">
+      <div 
+        onClick={handleCardClick}
+        className={`relative overflow-hidden rounded-2xl border-2 ${getOccupancyBgColor()} p-6 shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1 cursor-pointer`}
+      >
         {/* Decorative gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-br from-white/50 to-transparent pointer-events-none" />
         
-        {/* Status badge */}
-        <div className="absolute top-4 right-4">
-          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${getStatusColor()}`}>
+        {/* Status badges */}
+        <div className="absolute top-4 right-4 flex flex-row gap-2 items-center">
+          {/* Gender restriction dropdown */}
+          <div 
+            className="relative z-10" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            <select
+              value={genderRestriction}
+              onChange={(e) => handleGenderChange(e.target.value)}
+              disabled={isUpdating}
+              className={`px-2.5 py-1 rounded-full text-xs font-semibold border-0 cursor-pointer min-w-fit ${getGenderColor()} ${isUpdating ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80'} focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-400`}
+            >
+              <option value="both">👫 All</option>
+              <option value="male_only">♂️ Male</option>
+              <option value="female_only">♀️ Female</option>
+            </select>
+          </div>
+          
+          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${getStatusColor()} min-w-fit`}>
             {getStatusText()}
           </span>
         </div>
@@ -50,6 +144,10 @@ export default function TentCard({ locationId, tent }) {
         {/* Header */}
         <div className="relative mb-4">
           <h3 className="text-xl font-bold text-gray-900 mb-1 pr-20">Tent {tent.index}</h3>
+          <div className="flex items-center gap-2">
+            {/* <span className="text-lg">{getGenderIcon()}</span> */}
+            {/* <span className="text-sm text-gray-600">{getGenderText()}</span> */}
+          </div>
         </div>
 
         {/* Main stats */}
@@ -98,6 +196,6 @@ export default function TentCard({ locationId, tent }) {
         {/* Hover effect overlay */}
         <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-transparent to-gray-900/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
       </div>
-    </Link>
+    </div>
   );
 }

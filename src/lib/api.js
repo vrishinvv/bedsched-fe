@@ -14,12 +14,28 @@ async function handle(res, fallbackMsg) {
     }
   }
   // Try to surface server-provided error details
+  let errorData = null;
   let msg = fallbackMsg;
   try {
     const text = await res.text();
-    msg = text || fallbackMsg;
+    // Try to parse as JSON first
+    try {
+      errorData = JSON.parse(text);
+      msg = errorData.message || errorData.error || text || fallbackMsg;
+    } catch {
+      msg = text || fallbackMsg;
+    }
   } catch {}
-  throw new Error(msg);
+  
+  // Create error with response data attached
+  const error = new Error(msg);
+  if (errorData) {
+    error.response = {
+      status: res.status,
+      data: errorData
+    };
+  }
+  throw error;
 }
 
 /**
@@ -95,6 +111,18 @@ export async function fetchTentBlocks(locationId, tentIndex) {
 }
 
 /**
+ * Update tent settings (gender restriction)
+ */
+export async function updateTent(locationId, tentIndex, payload) {
+  const res = await fetch(`${API_BASE_URL}/api/locations/${locationId}/tents/${tentIndex}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return handle(res, 'Failed to update tent');
+}
+
+/**
  * Fetch block detail with bed information
  */
 export async function fetchBlockDetail(locationId, tentIndex, blockIndex) {
@@ -149,4 +177,16 @@ export async function deallocateBed(locationId, tentIndex, blockIndex, bedNumber
     method: 'DELETE',
   });
   return handle(res, 'Failed to deallocate bed');
+}
+
+/**
+ * Bulk allocate beds
+ */
+export async function bulkAllocateBeds(locationId, tentIndex, blockIndex, payload) {
+  const res = await fetch(`${API_BASE_URL}/api/locations/${locationId}/tents/${tentIndex}/blocks/${blockIndex}/beds/bulk-allocate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return handle(res, 'Failed to bulk allocate beds');
 }
