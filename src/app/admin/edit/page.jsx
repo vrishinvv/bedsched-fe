@@ -1,12 +1,12 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { searchAllocationsByPhone, updatePhoneByPhone, updateContactNameByPhone, updateEndDateByPhone, deallocateByPhone } from "@/lib/api";
 import Notification from "@/components/Notification";
 import { TreeSkeleton } from '@/components/Skeleton';
 
-export default function EditByPhonePage() {
+function EditByPhoneContent() {
   const sp = useSearchParams();
   const [phone, setPhone] = useState(sp.get('phone') || '');
   const [newPhone, setNewPhone] = useState('');
@@ -524,5 +524,13 @@ export default function EditByPhonePage() {
       
       <Notification notification={notification} onClose={() => setNotification(null)} />
     </div>
+  );
+}
+
+export default function EditByPhonePage() {
+  return (
+    <Suspense fallback={<div className="text-center py-12 text-gray-400">Loading...</div>}>
+      <EditByPhoneContent />
+    </Suspense>
   );
 }
