@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { searchAllocationsByPhone, confirmAllocations } from '@/lib/api';
@@ -7,7 +7,7 @@ import Notification from '@/components/Notification';
 import SearchResultCard from '@/components/SearchResultCard';
 import { TreeSkeleton } from '@/components/Skeleton';
 
-export default function AdminConfirmPage() {
+function AdminConfirmContent() {
   const params = useSearchParams();
   const router = useRouter();
   const [phone, setPhone] = useState('');
@@ -201,5 +201,13 @@ export default function AdminConfirmPage() {
 
       <Notification notification={note} onClose={()=>setNote(null)} />
     </main>
+  );
+}
+
+export default function AdminConfirmPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-12 text-gray-400">Loading...</div>}>
+      <AdminConfirmContent />
+    </Suspense>
   );
 }
