@@ -56,20 +56,20 @@ function ReservedActiveContent() {
   }, [filteredItems]);
 
   return (
-    <div className="p-4 max-w-5xl mx-auto">
-      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-900/20 via-purple-900/20 to-fuchsia-900/20 border border-indigo-500/20 p-6 mb-6">
-        <div className="relative flex items-end justify-between gap-4 flex-wrap">
+    <div className="p-3 sm:p-4 max-w-5xl mx-auto">
+      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-900/20 via-purple-900/20 to-fuchsia-900/20 border border-indigo-500/20 p-4 sm:p-6 mb-6">
+        <div className="relative flex items-end justify-between gap-3 sm:gap-4 flex-wrap">
           <div>
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex items-center gap-2 sm:gap-3 mb-2">
               <Link href="/" className="inline-flex items-center gap-2 text-indigo-300 hover:underline">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                 Back
               </Link>
             </div>
-            <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-indigo-300 to-fuchsia-300 bg-clip-text text-transparent">Active Reservations</h2>
-            <p className="text-indigo-200/80">View all currently active reserved seats.</p>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-indigo-300 to-fuchsia-300 bg-clip-text text-transparent">Active Reservations</h2>
+            <p className="text-sm sm:text-base text-indigo-200/80">View all currently active reserved seats.</p>
           </div>
-          <button onClick={load} className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow">Refresh</button>
+          <button onClick={load} className="px-3 sm:px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow touch-manipulation">Refresh</button>
         </div>
       </section>
 

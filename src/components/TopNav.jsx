@@ -1,17 +1,18 @@
-'use client';
+"use client";
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { getMe } from '@/lib/api';
 
 export default function TopNav() {
   const [user, setUser] = useState(null);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
         const res = await getMe();
         setUser(res.user || null);
-      } catch {
+      } catch (e) {
         setUser(null);
       }
     })();
@@ -25,17 +26,78 @@ export default function TopNav() {
 
   return (
     <nav className="text-sm">
-      <ul className="flex items-center gap-2">
-        <li><Link className="px-3 py-1.5 rounded-md text-gray-300 hover:text-white hover:bg-white/10 transition-colors" href="/">Dashboard</Link></li>
-        {isAdmin && (
-          <>
-            <li><Link className="px-3 py-1.5 rounded-md text-gray-300 hover:text-white hover:bg-white/10 transition-colors" href="/admin/confirm">Search & Confirm</Link></li>
-            <li><Link className="px-3 py-1.5 rounded-md text-gray-300 hover:text-white hover:bg-white/10 transition-colors" href="/admin/edit">Edit</Link></li>
-            <li><Link className="px-3 py-1.5 rounded-md text-gray-300 hover:text-white hover:bg-white/10 transition-colors" href="/admin/reserved">Active Reservations</Link></li>
-            <li><Link className="px-3 py-1.5 rounded-md text-gray-300 hover:text-white hover:bg-white/10 transition-colors" href="/admin/departures">Departures</Link></li>
-          </>
-        )}
-      </ul>
+      {/* Hamburger button */}
+      <button
+        aria-label="Open menu"
+        className="inline-flex items-center justify-center w-10 h-10 rounded-md text-gray-300 hover:text-white hover:bg-white/10 transition-colors touch-manipulation"
+        onClick={() => setOpen(true)}
+      >
+        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M4 12h16M4 17h16" />
+        </svg>
+      </button>
+
+      {/* Overlay */}
+      {open && (
+        <div className="fixed inset-0 z-40" aria-hidden="true">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
+        </div>
+      )}
+
+      {/* Side drawer */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        className={`fixed right-0 top-0 z-50 h-full w-72 max-w-[85vw] bg-gray-900/95 backdrop-blur border-l border-white/10 transform transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+          <div className="text-base font-semibold text-white">Menu</div>
+          <button
+            aria-label="Close menu"
+            className="inline-flex items-center justify-center w-9 h-9 rounded-md text-gray-300 hover:text-white hover:bg-white/10 transition-colors"
+            onClick={() => setOpen(false)}
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="px-2 py-2 pb-safe">
+          <ul className="space-y-1">
+            <li>
+              <Link onClick={() => setOpen(false)} href="/" className="block px-3 py-2 rounded-md text-gray-200 hover:bg-white/10 hover:text-white transition-colors">
+                Dashboard
+              </Link>
+            </li>
+            {isAdmin && (
+              <>
+                <li>
+                  <Link onClick={() => setOpen(false)} href="/admin/confirm" className="block px-3 py-2 rounded-md text-gray-200 hover:bg-white/10 hover:text-white transition-colors">
+                    Search & Confirm
+                  </Link>
+                </li>
+                <li>
+                  <Link onClick={() => setOpen(false)} href="/admin/edit" className="block px-3 py-2 rounded-md text-gray-200 hover:bg-white/10 hover:text-white transition-colors">
+                    Edit
+                  </Link>
+                </li>
+                <li>
+                  <Link onClick={() => setOpen(false)} href="/admin/reserved" className="block px-3 py-2 rounded-md text-gray-200 hover:bg-white/10 hover:text-white transition-colors">
+                    Active Reservations
+                  </Link>
+                </li>
+                <li>
+                  <Link onClick={() => setOpen(false)} href="/admin/departures" className="block px-3 py-2 rounded-md text-gray-200 hover:bg-white/10 hover:text-white transition-colors">
+                    Departures
+                  </Link>
+                </li>
+              </>
+            )}
+          </ul>
+        </div>
+      </div>
     </nav>
   );
+
 }

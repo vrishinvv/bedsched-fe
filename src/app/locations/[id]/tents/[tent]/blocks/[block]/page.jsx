@@ -89,13 +89,31 @@ export default function BlockBedsPage({ params }) {
     const isEdit = Boolean(modal.data);
     try {
       setPending(true);
-      setBedsState((s) => ({ ...s, beds: { ...s.beds, [n]: payload } }));
+      // Optimistic update: ensure status present so stats rerender correctly
+      setBedsState((s) => ({ 
+        ...s, 
+        beds: { 
+          ...s.beds, 
+          [n]: { 
+            ...(s.beds?.[n] || {}),
+            ...payload,
+            status: isEdit ? (s.beds?.[n]?.status || 'confirmed') : 'confirmed'
+          } 
+        } 
+      }));
       
       if (isEdit) {
-        await editAllocation(id, Number(tent), Number(block), n, payload);
+        const updated = await editAllocation(id, Number(tent), Number(block), n, payload);
+        // If API returns authoritative allocation, sync it (fallback to optimistic if not)
+        if (updated && typeof updated === 'object') {
+          setBedsState((s) => ({ ...s, beds: { ...s.beds, [n]: { ...s.beds?.[n], ...updated, status: updated.status || (s.beds?.[n]?.status || 'confirmed') } } }));
+        }
         showNotification('success', `Bed ${n} allocation updated successfully for ${payload.name}`);
       } else {
-        await allocateBed(id, Number(tent), Number(block), n, payload);
+        const created = await allocateBed(id, Number(tent), Number(block), n, payload);
+        if (created && typeof created === 'object') {
+          setBedsState((s) => ({ ...s, beds: { ...s.beds, [n]: { ...s.beds?.[n], ...created, status: created.status || 'confirmed' } } }));
+        }
         showNotification('success', `Bed ${n} allocated successfully to ${payload.name}`);
       }
       
@@ -172,6 +190,7 @@ export default function BlockBedsPage({ params }) {
               gender: booking.gender,
               startDate,
               endDate,
+              status: 'confirmed'
             };
           });
           return { ...s, beds: updatedBeds };
@@ -209,25 +228,25 @@ export default function BlockBedsPage({ params }) {
   if (err) return <div className="text-red-400">{err}</div>;
 
   return (
-    <main className="space-y-5">
+    <main className="space-y-5 p-3 sm:p-4">
       {/* Enhanced Header with Purple Breadcrumb */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-purple-900/20 via-purple-800/20 to-indigo-900/20 border border-purple-500/20 p-6">
+      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-purple-900/20 via-purple-800/20 to-indigo-900/20 border border-purple-500/20 p-4 sm:p-6">
         <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
         <div className="relative">
           <nav className="mb-3">
-            <Link href={`/locations/${meta.location.id}/tents/${meta.tent.index}`} className="inline-flex items-center text-sm text-purple-300/80 hover:text-purple-200 transition-colors">
-              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <Link href={`/locations/${meta.location.id}/tents/${meta.tent.index}`} className="inline-flex items-center text-xs sm:text-sm text-purple-300/80 hover:text-purple-200 transition-colors">
+              <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
               Back to Tent {meta.tent.index}
             </Link>
           </nav>
-          <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
+          <h2 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
             {meta.location.name} | Tent {meta.tent.index} | Block {meta.block.index}
           </h2>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <p className="text-purple-200/80">{stats.totalCapacity} beds • {stats.totalAllocated} occupied • {stats.totalNotAllocated} available • {stats.reservedCount} reserved</p>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <p className="text-xs sm:text-sm text-purple-200/80">{stats.totalCapacity} beds • {stats.totalAllocated} occupied • {stats.totalNotAllocated} available • {stats.totalReserved} reserved</p>
               <div className={`px-3 py-1.5 rounded-full text-sm font-semibold border ${
                 genderRestriction === 'male_only' ? 'text-blue-200 bg-blue-600/40 border-blue-400/50' :
                 genderRestriction === 'female_only' ? 'text-pink-200 bg-pink-600/40 border-pink-400/50' :
@@ -236,7 +255,7 @@ export default function BlockBedsPage({ params }) {
                 {genderRestriction === 'male_only' ? '♂️ Male Only' : genderRestriction === 'female_only' ? '♀️ Female Only' : '👫 All Genders'}
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <div className="relative">
                 <select
                   value={genderRestriction}
@@ -267,7 +286,7 @@ export default function BlockBedsPage({ params }) {
               </div>
               <button
                 onClick={() => setBulkModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium transition-colors"
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium transition-colors touch-manipulation"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -280,7 +299,7 @@ export default function BlockBedsPage({ params }) {
       </section>
 
       {/* Enhanced Dashboard */}
-      <section className="grid grid-cols-2 gap-4 md:grid-cols-5">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-5">
         <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/10 via-blue-500/10 to-cyan-500/10 border border-blue-500/20 p-5 backdrop-blur-sm transition-all duration-300 hover:scale-105">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-400/5 to-transparent pointer-events-none" />
           <div className="relative">

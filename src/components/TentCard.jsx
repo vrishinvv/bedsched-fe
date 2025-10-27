@@ -46,7 +46,7 @@ export default function TentCard({ locationId, tent }) {
     <div className="block group">
       <div 
         onClick={handleCardClick}
-        className={`relative overflow-hidden rounded-2xl border-2 ${getOccupancyBgColor()} p-6 shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1 cursor-pointer`}
+        className={`relative overflow-hidden rounded-2xl border-2 ${getOccupancyBgColor()} p-4 sm:p-6 shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1 cursor-pointer`}
       >
         {/* Decorative gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-br from-white/50 to-transparent pointer-events-none" />
@@ -60,15 +60,15 @@ export default function TentCard({ locationId, tent }) {
 
         {/* Header */}
         <div className="relative mb-4">
-          <h3 className="text-xl font-bold text-gray-900 mb-1 pr-20">Tent {tent.index}</h3>
+          <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 pr-20">Tent {tent.index}</h3>
           <div className="flex items-center gap-2" />
         </div>
 
         {/* Main stats */}
         <div className="relative mb-6">
           <div className="flex items-end gap-1 mb-2">
-            <span className="text-3xl font-bold text-gray-900">{tent.allocated}</span>
-            <span className="text-lg text-gray-500 mb-1">/ {tent.size}</span>
+            <span className="text-2xl sm:text-3xl font-bold text-gray-900">{tent.allocated}</span>
+            <span className="text-sm sm:text-lg text-gray-500 mb-1">/ {tent.size}</span>
           </div>
         </div>
 
@@ -88,11 +88,11 @@ export default function TentCard({ locationId, tent }) {
 
         {/* Bottom stats */}
         <div className="relative flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {tent.freeingTomorrow > 0 && (
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-xs sm:text-sm font-medium text-gray-700">
                   {tent.freeingTomorrow} freeing tomorrow
                 </span>
               </div>
@@ -100,7 +100,7 @@ export default function TentCard({ locationId, tent }) {
             {typeof tent.reserved === 'number' && tent.reserved > 0 && (
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-xs sm:text-sm font-medium text-gray-700">
                   {tent.reserved} reserved
                 </span>
               </div>

@@ -136,12 +136,23 @@ export default function AllocateModal({
 
   function handleChange(e) {
     const { name, value } = e.target;
+    // Sanitize phone: digits only, max 10
+    if (name === 'phone') {
+      const digits = value.replace(/\D/g, '').slice(0, 10);
+      setForm((f) => ({ ...f, phone: digits }));
+      return;
+    }
     setForm((f) => ({ ...f, [name]: value }));
   }
 
   function handleSave() {
-    if (!form.name || !form.startDate || !form.endDate) {
-      return alert('Name, start & end dates are required');
+    if (!form.name || !form.startDate || !form.endDate || !form.phone) {
+      return alert('Name, phone, start & end dates are required');
+    }
+
+    // Validate phone: exactly 10 digits
+    if (!/^\d{10}$/.test(form.phone)) {
+      return alert('Please enter a valid 10-digit phone number.');
     }
 
     const today = getTodayDate();
@@ -180,10 +191,26 @@ export default function AllocateModal({
 
   const todayDate = getTodayDate();
 
+  // Prepare validation errors for disabled state explanation
+  const validationErrors = (() => {
+    const errs = [];
+    if (!form.name || !form.name.trim()) errs.push('Name is required');
+    if (!/^\d{10}$/.test(form.phone)) errs.push('Enter a valid 10-digit phone number');
+    if (!form.startDate) errs.push('Start date is required');
+    if (!form.endDate) errs.push('End date is required');
+    if (form.endDate && form.endDate < todayDate) errs.push('End date must be today or later');
+    if (form.startDate && form.endDate && form.endDate < form.startDate) errs.push('End date cannot be before start date');
+    const selectedGender = form.gender || 'Male';
+    if (genderRestriction === 'male_only' && selectedGender.toLowerCase() !== 'male') errs.push('This tent is restricted to male guests only');
+    if (genderRestriction === 'female_only' && selectedGender.toLowerCase() !== 'female') errs.push('This tent is restricted to female guests only');
+    return errs;
+  })();
+  const canSave = validationErrors.length === 0 && !pending;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={!pending ? onClose : undefined} />
-      <div ref={ref} className="relative w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl">
+      <div ref={ref} className="relative w-full h-full sm:h-auto sm:max-w-lg rounded-none sm:rounded-2xl bg-white p-4 sm:p-5 shadow-xl overflow-y-auto">
         {/* Enhanced loading overlay with skeleton */}
         {pending && (
           <div className="absolute inset-0 bg-white/95 rounded-2xl flex flex-col items-center justify-center z-10 p-8">
@@ -210,7 +237,7 @@ export default function AllocateModal({
           </div>
         )}
 
-        <h3 className="mb-4 text-lg font-semibold text-gray-900">
+        <h3 className="mb-4 text-base sm:text-lg font-semibold text-gray-900">
           {isEdit ? `Edit allocation — Bed ${bedNumber}` : `Allocate bed — Bed ${bedNumber}`}
         </h3>
         
@@ -245,14 +272,18 @@ export default function AllocateModal({
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Phone</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Phone*</label>
             <input 
               name="phone" 
               value={form.phone} 
               onChange={handleChange} 
               disabled={pending}
+              type="tel"
+              inputMode="numeric"
+              pattern="\\d{10}"
+              maxLength={10}
               className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
-              placeholder="Optional" 
+              placeholder="10-digit phone" 
             />
           </div>
           <div>
@@ -299,7 +330,15 @@ export default function AllocateModal({
           </div>
         </div>
         
-        <div className="mt-5 flex items-center justify-between">
+        <div className="mt-5 sticky bottom-0 bg-white pt-3 pb-3 flex items-center justify-between border-t">
+          {!canSave && (
+            <div className="text-xs text-red-600 space-y-1">
+              <div className="font-medium">Can’t save yet:</div>
+              <ul className="list-disc pl-4">
+                {validationErrors.map((e, i) => (<li key={i}>{e}</li>))}
+              </ul>
+            </div>
+          )}
           {isEdit ? (
             <button 
               onClick={onDelete} 
@@ -319,7 +358,8 @@ export default function AllocateModal({
             </button>
             <button 
               onClick={handleSave} 
-              disabled={pending}
+              disabled={!canSave}
+              title={!canSave ? validationErrors[0] : undefined}
               className="rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {pending && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}

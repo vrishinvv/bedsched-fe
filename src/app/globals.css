@@ -3,3 +3,11 @@
 body {
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Mobile helper utilities */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+:root { --safe-bottom: env(safe-area-inset-bottom); --safe-top: env(safe-area-inset-top); }
+.pb-safe { padding-bottom: var(--safe-bottom); }
+.pt-safe { padding-top: var(--safe-top); }

@@ -69,6 +69,11 @@ export default function BulkAllocateModal({
 
   function handleChange(e) {
     const { name, value } = e.target;
+    if (name === 'phone') {
+      const digits = value.replace(/\D/g, '').slice(0, 10);
+      setForm((f) => ({ ...f, phone: digits }));
+      return;
+    }
     setForm((f) => ({ ...f, [name]: value }));
   }
 
@@ -78,8 +83,12 @@ export default function BulkAllocateModal({
   }
 
   async function handleSave() {
-    if (!form.name || !form.startDate || !form.endDate) {
-      return alert('Name, start & end dates are required');
+    if (!form.name || !form.startDate || !form.endDate || !form.phone) {
+      return alert('Name, phone, start & end dates are required');
+    }
+
+    if (!/^\d{10}$/.test(form.phone)) {
+      return alert('Please enter a valid 10-digit phone number.');
     }
 
     const today = getTodayDate();
@@ -119,15 +128,30 @@ export default function BulkAllocateModal({
 
   const todayDate = getTodayDate();
 
+  // Explain disabled state and pre-validate inputs
+  const validationErrors = (() => {
+    const errs = [];
+    if (!form.name || !form.name.trim()) errs.push('Name is required');
+    if (!/^\d{10}$/.test(form.phone)) errs.push('Enter a valid 10-digit phone number');
+    if (!form.startDate) errs.push('Start date is required');
+    if (!form.endDate) errs.push('End date is required');
+    if (form.endDate && form.endDate < todayDate) errs.push('End date must be today or later');
+    if (form.startDate && form.endDate && form.endDate < form.startDate) errs.push('End date cannot be before start date');
+    const totalCount = (isMixed ? (form.maleCount + form.femaleCount) : (isMaleOnly ? form.maleCount : form.femaleCount));
+    if (totalCount <= 0) errs.push('Specify at least 1 person to book');
+    return errs;
+  })();
+  const canBook = validationErrors.length === 0 && !pending && !result;
+
   // Show results
   if (result) {
     const hasSuccess = result.success && result.success.length > 0;
     const hasErrors = result.errors && result.errors.length > 0;
     
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center">
         <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-        <div ref={ref} className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl max-h-[80vh] overflow-y-auto">
+        <div ref={ref} className="relative w-full h-full sm:h-auto sm:max-w-lg rounded-none sm:rounded-2xl bg-white p-4 sm:p-6 shadow-xl overflow-y-auto">
           <h3 className="mb-4 text-xl font-semibold text-gray-900">
             Booking Results
           </h3>
@@ -170,7 +194,7 @@ export default function BulkAllocateModal({
             </div>
           )}
 
-          <div className="flex justify-end">
+          <div className="sticky bottom-0 bg-white pt-3 pb-3 flex justify-end border-t">
             <button 
               onClick={onClose}
               className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black"
@@ -184,9 +208,9 @@ export default function BulkAllocateModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={!pending ? onClose : undefined} />
-      <div ref={ref} className="relative w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl">
+      <div ref={ref} className="relative w-full h-full sm:h-auto sm:max-w-lg rounded-none sm:rounded-2xl bg-white p-4 sm:p-5 shadow-xl overflow-y-auto">
         {/* Loading overlay */}
         {pending && (
           <div className="absolute inset-0 bg-white/95 rounded-2xl flex flex-col items-center justify-center z-10 p-8">
@@ -251,14 +275,18 @@ export default function BulkAllocateModal({
 
           {/* Phone */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Phone</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Phone*</label>
             <input 
               name="phone" 
               value={form.phone} 
               onChange={handleChange} 
               disabled={pending}
+              type="tel"
+              inputMode="numeric"
+              pattern="\\d{10}"
+              maxLength={10}
               className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
-              placeholder="Optional" 
+              placeholder="10-digit phone" 
             />
           </div>
 
@@ -273,6 +301,8 @@ export default function BulkAllocateModal({
                   value={form.maleCount} 
                   onChange={handleNumberChange} 
                   min="0"
+                  step="1"
+                  inputMode="numeric"
                   disabled={pending}
                   className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
                 />
@@ -287,6 +317,8 @@ export default function BulkAllocateModal({
                   value={form.femaleCount} 
                   onChange={handleNumberChange} 
                   min="0"
+                  step="1"
+                  inputMode="numeric"
                   disabled={pending}
                   className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
                 />
@@ -322,7 +354,15 @@ export default function BulkAllocateModal({
           </div>
         </div>
         
-        <div className="mt-5 flex items-center justify-end gap-2">
+        <div className="mt-5 sticky bottom-0 bg-white pt-3 pb-3 flex items-center justify-between gap-2 border-t">
+          {!canBook && !result && (
+            <div className="text-xs text-red-600 space-y-1">
+              <div className="font-medium">Can’t book yet:</div>
+              <ul className="list-disc pl-4">
+                {validationErrors.map((e, i) => (<li key={i}>{e}</li>))}
+              </ul>
+            </div>
+          )}
           <button 
             onClick={onClose} 
             disabled={pending}
@@ -332,7 +372,8 @@ export default function BulkAllocateModal({
           </button>
           <button 
             onClick={handleSave} 
-            disabled={pending}
+            disabled={!canBook}
+            title={!canBook ? validationErrors[0] : undefined}
             className="rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {pending && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}

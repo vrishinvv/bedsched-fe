@@ -57,6 +57,11 @@ function EditByPhoneContent() {
 
   const onUpdatePhone = async (newPhoneValue, allocationIds = null) => {
     if (!newPhoneValue || newPhoneValue === phone) return;
+    // Must be a 10-digit number if provided
+    if (!/^\d{10}$/.test(newPhoneValue)) {
+      setNotification({ type: 'error', message: 'Please enter a valid 10-digit phone number.' });
+      return;
+    }
     const ids = allocationIds !== null ? allocationIds : (selectedIds.size > 0 ? Array.from(selectedIds) : undefined);
     try {
       setLoading(true);
@@ -164,8 +169,14 @@ function EditByPhoneContent() {
     let ids = null;
     if (batchItemIds) {
       const batchSelected = Array.from(selectedIds).filter(id => batchItemIds.includes(id));
-      // If user selected items in this batch, use those. Otherwise, use all batch items.
-      ids = batchSelected.length > 0 ? batchSelected : batchItemIds;
+      if (batchSelected.length === 0) {
+        setNotification({ type: 'error', message: 'Select at least one allocation in this batch to apply changes.' });
+        return;
+      }
+      ids = batchSelected;
+    } else if (selectedIds.size === 0) {
+      setNotification({ type: 'error', message: 'Select at least one allocation to apply changes.' });
+      return;
     }
     
     // Check if any field has a value
@@ -246,18 +257,18 @@ function EditByPhoneContent() {
   }, [data]);
 
   return (
-    <div className="p-4 max-w-5xl mx-auto">
-      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-900/20 via-purple-900/20 to-fuchsia-900/20 border border-indigo-500/20 p-6 mb-6">
-        <div className="relative flex items-end justify-between gap-4 flex-wrap">
+    <div className="p-3 sm:p-4 max-w-5xl mx-auto">
+      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-900/20 via-purple-900/20 to-fuchsia-900/20 border border-indigo-500/20 p-4 sm:p-6 mb-6">
+        <div className="relative flex items-end justify-between gap-3 sm:gap-4 flex-wrap">
           <div>
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex items-center gap-2 sm:gap-3 mb-2">
               <Link href="/" className="inline-flex items-center gap-2 text-indigo-300 hover:underline">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                 Back
               </Link>
             </div>
-            <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-indigo-300 to-fuchsia-300 bg-clip-text text-transparent">Edit by Phone</h2>
-            <p className="text-indigo-200/80">Search and modify allocations by phone number.</p>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-indigo-300 to-fuchsia-300 bg-clip-text text-transparent">Edit by Phone</h2>
+            <p className="text-sm sm:text-base text-indigo-200/80">Search and modify allocations by phone number.</p>
           </div>
         </div>
       </section>
@@ -286,9 +297,12 @@ function EditByPhoneContent() {
               <input 
                 className="w-full px-3 py-2 rounded border border-white/10 bg-black/40 text-white placeholder-gray-400" 
                 type="tel" 
+                inputMode="numeric"
+                pattern="\\d{10}"
+                maxLength={10}
                 value={newPhone} 
-                onChange={(e)=>setNewPhone(e.target.value)}
-                placeholder="+91-XXXXXXXXXX" 
+                onChange={(e)=>setNewPhone(e.target.value.replace(/\D/g, '').slice(0,10))}
+                placeholder="10-digit phone" 
               />
             </div>
             <div>
@@ -492,17 +506,20 @@ function EditByPhoneContent() {
 
                 {/* Action buttons for this batch */}
                 <div className="flex items-center justify-end gap-2">
-                  <button 
-                    className="px-4 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50" 
-                    onClick={() => applyChanges(batchItems.map(it => it.id))} 
-                    disabled={loading}
-                  >
-                    Apply Changes {(() => {
-                      const batchItemIds = batchItems.map(it => it.id);
-                      const selectedInBatch = Array.from(selectedIds).filter(id => batchItemIds.includes(id));
-                      return selectedInBatch.length > 0 ? `(${selectedInBatch.length} selected)` : '';
-                    })()}
-                  </button>
+                  {(() => {
+                    const batchItemIds = batchItems.map(it => it.id);
+                    const selectedInBatch = Array.from(selectedIds).filter(id => batchItemIds.includes(id));
+                    return (
+                      <button 
+                        className="px-4 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50" 
+                        onClick={() => applyChanges(batchItemIds)} 
+                        disabled={loading || selectedInBatch.length === 0}
+                        title={selectedInBatch.length === 0 ? 'Select at least one allocation in this batch' : undefined}
+                      >
+                        Apply Changes {selectedInBatch.length > 0 ? `(${selectedInBatch.length} selected)` : ''}
+                      </button>
+                    );
+                  })()}
                   <button 
                     className="px-3 py-2 rounded border border-red-500/40 text-red-200 hover:bg-red-900/30" 
                     onClick={() => onDeallocate(batchItems.map(it => it.id))} 

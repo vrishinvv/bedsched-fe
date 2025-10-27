@@ -49,14 +49,14 @@ export default function BedGrid({ capacity = 100, beds = {}, onSelect }) {
     };
     
     return (
-        <div className="p-6 bg-gray-800 rounded-2xl shadow-2xl">
+        <div className="p-3 sm:p-6 bg-gray-800 rounded-2xl shadow-2xl">
             {/* Header */}
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
-                    <h3 className="text-xl font-bold text-white">Bed Layout</h3>
-                    <p className="text-sm text-gray-400">Click any bed to allocate or edit (IST timezone)</p>
+                    <h3 className="text-lg sm:text-xl font-bold text-white">Bed Layout</h3>
+                    <p className="text-xs sm:text-sm text-gray-400">Tap any bed to allocate or edit (IST timezone)</p>
                 </div>
-                <div className="flex items-center gap-4 text-xs">
+                <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 text-[11px] sm:text-xs overflow-x-auto no-scrollbar">
                     <div className="flex items-center gap-2">
                         <div className="w-3 h-3 bg-white rounded-full shadow-lg"></div>
                         <span className="text-gray-300">Available</span>
@@ -87,7 +87,7 @@ export default function BedGrid({ capacity = 100, beds = {}, onSelect }) {
             </div>
 
             {/* Bed Grid */}
-            <div className="grid grid-cols-8 gap-3 sm:grid-cols-10 md:grid-cols-12 lg:grid-cols-16 xl:grid-cols-20">
+            <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 lg:grid-cols-16 xl:grid-cols-20 gap-2 sm:gap-3">
                 {items.map((n) => {
                     const allocation = beds?.[n];
                     const status = getBedStatus(allocation);
@@ -151,7 +151,7 @@ export default function BedGrid({ capacity = 100, beds = {}, onSelect }) {
                             key={n}
                             onClick={() => onSelect(n, allocation || null)}
                             className={`
-                                group relative aspect-square w-full rounded-xl text-xs font-bold
+                                group relative aspect-square w-full rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold
                                 shadow-lg transition-all duration-300 ease-out transform cursor-pointer
                                 hover:scale-110 hover:shadow-xl hover:z-10
                                 ${styles.bg} ${styles.shadow}

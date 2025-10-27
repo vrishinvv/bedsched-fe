@@ -87,7 +87,7 @@ export default function Page() {
           <div className="mt-4 flex items-center gap-2 sm:gap-3 flex-wrap">
             <button onClick={()=>setRegOpen(true)} className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium shadow text-sm sm:text-base touch-manipulation">
               <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
-              Register
+              Reserve
             </button>
             {/* {role === 'admin' && (
               <Link href="/admin/confirm" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-900 text-white font-medium shadow">

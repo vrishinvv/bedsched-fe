@@ -39,7 +39,7 @@ export default function LocationCard({ location, isClickable = true }) {
   };
 
   const cardContent = (
-    <div className={`relative overflow-hidden rounded-2xl border-2 ${getOccupancyBgColor()} p-6 shadow-lg transition-all duration-300 ${isClickable ? 'group hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1' : 'opacity-90 cursor-not-allowed'}`}>
+    <div className={`relative overflow-hidden rounded-2xl border-2 ${getOccupancyBgColor()} p-4 sm:p-6 shadow-lg transition-all duration-300 ${isClickable ? 'group hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1' : 'opacity-90 cursor-not-allowed'}`}>
       {/* Decorative gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-white/50 to-transparent pointer-events-none" />
 
@@ -52,14 +52,14 @@ export default function LocationCard({ location, isClickable = true }) {
 
       {/* Header */}
       <div className="relative mb-4">
-        <h3 className="text-xl font-bold text-gray-900 mb-1 pr-20">{location.name}</h3>
+        <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 pr-20">{location.name}</h3>
       </div>
 
       {/* Main stats */}
       <div className="relative mb-6">
         <div className="flex items-end gap-1 mb-2">
-          <span className="text-3xl font-bold text-gray-900">{allocated}</span>
-          <span className="text-lg text-gray-500 mb-1">/ {total}</span>
+          <span className="text-2xl sm:text-3xl font-bold text-gray-900">{allocated}</span>
+          <span className="text-sm sm:text-lg text-gray-500 mb-1">/ {total}</span>
         </div>
       </div>
 
@@ -79,11 +79,11 @@ export default function LocationCard({ location, isClickable = true }) {
 
       {/* Bottom stats */}
       <div className="relative flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {freeingTomorrow > 0 && (
             <div className="flex items-center gap-1">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-sm font-medium text-gray-700">
+              <span className="text-xs sm:text-sm font-medium text-gray-700">
                 {freeingTomorrow} freeing tomorrow
               </span>
             </div>
@@ -91,7 +91,7 @@ export default function LocationCard({ location, isClickable = true }) {
           {reserved > 0 && (
             <div className="flex items-center gap-1">
               <div className="w-2 h-2 bg-blue-500 rounded-full" />
-              <span className="text-sm font-medium text-gray-700">
+              <span className="text-xs sm:text-sm font-medium text-gray-700">
                 {reserved} reserved
               </span>
             </div>

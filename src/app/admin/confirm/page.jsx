@@ -189,7 +189,6 @@ function AdminConfirmContent() {
                   onToggleSelect={toggleItem}
                 />
                 <div className="flex items-center justify-end gap-2">
-                  <button onClick={()=>doConfirm(b.batchId)} disabled={loading || !b.batchId} className="px-3 py-2 rounded-md bg-emerald-600 text-white text-sm hover:bg-emerald-700 disabled:opacity-50">Confirm All</button>
                   <button onClick={()=>doConfirm(b.batchId, batchSelectedIds)} disabled={loading || !b.batchId || batchSelectedIds.length === 0} className="px-3 py-2 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-50">Confirm Selected ({batchSelectedIds.length})</button>
                 </div>
               </div>

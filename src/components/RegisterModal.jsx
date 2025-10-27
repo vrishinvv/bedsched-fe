@@ -17,6 +17,8 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
   const [confirmCtx, setConfirmCtx] = useState(null); // { type: 'mixed-blocks'|'split', preview: [...] }
   const [result, setResult] = useState(null); // store reservation result for summary
 
+  const getTodayIST = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
   // Reset modal state on reopen so it doesn't retain old state
   useEffect(() => {
     if (open) {
@@ -47,12 +49,30 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
     try {
       setPending(true);
       setResult(null);
+      // Basic validations
+      if (!/^\d{10}$/.test(form.phone)) {
+        show('error', 'Please enter a valid 10-digit phone number.');
+        return;
+      }
+      if (!form.startDate || !form.endDate) {
+        show('error', 'Start and End dates are required.');
+        return;
+      }
+      const today = getTodayIST();
+      if (form.endDate < today) {
+        show('error', 'End date must be today or later.');
+        return;
+      }
+      if (form.endDate < form.startDate) {
+        show('error', 'End date cannot be before start date.');
+        return;
+      }
       const payload = {
         contactName: form.contactName || undefined,
         phone: form.phone,
         isFamily: !!form.isFamily,
-        maleCount: Number(form.maleCount || 0),
-        femaleCount: Number(form.femaleCount || 0),
+        maleCount: parseInt(form.maleCount || 0, 10),
+        femaleCount: parseInt(form.femaleCount || 0, 10),
         startDate: form.startDate,
         endDate: form.endDate,
         confirmFallback,
@@ -74,6 +94,20 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
       setPending(false);
     }
   };
+
+  // Build a list of unmet requirements to explain disabled state
+  const validationErrors = (() => {
+    const errs = [];
+    if (!/^\d{10}$/.test(form.phone)) errs.push('Enter a valid 10-digit phone number');
+    if (!form.startDate) errs.push('Start date is required');
+    if (!form.endDate) errs.push('End date is required');
+    const today = getTodayIST();
+    if (form.endDate && form.endDate < today) errs.push('End date must be today or later');
+    if (form.startDate && form.endDate && form.endDate < form.startDate) errs.push('End date cannot be before start date');
+    if (total <= 0) errs.push('Add at least 1 person (male or female)');
+    return errs;
+  })();
+  const canReserve = validationErrors.length === 0 && !pending && !result && !confirmCtx;
 
   // Group items by (locationId, tentIndex, blockIndex) with gender breakdown
   const grouped = () => {
@@ -101,13 +135,13 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-xl rounded-2xl bg-white shadow-xl overflow-hidden text-gray-900">
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
-          <h3 className="text-lg font-semibold text-white">Register Guests (Global Reserve)</h3>
+    <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center bg-black/50 p-0 sm:p-4">
+      <div className="w-full h-full sm:h-auto sm:max-w-xl rounded-none sm:rounded-2xl bg-white shadow-xl overflow-hidden text-gray-900">
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-4 sm:px-6 py-3 sm:py-4">
+          <h3 className="text-base sm:text-lg font-semibold text-white">Register Guests (Global Reserve)</h3>
         </div>
 
-        <div className="px-6 py-5 space-y-4">
+        <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-4 overflow-y-auto max-h-[calc(100vh-140px)] sm:max-h-none">
           {pending && (
             <div className="rounded-lg border border-blue-200 bg-blue-50 text-blue-800 p-3 flex items-center gap-3">
               <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -152,13 +186,19 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Phone</label>
+              <label className="block text-sm font-medium text-gray-700">Phone*</label>
               <input
                 type="tel"
                 className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
                 value={form.phone}
-                onChange={(e)=>setForm(f=>({...f, phone: e.target.value }))}
-                placeholder="+91-XXXXXXXXXX"
+                onChange={(e)=>{
+                  const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  setForm(f=>({...f, phone: digits }));
+                }}
+                inputMode="numeric"
+                pattern="\\d{10}"
+                maxLength={10}
+                placeholder="10-digit phone"
               />
             </div>
           </div>
@@ -171,11 +211,17 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">Male Count</label>
-              <input type="number" min={0} className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900" value={form.maleCount} onChange={(e)=>setForm(f=>({...f, maleCount: Math.max(0, Number(e.target.value||0)) }))} />
+              <input type="number" min={0} step={1} inputMode="numeric" className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900" value={form.maleCount} onChange={(e)=>{
+                const v = parseInt(e.target.value, 10);
+                setForm(f=>({...f, maleCount: isNaN(v) ? 0 : Math.max(0, v) }));
+              }} />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Female Count</label>
-              <input type="number" min={0} className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900" value={form.femaleCount} onChange={(e)=>setForm(f=>({...f, femaleCount: Math.max(0, Number(e.target.value||0)) }))} />
+              <input type="number" min={0} step={1} inputMode="numeric" className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900" value={form.femaleCount} onChange={(e)=>{
+                const v = parseInt(e.target.value, 10);
+                setForm(f=>({...f, femaleCount: isNaN(v) ? 0 : Math.max(0, v) }));
+              }} />
             </div>
           </div>
 
@@ -186,7 +232,7 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">End Date</label>
-              <input type="date" className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900" value={form.endDate} onChange={(e)=>setForm(f=>({...f, endDate: e.target.value }))} />
+              <input type="date" min={getTodayIST()} className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900" value={form.endDate} onChange={(e)=>setForm(f=>({...f, endDate: e.target.value }))} />
             </div>
           </div>
 
@@ -198,13 +244,22 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 border-t px-6 py-4 bg-gray-50">
-          <button onClick={onClose} className="px-4 py-2 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-100">{result ? 'Close' : 'Cancel'}</button>
-          {!result && !confirmCtx && (
-            <button disabled={pending || !form.phone || total<=0 || !form.startDate || !form.endDate} onClick={()=>handleReserve(false)} className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">Reserve</button>
+          <div className="flex items-center justify-between gap-3 border-t px-4 sm:px-6 py-3 sm:py-4 bg-gray-50 sticky bottom-0">
+            {/* Explain disabled state */}
+            {!canReserve && !result && (
+              <div className="text-xs text-red-600 space-y-1">
+                <div className="font-medium">Can’t reserve yet:</div>
+                <ul className="list-disc pl-4">
+                  {validationErrors.map((e, i) => (<li key={i}>{e}</li>))}
+                </ul>
+              </div>
+            )}
+          <button onClick={onClose} className="px-3 sm:px-4 py-2 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-100">{result ? 'Close' : 'Cancel'}</button>
+            {!result && !confirmCtx && (
+            <button disabled={!canReserve} title={!canReserve ? validationErrors[0] : undefined} onClick={()=>handleReserve(false)} className="px-3 sm:px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">Reserve</button>
           )}
           {!result && confirmCtx && (
-            <button disabled={pending} onClick={()=>handleReserve(true)} className="px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">Proceed Anyway</button>
+            <button disabled={pending} onClick={()=>handleReserve(true)} className="px-3 sm:px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">Proceed Anyway</button>
           )}
         </div>
 

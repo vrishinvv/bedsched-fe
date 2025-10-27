@@ -80,8 +80,8 @@ export default function SearchResultCard({ batch, filter = {}, onViewLocation, s
     <div className={`overflow-hidden rounded-xl border bg-gradient-to-br shadow-lg ${colorClass}`}>
       {/* Header */}
       <div className="bg-white/5 border-b border-white/10 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-3 flex-wrap">
             {batchId && (
               <>
                 <div className="text-sm font-medium text-gray-300">Batch</div>
@@ -94,7 +94,7 @@ export default function SearchResultCard({ batch, filter = {}, onViewLocation, s
               </div>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {statuses.map((status, i) => (
               <span 
                 key={i}
@@ -148,7 +148,7 @@ export default function SearchResultCard({ batch, filter = {}, onViewLocation, s
                       const allTentSelected = tentIds.length > 0 && tentIds.every(id => selectedIds.includes(id));
                       return (
                         <div key={tentKey}>
-                          <div className="px-4 py-2 pl-12 flex items-center justify-between cursor-pointer hover:bg-white/5 border-b border-white/5" onClick={() => toggle(tentKey)}>
+                          <div className="px-4 py-2 pl-8 sm:pl-12 flex items-center justify-between cursor-pointer hover:bg-white/5 border-b border-white/5" onClick={() => toggle(tentKey)}>
                             <div className="flex items-center gap-3">
                               {onToggleSelect && tentIds.length > 0 && (
                                 <input type="checkbox" checked={allTentSelected} onChange={() => toggleAll(tentIds)} onClick={(e) => e.stopPropagation()} className="rounded" />
@@ -170,7 +170,7 @@ export default function SearchResultCard({ batch, filter = {}, onViewLocation, s
                                 const allBlockSelected = blockIds.length > 0 && blockIds.every(id => selectedIds.includes(id));
                                 return (
                                   <div key={blockKey}>
-                                    <div className="px-4 py-2 pl-20 flex items-center justify-between cursor-pointer hover:bg-white/5 border-b border-white/5" onClick={() => toggle(blockKey)}>
+                                        <div className="px-4 py-2 pl-12 sm:pl-20 flex items-center justify-between cursor-pointer hover:bg-white/5 border-b border-white/5" onClick={() => toggle(blockKey)}>
                                       <div className="flex items-center gap-3">
                                         {onToggleSelect && blockIds.length > 0 && (
                                           <input type="checkbox" checked={allBlockSelected} onChange={() => toggleAll(blockIds)} onClick={(e) => e.stopPropagation()} className="rounded" />
@@ -188,7 +188,7 @@ export default function SearchResultCard({ batch, filter = {}, onViewLocation, s
                                         {block.beds.map((bed) => {
                                           const isSelected = selectedIds.includes(bed.id);
                                           return (
-                                            <div key={bed.id} className={`px-4 py-2 pl-28 flex items-center gap-3 hover:bg-white/5 ${isSelected ? 'bg-indigo-500/10' : ''}`}>
+                                            <div key={bed.id} className={`px-4 py-2 pl-16 sm:pl-28 flex items-center gap-2 sm:gap-3 hover:bg-white/5 ${isSelected ? 'bg-indigo-500/10' : ''}`}>
                                               {bed.status === 'reserved' && onToggleSelect && (
                                                 <input
                                                   type="checkbox"
@@ -197,7 +197,7 @@ export default function SearchResultCard({ batch, filter = {}, onViewLocation, s
                                                   className="w-4 h-4 rounded border-gray-400 text-indigo-600"
                                                 />
                                               )}
-                                              <span className="text-xs text-gray-400">Bed {bed.bedNumber}</span>
+                                              <span className="text-[11px] sm:text-xs text-gray-400">Bed {bed.bedNumber}</span>
                                               <span className={`px-1.5 py-0.5 rounded text-xs ${bed.gender?.toLowerCase() === 'male' ? 'bg-blue-500/20 text-blue-200' : 'bg-pink-500/20 text-pink-200'}`}>
                                                 {bed.gender}
                                               </span>
@@ -208,7 +208,7 @@ export default function SearchResultCard({ batch, filter = {}, onViewLocation, s
                                                 {new Date(bed.startDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' })} → {new Date(bed.endDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' })}
                                               </span>
                                               {bed.contactName && (
-                                                <span className="text-xs text-gray-300">{bed.contactName}</span>
+                                                <span className="text-[11px] sm:text-xs text-gray-300">{bed.contactName}</span>
                                               )}
                                               <span className="text-xs text-gray-500 ml-auto">#{bed.id}</span>
                                             </div>

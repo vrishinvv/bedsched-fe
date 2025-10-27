@@ -63,28 +63,28 @@ export default function LocationTentsPage({ params }) {
   const { location, tents } = data;
 
   return (
-    <main className="space-y-6">
+    <main className="space-y-6 p-3 sm:p-4">
       {/* Enhanced Header with Purple Breadcrumb */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-purple-900/20 via-purple-800/20 to-indigo-900/20 border border-purple-500/20 p-6">
+      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-purple-900/20 via-purple-800/20 to-indigo-900/20 border border-purple-500/20 p-4 sm:p-6">
         <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
         <div className="relative">
           <nav className="mb-3">
-            <Link href="/" className="inline-flex items-center text-sm text-purple-300/80 hover:text-purple-200 transition-colors">
-              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <Link href="/" className="inline-flex items-center text-xs sm:text-sm text-purple-300/80 hover:text-purple-200 transition-colors">
+              <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
               Back to Locations
             </Link>
           </nav>
-          <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
+          <h2 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
             {location.name}
           </h2>
-          <p className="text-purple-200/80">Managing {tents.length} tent{tents.length !== 1 ? 's' : ''} • {stats.totalCapacity} total beds</p>
+          <p className="text-xs sm:text-sm text-purple-200/80">Managing {tents.length} tent{tents.length !== 1 ? 's' : ''} • {stats.totalCapacity} total beds</p>
         </div>
       </section>
 
       {/* Enhanced Dashboard */}
-      <section className="grid grid-cols-2 gap-4 md:grid-cols-5">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-5">
         <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/10 via-blue-500/10 to-cyan-500/10 border border-blue-500/20 p-5 backdrop-blur-sm transition-all duration-300 hover:scale-105">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-400/5 to-transparent pointer-events-none" />
           <div className="relative">
@@ -151,7 +151,7 @@ export default function LocationTentsPage({ params }) {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <section className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {tents.map((t) => (
           <TentCard key={t.index} locationId={location.id} tent={t} />
         ))}
