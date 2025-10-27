@@ -10,7 +10,7 @@ export default function AllocateModal({
   onSave,
   onDelete,
   pending = false, // Add pending prop
-  tentGenderRestriction = 'both', // New prop for tent's gender restriction
+  genderRestriction = 'both', // Block-level gender restriction
 }) {
   const [form, setForm] = useState({
     name: '',
@@ -52,13 +52,14 @@ export default function AllocateModal({
           gender: initialData.gender || 'Male',
           startDate: initialData.startDate || '',
           endDate: initialData.endDate || '',
+          status: initialData.status || undefined, // Preserve status for reserved beds
         });
       } else {
-        // Set default gender based on tent restriction
+        // Set default gender based on restriction
         let defaultGender = 'Male';
-        if (tentGenderRestriction === 'female_only') {
+        if (genderRestriction === 'female_only') {
           defaultGender = 'Female';
-        } else if (tentGenderRestriction === 'male_only') {
+        } else if (genderRestriction === 'male_only') {
           defaultGender = 'Male';
         }
         
@@ -71,7 +72,7 @@ export default function AllocateModal({
         });
       }
     }
-  }, [open, initialData, tentGenderRestriction]);
+  }, [open, initialData, genderRestriction]);
 
   useEffect(() => {
     function onKey(e) { if (e.key === 'Escape') onClose(); }
@@ -85,7 +86,7 @@ export default function AllocateModal({
 
   // Helper functions for gender restriction display
   const getGenderRestrictionInfo = () => {
-    switch (tentGenderRestriction) {
+    switch (genderRestriction) {
       case 'male_only':
         return {
           text: 'This tent is restricted to male guests only',
@@ -118,10 +119,10 @@ export default function AllocateModal({
 
   // Filter gender options based on tent restrictions
   const getAvailableGenderOptions = () => {
-    if (tentGenderRestriction === 'male_only') {
+    if (genderRestriction === 'male_only') {
       return [{ value: 'Male', label: 'Male' }];
     }
-    if (tentGenderRestriction === 'female_only') {
+    if (genderRestriction === 'female_only') {
       return [{ value: 'Female', label: 'Female' }];
     }
     return [
@@ -145,7 +146,7 @@ export default function AllocateModal({
 
     const today = getTodayDate();
     
-    // End date must be today or in the future
+    // End date must be today or in the future (for both new and edits)
     if (form.endDate < today) {
       return alert('End date must be today or in the future.');
     }
@@ -157,10 +158,10 @@ export default function AllocateModal({
 
     // Validate gender restriction
     const selectedGender = form.gender || 'Male';
-    if (tentGenderRestriction === 'male_only' && selectedGender.toLowerCase() !== 'male') {
+    if (genderRestriction === 'male_only' && selectedGender.toLowerCase() !== 'male') {
       return alert('This tent is restricted to male guests only. Please select Male as the gender.');
     }
-    if (tentGenderRestriction === 'female_only' && selectedGender.toLowerCase() !== 'female') {
+    if (genderRestriction === 'female_only' && selectedGender.toLowerCase() !== 'female') {
       return alert('This tent is restricted to female guests only. Please select Female as the gender.');
     }
 
@@ -168,6 +169,11 @@ export default function AllocateModal({
       ...form,
       gender: selectedGender
     };
+    
+    // Remove status from payload if it exists (backend doesn't need it for update)
+    if (payload.status) {
+      delete payload.status;
+    }
 
     onSave(payload);
   }
@@ -262,7 +268,7 @@ export default function AllocateModal({
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
-            {tentGenderRestriction !== 'both' && (
+            {genderRestriction !== 'both' && (
               <p className="text-xs text-gray-500 mt-1">Limited by tent restriction</p>
             )}
           </div>

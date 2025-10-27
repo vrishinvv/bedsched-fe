@@ -25,13 +25,14 @@ export default function LocationTentsPage({ params }) {
   }, [id]);
 
   const stats = useMemo(() => {
-    if (!data?.tents) return { totalCapacity: 0, totalAllocated: 0, totalNotAllocated: 0, totalFreeingTomorrow: 0 };
+    if (!data?.tents) return { totalCapacity: 0, totalAllocated: 0, totalNotAllocated: 0, totalFreeingTomorrow: 0, totalReserved: 0 };
     
     const totalCapacity = data.tents.reduce((s, t) => s + (t.size || 0), 0);
     const totalAllocated = data.tents.reduce((s, t) => s + (t.allocated || 0), 0);
     const totalNotAllocated = totalCapacity - totalAllocated;
     const totalFreeingTomorrow = data.tents.reduce((s, t) => s + (t.freeingTomorrow || 0), 0);
-    return { totalCapacity, totalAllocated, totalNotAllocated, totalFreeingTomorrow };
+    const totalReserved = data.tents.reduce((s, t) => s + (t.reserved || 0), 0);
+    return { totalCapacity, totalAllocated, totalNotAllocated, totalFreeingTomorrow, totalReserved };
   }, [data]);
 
   if (loading) {
@@ -83,7 +84,7 @@ export default function LocationTentsPage({ params }) {
       </section>
 
       {/* Enhanced Dashboard */}
-      <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <section className="grid grid-cols-2 gap-4 md:grid-cols-5">
         <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/10 via-blue-500/10 to-cyan-500/10 border border-blue-500/20 p-5 backdrop-blur-sm transition-all duration-300 hover:scale-105">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-400/5 to-transparent pointer-events-none" />
           <div className="relative">
@@ -133,6 +134,19 @@ export default function LocationTentsPage({ params }) {
             </div>
             <div className="text-xs text-amber-300/70 font-medium">Frees Tomorrow</div>
             <div className="text-2xl font-bold text-white">{stats.totalFreeingTomorrow.toLocaleString()}</div>
+          </div>
+        </div>
+
+        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600/10 via-purple-500/10 to-indigo-500/10 border border-indigo-500/20 p-5 backdrop-blur-sm transition-all duration-300 hover:scale-105 col-span-2 md:col-span-1">
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-400/5 to-transparent pointer-events-none" />
+          <div className="relative">
+            <div className="p-2 bg-indigo-500/20 rounded-xl w-fit mb-3">
+              <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="text-xs text-indigo-300/70 font-medium">Active Reservations</div>
+            <div className="text-2xl font-bold text-white">{stats.totalReserved.toLocaleString()}</div>
           </div>
         </div>
       </section>

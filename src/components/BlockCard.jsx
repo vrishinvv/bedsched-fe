@@ -34,14 +34,26 @@ export default function BlockCard({ locationId, tentIndex, block }) {
     return 'text-emerald-700 bg-emerald-100';
   };
 
+  const getGenderBadge = () => {
+    const g = block.genderRestriction || 'both';
+    const cls = g === 'male_only'
+      ? 'text-blue-700 bg-blue-100'
+      : g === 'female_only'
+      ? 'text-pink-700 bg-pink-100'
+      : 'text-green-700 bg-green-100';
+    const text = g === 'male_only' ? '♂️ Male' : g === 'female_only' ? '♀️ Female' : '👫 All';
+    return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${cls}`}>{text}</span>;
+  };
+
   return (
     <Link href={`/locations/${locationId}/tents/${tentIndex}/blocks/${block.index}`} className="block group">
       <div className={`relative overflow-hidden rounded-2xl border-2 ${getOccupancyBgColor()} p-6 shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1`}>
         {/* Decorative gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-br from-white/50 to-transparent pointer-events-none" />
         
-        {/* Status badge */}
-        <div className="absolute top-4 right-4">
+        {/* Status + Gender badges */}
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          {getGenderBadge()}
           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${getStatusColor()}`}>
             {getStatusText()}
           </span>
@@ -82,6 +94,14 @@ export default function BlockCard({ locationId, tentIndex, block }) {
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                 <span className="text-sm font-medium text-gray-700">
                   {block.freeingTomorrow} freeing tomorrow
+                </span>
+              </div>
+            )}
+            {typeof block.reserved === 'number' && block.reserved > 0 && (
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                <span className="text-sm font-medium text-gray-700">
+                  {block.reserved} reserved
                 </span>
               </div>
             )}

@@ -113,3 +113,37 @@ export function HeaderSkeleton() {
     </section>
   );
 }
+
+// Skeleton for tree view (batches with hierarchy)
+export function TreeSkeleton({ count = 3 }) {
+  return (
+    <div className="space-y-4">
+      {Array.from({ length: count }).map((_, idx) => (
+        <div key={idx} className="overflow-hidden rounded-xl border bg-gradient-to-br shadow-lg border-blue-500/20 from-blue-950/40 via-indigo-950/30 to-blue-950/40">
+          {/* Header */}
+          <div className="bg-white/5 border-b border-white/10 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-6 w-32 bg-gradient-to-r from-gray-500 via-gray-400 to-gray-500" />
+              <Skeleton className="h-5 w-20 bg-gradient-to-r from-gray-600 via-gray-500 to-gray-600" />
+            </div>
+          </div>
+          
+          {/* Content */}
+          <div className="px-4 py-3 space-y-2">
+            <Skeleton className="h-4 w-full bg-gradient-to-r from-gray-600 via-gray-500 to-gray-600" />
+            <Skeleton className="h-4 w-3/4 bg-gradient-to-r from-gray-600 via-gray-500 to-gray-600" />
+            <Skeleton className="h-4 w-5/6 bg-gradient-to-r from-gray-600 via-gray-500 to-gray-600" />
+          </div>
+          
+          {/* Footer buttons */}
+          <div className="bg-white/5 border-t border-white/10 px-4 py-3">
+            <div className="flex items-center justify-end gap-2">
+              <Skeleton className="h-8 w-20 bg-gradient-to-r from-gray-600 via-gray-500 to-gray-600" />
+              <Skeleton className="h-8 w-24 bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}

@@ -8,17 +8,17 @@ import Notification from '@/components/Notification';
 import { BedGridSkeleton, StatCardSkeleton, HeaderSkeleton } from '@/components/Skeleton';
 import {
   fetchBlockDetail,
-  fetchTentBlocks,
   allocateBed,
   editAllocation,
   deallocateBed,
   bulkAllocateBeds,
+  updateBlock,
 } from '@/lib/api';
 
 export default function BlockBedsPage({ params }) {
   const { id, tent, block } = use(params);
   const [meta, setMeta] = useState(null); // { location, tent, block }
-  const [tentInfo, setTentInfo] = useState(null); // tent details including gender restriction
+  const [genderRestriction, setGenderRestriction] = useState('both'); // block-level gender restriction
   const [bedsState, setBedsState] = useState(null); // { capacity, beds:{} }
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
@@ -26,6 +26,7 @@ export default function BlockBedsPage({ params }) {
   const [bulkModal, setBulkModal] = useState(false);
   const [pending, setPending] = useState(false);
   const [notification, setNotification] = useState(null);
+  const [updatingRestriction, setUpdatingRestriction] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -34,11 +35,7 @@ export default function BlockBedsPage({ params }) {
         const blockRes = await fetchBlockDetail(id, Number(tent), Number(block));
         setMeta(blockRes.meta);
         setBedsState({ capacity: blockRes.blockSize, beds: blockRes.beds });
-        
-        // Fetch tent data to get gender restriction
-        const tentRes = await fetchTentBlocks(id, Number(tent));
-        console.log('Tent data fetched:', tentRes);
-        setTentInfo(tentRes.tent);
+        setGenderRestriction(blockRes.meta?.block?.genderRestriction || 'both');
       } catch (e) {
         setErr(e.message);
       } finally {
@@ -48,28 +45,31 @@ export default function BlockBedsPage({ params }) {
   }, [id, tent, block]);
 
   const allocatedCount = useMemo(
-    () => Object.values(bedsState?.beds || {}).filter(Boolean).length,
+    () => Object.values(bedsState?.beds || {}).filter(b => b && b.status === 'confirmed').length,
     [bedsState]
   );
 
   const stats = useMemo(() => {
-    if (!bedsState) return { totalCapacity: 0, totalAllocated: 0, totalNotAllocated: 0, totalFreeingTomorrow: 0 };
+    if (!bedsState) return { totalCapacity: 0, totalAllocated: 0, totalNotAllocated: 0, totalFreeingTomorrow: 0, totalReserved: 0 };
     
     const totalCapacity = bedsState.capacity || 0;
     const totalAllocated = allocatedCount;
     const totalNotAllocated = totalCapacity - totalAllocated;
+    const totalReserved = Object.values(bedsState.beds || {}).filter(b => b && b.status === 'reserved' && (!b.reservedExpiresAt || new Date(b.reservedExpiresAt).getTime() > Date.now())).length;
     
-    // Calculate freeing tomorrow from bed allocations
+    // Calculate freeing tomorrow from bed allocations (IST)
     const totalFreeingTomorrow = Object.values(bedsState.beds || {}).filter(bed => {
-      if (!bed?.endDate) return false;
-      const today = new Date();
-      const tomorrow = new Date(today);
-      tomorrow.setDate(today.getDate() + 1);
-      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+      if (!bed?.endDate || bed.status !== 'confirmed') return false;
+      const now = new Date();
+      const istOffset = 5.5 * 60 * 60 * 1000;
+      const istToday = new Date(now.getTime() + istOffset);
+      const istTomorrow = new Date(istToday);
+      istTomorrow.setDate(istToday.getDate() + 1);
+      const tomorrowStr = istTomorrow.toISOString().split('T')[0];
       return bed.endDate === tomorrowStr;
     }).length;
     
-    return { totalCapacity, totalAllocated, totalNotAllocated, totalFreeingTomorrow };
+    return { totalCapacity, totalAllocated, totalNotAllocated, totalFreeingTomorrow, totalReserved };
   }, [bedsState, allocatedCount]);
 
   function openAllocate(n, data) {
@@ -139,7 +139,7 @@ export default function BlockBedsPage({ params }) {
       setModal({ open: false, bedNumber: null, data: null });
     } catch (e) {
       // Revert optimistic update on error
-      setBedsState((s) => ({ ...s, beds: { ...s, beds, [n]: originalData } }));
+      setBedsState((s) => ({ ...s, beds: { ...s.beds, [n]: originalData } }));
       
       const errorMessage = e.message || 'Failed to deallocate bed';
       showNotification('error', errorMessage);
@@ -227,36 +227,60 @@ export default function BlockBedsPage({ params }) {
           </h2>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <p className="text-purple-200/80">{stats.totalCapacity} beds • {stats.totalAllocated} occupied • {stats.totalNotAllocated} available</p>
-              {tentInfo?.genderRestriction && (
-                <div className={`px-3 py-1.5 rounded-full text-sm font-semibold border ${
-                  tentInfo.genderRestriction === 'male_only' ? 'text-blue-200 bg-blue-600/40 border-blue-400/50' :
-                  tentInfo.genderRestriction === 'female_only' ? 'text-pink-200 bg-pink-600/40 border-pink-400/50' :
-                  'text-green-200 bg-green-600/40 border-green-400/50'
-                }`}>
-                  {
-                    tentInfo.genderRestriction === 'male_only' ? '♂️ Male Only' :
-                    tentInfo.genderRestriction === 'female_only' ? '♀️ Female Only' :
-                    '👫 All Genders'
-                  }
-                </div>
-              )}
+              <p className="text-purple-200/80">{stats.totalCapacity} beds • {stats.totalAllocated} occupied • {stats.totalNotAllocated} available • {stats.reservedCount} reserved</p>
+              <div className={`px-3 py-1.5 rounded-full text-sm font-semibold border ${
+                genderRestriction === 'male_only' ? 'text-blue-200 bg-blue-600/40 border-blue-400/50' :
+                genderRestriction === 'female_only' ? 'text-pink-200 bg-pink-600/40 border-pink-400/50' :
+                'text-green-200 bg-green-600/40 border-green-400/50'
+              }`}>
+                {genderRestriction === 'male_only' ? '♂️ Male Only' : genderRestriction === 'female_only' ? '♀️ Female Only' : '👫 All Genders'}
+              </div>
             </div>
-            <button
-              onClick={() => setBulkModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Bulk Book Beds
-            </button>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <select
+                  value={genderRestriction}
+                  disabled={updatingRestriction}
+                  onChange={async (e) => {
+                    const newVal = e.target.value;
+                    if (newVal === genderRestriction) return;
+                    try {
+                      setUpdatingRestriction(true);
+                      await updateBlock(id, Number(tent), Number(block), { genderRestriction: newVal });
+                      setGenderRestriction(newVal);
+                    } catch (e) {
+                      alert(e.message || 'Failed to update block restriction');
+                    } finally {
+                      setUpdatingRestriction(false);
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${
+                    genderRestriction === 'male_only' ? 'bg-blue-50 border-blue-300 text-blue-700' :
+                    genderRestriction === 'female_only' ? 'bg-pink-50 border-pink-300 text-pink-700' :
+                    'bg-green-50 border-green-300 text-green-700'
+                  } ${updatingRestriction ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  <option value="both">👫 All Genders</option>
+                  <option value="male_only">♂️ Male Only</option>
+                  <option value="female_only">♀️ Female Only</option>
+                </select>
+              </div>
+              <button
+                onClick={() => setBulkModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Bulk Book Beds
+              </button>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Enhanced Dashboard */}
-      <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <section className="grid grid-cols-2 gap-4 md:grid-cols-5">
         <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/10 via-blue-500/10 to-cyan-500/10 border border-blue-500/20 p-5 backdrop-blur-sm transition-all duration-300 hover:scale-105">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-400/5 to-transparent pointer-events-none" />
           <div className="relative">
@@ -308,6 +332,19 @@ export default function BlockBedsPage({ params }) {
             <div className="text-2xl font-bold text-white">{stats.totalFreeingTomorrow.toLocaleString()}</div>
           </div>
         </div>
+
+        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600/10 via-purple-500/10 to-indigo-500/10 border border-indigo-500/20 p-5 backdrop-blur-sm transition-all duration-300 hover:scale-105 col-span-2 md:col-span-1">
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-400/5 to-transparent pointer-events-none" />
+          <div className="relative">
+            <div className="p-2 bg-indigo-500/20 rounded-xl w-fit mb-3">
+              <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="text-xs text-indigo-300/70 font-medium">Active Reservations</div>
+            <div className="text-2xl font-bold text-white">{stats.totalReserved.toLocaleString()}</div>
+          </div>
+        </div>
       </section>
 
       <BedGrid
@@ -324,13 +361,13 @@ export default function BlockBedsPage({ params }) {
         onSave={handleSave}
         onDelete={handleDelete}
         pending={pending}
-        tentGenderRestriction={tentInfo?.genderRestriction || 'both'}
+        genderRestriction={genderRestriction}
       />
 
       <BulkAllocateModal
         open={bulkModal}
         onClose={() => setBulkModal(false)}
-        tentGenderRestriction={tentInfo?.genderRestriction || 'both'}
+        genderRestriction={genderRestriction}
         onSave={handleBulkBooking}
       />
 

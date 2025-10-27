@@ -25,13 +25,14 @@ export default function TentBlocksPage({ params }) {
   }, [id, tent]);
 
   const stats = useMemo(() => {
-    if (!data?.blocks) return { totalCapacity: 0, totalAllocated: 0, totalNotAllocated: 0, totalFreeingTomorrow: 0 };
+    if (!data?.blocks) return { totalCapacity: 0, totalAllocated: 0, totalNotAllocated: 0, totalFreeingTomorrow: 0, totalReserved: 0 };
     
     const totalCapacity = data.blocks.reduce((s, b) => s + (b.size || 0), 0);
     const totalAllocated = data.blocks.reduce((s, b) => s + (b.allocated || 0), 0);
     const totalNotAllocated = totalCapacity - totalAllocated;
     const totalFreeingTomorrow = data.blocks.reduce((s, b) => s + (b.freeingTomorrow || 0), 0);
-    return { totalCapacity, totalAllocated, totalNotAllocated, totalFreeingTomorrow };
+    const totalReserved = data.blocks.reduce((s, b) => s + (b.reserved || 0), 0);
+    return { totalCapacity, totalAllocated, totalNotAllocated, totalFreeingTomorrow, totalReserved };
   }, [data]);
 
   if (loading) {
@@ -80,25 +81,12 @@ export default function TentBlocksPage({ params }) {
           </h2>
           <div className="flex items-center gap-4">
             <p className="text-purple-200/80">Managing {blocks.length} block{blocks.length !== 1 ? 's' : ''} • {stats.totalCapacity} total beds</p>
-            {tentMeta?.genderRestriction && (
-              <div className={`px-3 py-1.5 rounded-full text-sm font-semibold border ${
-                tentMeta.genderRestriction === 'male_only' ? 'text-blue-200 bg-blue-600/40 border-blue-400/50' :
-                tentMeta.genderRestriction === 'female_only' ? 'text-pink-200 bg-pink-600/40 border-pink-400/50' :
-                'text-green-200 bg-green-600/40 border-green-400/50'
-              }`}>
-                {
-                  tentMeta.genderRestriction === 'male_only' ? '♂️ Male Only' :
-                  tentMeta.genderRestriction === 'female_only' ? '♀️ Female Only' :
-                  '👫 All Genders'
-                }
-              </div>
-            )}
           </div>
         </div>
       </section>
 
       {/* Enhanced Dashboard */}
-      <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <section className="grid grid-cols-2 gap-4 md:grid-cols-5">
         <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/10 via-blue-500/10 to-cyan-500/10 border border-blue-500/20 p-5 backdrop-blur-sm transition-all duration-300 hover:scale-105">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-400/5 to-transparent pointer-events-none" />
           <div className="relative">
@@ -148,6 +136,19 @@ export default function TentBlocksPage({ params }) {
             </div>
             <div className="text-xs text-amber-300/70 font-medium">Frees Tomorrow</div>
             <div className="text-2xl font-bold text-white">{stats.totalFreeingTomorrow.toLocaleString()}</div>
+          </div>
+        </div>
+
+        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600/10 via-purple-500/10 to-indigo-500/10 border border-indigo-500/20 p-5 backdrop-blur-sm transition-all duration-300 hover:scale-105 col-span-2 md:col-span-1">
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-400/5 to-transparent pointer-events-none" />
+          <div className="relative">
+            <div className="p-2 bg-indigo-500/20 rounded-xl w-fit mb-3">
+              <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="text-xs text-indigo-300/70 font-medium">Active Reservations</div>
+            <div className="text-2xl font-bold text-white">{stats.totalReserved.toLocaleString()}</div>
           </div>
         </div>
       </section>

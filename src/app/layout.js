@@ -1,4 +1,5 @@
 import './globals.css';
+import TopNav from '@/components/TopNav';
 export const metadata = { title: 'Tent Bed Allocator' };
 
 export default function RootLayout({ children }) {
@@ -8,7 +9,7 @@ return (
       <div className="mx-auto max-w-7xl p-4">
         <header className="mb-6 flex items-center justify-between">
           <h1 className="text-2xl font-bold tracking-tight text-white">Tent Bed Allocator</h1>
-          <nav className="text-sm text-gray-400">Internal tool</nav>
+          <TopNav />
         </header>
         {children}
       </div>

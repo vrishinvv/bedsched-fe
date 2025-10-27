@@ -19,6 +19,10 @@ export default function BedGrid({ capacity = 100, beds = {}, onSelect }) {
     // Helper function to determine bed status
     const getBedStatus = (allocation) => {
         if (!allocation) return 'available';
+        if (allocation.status === 'reserved' && allocation.reservedExpiresAt) {
+            const expires = new Date(allocation.reservedExpiresAt).getTime();
+            if (Date.now() < expires) return 'reserved';
+        }
         
         const today = getTodayIST();
         const startDate = allocation.startDate;
@@ -65,6 +69,10 @@ export default function BedGrid({ capacity = 100, beds = {}, onSelect }) {
                         <div className="w-3 h-3 bg-orange-500 rounded-full shadow-lg"></div>
                         <span className="text-gray-300">Future Booking</span>
                     </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-blue-500 rounded-full shadow-lg"></div>
+                        <span className="text-gray-300">Reserved</span>
+                    </div>
                 </div>
             </div>
 
@@ -87,6 +95,12 @@ export default function BedGrid({ capacity = 100, beds = {}, onSelect }) {
                     // Define styles based on status
                     const getStatusStyles = () => {
                         switch (status) {
+                            case 'reserved':
+                                return {
+                                    bg: 'bg-gradient-to-br from-blue-400 to-blue-600 text-white hover:from-blue-500 hover:to-blue-700',
+                                    glow: 'bg-blue-400',
+                                    shadow: 'shadow-blue-500/25'
+                                };
                             case 'current':
                                 return {
                                     bg: 'bg-gradient-to-br from-red-400 to-red-600 text-white hover:from-red-500 hover:to-red-700',
@@ -118,6 +132,11 @@ export default function BedGrid({ capacity = 100, beds = {}, onSelect }) {
                         const endDate = formatDate(allocation.endDate);
                         
                         switch (status) {
+                            case 'reserved': {
+                                const expiresAt = allocation.reservedExpiresAt ? new Date(allocation.reservedExpiresAt) : null;
+                                const expiresStr = expiresAt ? expiresAt.toLocaleString() : 'Soon';
+                                return `Bed ${n}: Reserved by ${allocation.name || 'contact'} (${startDate} - ${endDate}) until ${expiresStr}`;
+                            }
                             case 'current':
                                 return `Bed ${n}: ${allocation.name} (${startDate} - ${endDate}) - Currently Occupied`;
                             case 'future':

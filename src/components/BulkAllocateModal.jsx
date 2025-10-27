@@ -5,7 +5,7 @@ import Skeleton from '@/components/Skeleton';
 export default function BulkAllocateModal({
   open,
   onClose,
-  tentGenderRestriction,
+  genderRestriction,
   onSave,
 }) {
   const [form, setForm] = useState({
@@ -63,9 +63,9 @@ export default function BulkAllocateModal({
 
   if (!open) return null;
 
-  const isMaleOnly = tentGenderRestriction === 'male_only';
-  const isFemaleOnly = tentGenderRestriction === 'female_only';
-  const isMixed = tentGenderRestriction === 'both';
+  const isMaleOnly = genderRestriction === 'male_only';
+  const isFemaleOnly = genderRestriction === 'female_only';
+  const isMixed = genderRestriction === 'both';
 
   function handleChange(e) {
     const { name, value } = e.target;
