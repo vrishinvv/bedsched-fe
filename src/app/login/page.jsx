@@ -18,7 +18,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(username.trim(), password);
-      router.replace('/');
+      // Force a full page reload to ensure cookies are properly loaded
+      window.location.href = '/';
     } catch (err) {
       setError(err?.message || 'Login failed');
     } finally {

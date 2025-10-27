@@ -22,6 +22,11 @@ export default function Page() {
         const data = await fetchLocations();
         setLocations(data);
         const me = await getMe().catch(()=>null);
+        if (!me || !me.user) {
+          // Not authenticated, redirect to login
+          router.push('/login');
+          return;
+        }
         setRole(me?.user?.role || null);
       } catch (e) {
         setErr(e.message);
@@ -29,7 +34,7 @@ export default function Page() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [router]);
 
   const stats = useMemo(() => {
     const totalCapacity = locations.reduce((s, l) => s + (l.capacity || 0), 0);

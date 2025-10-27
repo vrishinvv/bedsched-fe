@@ -6,6 +6,7 @@ import { searchAllocationsByPhone, confirmAllocations } from '@/lib/api';
 import Notification from '@/components/Notification';
 import SearchResultCard from '@/components/SearchResultCard';
 import { TreeSkeleton } from '@/components/Skeleton';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
 function AdminConfirmContent() {
   const params = useSearchParams();
@@ -207,7 +208,9 @@ function AdminConfirmContent() {
 export default function AdminConfirmPage() {
   return (
     <Suspense fallback={<div className="text-center py-12 text-gray-400">Loading...</div>}>
-      <AdminConfirmContent />
+      <ProtectedRoute adminOnly={true}>
+        <AdminConfirmContent />
+      </ProtectedRoute>
     </Suspense>
   );
 }

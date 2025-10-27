@@ -4,8 +4,9 @@ import Link from "next/link";
 import { fetchDepartures } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { TreeSkeleton } from "@/components/Skeleton";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
-export default function DeparturesPage() {
+function DeparturesContent() {
   const getTodayIST = () => {
     const now = new Date();
     const istOffset = 5.5 * 60 * 60 * 1000;
@@ -306,5 +307,13 @@ export default function DeparturesPage() {
         {!loading && !items.length && <div className="text-sm text-gray-300">No departures for {date}</div>}
       </div>
     </div>
+  );
+}
+
+export default function DeparturesPage() {
+  return (
+    <ProtectedRoute adminOnly={true}>
+      <DeparturesContent />
+    </ProtectedRoute>
   );
 }

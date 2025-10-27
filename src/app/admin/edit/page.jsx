@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { searchAllocationsByPhone, updatePhoneByPhone, updateContactNameByPhone, updateEndDateByPhone, deallocateByPhone } from "@/lib/api";
 import Notification from "@/components/Notification";
 import { TreeSkeleton } from '@/components/Skeleton';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
 function EditByPhoneContent() {
   const sp = useSearchParams();
@@ -530,7 +531,9 @@ function EditByPhoneContent() {
 export default function EditByPhonePage() {
   return (
     <Suspense fallback={<div className="text-center py-12 text-gray-400">Loading...</div>}>
-      <EditByPhoneContent />
+      <ProtectedRoute adminOnly={true}>
+        <EditByPhoneContent />
+      </ProtectedRoute>
     </Suspense>
   );
 }

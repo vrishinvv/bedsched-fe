@@ -4,8 +4,9 @@ import Link from "next/link";
 import { fetchReservedActive } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { TreeSkeleton } from "@/components/Skeleton";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
-export default function ReservedActivePage() {
+function ReservedActiveContent() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -339,5 +340,13 @@ export default function ReservedActivePage() {
         {!loading && !items.length && <div className="text-sm text-gray-300">No active reservations</div>}
       </div>
     </div>
+  );
+}
+
+export default function ReservedActivePage() {
+  return (
+    <ProtectedRoute adminOnly={true}>
+      <ReservedActiveContent />
+    </ProtectedRoute>
   );
 }
