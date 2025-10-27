@@ -11,6 +11,14 @@ export default function ProtectedRoute({ children, adminOnly = false }) {
   useEffect(() => {
     (async () => {
       try {
+        // Fast-path: if no token in localStorage, redirect immediately
+        if (typeof window !== 'undefined') {
+          const token = window.localStorage.getItem('bs_token');
+          if (!token) {
+            router.push('/login');
+            return;
+          }
+        }
         const me = await getMe();
         if (!me || !me.user) {
           router.push('/login');
