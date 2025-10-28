@@ -85,7 +85,39 @@ export default function BedGrid({
         if (typeof onSelectionChange === 'function') onSelectionChange(next);
     }
 
+    // Long press support for mobile
+    const [longPressTimer, setLongPressTimer] = useState(null);
+    const [longPressActive, setLongPressActive] = useState(false);
+
+    const handleTouchStart = useCallback((e, n) => {
+        const timer = setTimeout(() => {
+            setLongPressActive(true);
+            // Trigger range selection mode (same as Ctrl+Click)
+            if (anchor == null) {
+                setAnchor(n);
+                emitSelection([n]);
+            } else {
+                const [start, end] = anchor < n ? [anchor, n] : [n, anchor];
+                const range = Array.from({ length: end - start + 1 }, (_, i) => start + i);
+                emitSelection(range);
+                setAnchor(null);
+            }
+        }, 500); // 500ms long press threshold
+        setLongPressTimer(timer);
+    }, [anchor]);
+
+    const handleTouchEnd = useCallback(() => {
+        if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            setLongPressTimer(null);
+        }
+        setTimeout(() => setLongPressActive(false), 100);
+    }, [longPressTimer]);
+
     const handleClick = useCallback((e, n, allocation) => {
+        // Ignore if this was a long press
+        if (longPressActive) return;
+
         const isCtrlOrMeta = e.ctrlKey || e.metaKey; // support macOS cmd key too
 
         if (isCtrlOrMeta) {
@@ -105,7 +137,7 @@ export default function BedGrid({
         // Regular click: open allocation modal/callback
         setAnchor(null);
         onSelect?.(n, allocation || null);
-    }, [anchor, onSelect]);
+    }, [anchor, onSelect, longPressActive]);
 
     // Clear selection when clicking outside the grid or pressing Escape
     useEffect(() => {
@@ -141,7 +173,7 @@ export default function BedGrid({
             <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                     <h3 className="text-lg sm:text-xl font-bold text-white">Bed Layout</h3>
-                    <p className="text-xs sm:text-sm text-gray-400">Tap any bed to allocate or edit (IST timezone)</p>
+                    <p className="text-xs sm:text-sm text-gray-400">Tap any bed to allocate or edit • Long press to multi-select (IST timezone)</p>
                 </div>
                 <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 text-[11px] sm:text-xs overflow-x-auto no-scrollbar">
                     <div className="flex items-center gap-2">
@@ -251,6 +283,9 @@ export default function BedGrid({
                         <button
                             key={n}
                             onClick={(e) => handleClick(e, n, status === 'available' ? null : (allocation || null))}
+                            onTouchStart={(e) => handleTouchStart(e, n)}
+                            onTouchEnd={handleTouchEnd}
+                            onTouchCancel={handleTouchEnd}
                             className={`
                                 group relative aspect-square w-full rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold
                                 shadow-lg transition-all duration-300 ease-out transform cursor-pointer
