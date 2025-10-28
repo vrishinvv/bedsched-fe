@@ -13,6 +13,7 @@ import {
   deallocateBed,
   bulkAllocateBeds,
   updateBlock,
+  deallocateBedsBatch,
 } from '@/lib/api';
 
 export default function BlockBedsPage({ params }) {
@@ -27,6 +28,14 @@ export default function BlockBedsPage({ params }) {
   const [pending, setPending] = useState(false);
   const [notification, setNotification] = useState(null);
   const [updatingRestriction, setUpdatingRestriction] = useState(false);
+  const [deallocating, setDeallocating] = useState(false);
+  const [confirmDeallocate, setConfirmDeallocate] = useState(null);
+  // Enhancements: phone filter + selection
+  const [phoneFilter, setPhoneFilter] = useState('');
+  const [selectedBeds, setSelectedBeds] = useState([]);
+  const [batchSelection, setBatchSelection] = useState([]);
+  // Reallocate modal state
+  // Reallocate flow removed per request
 
   useEffect(() => {
     (async () => {
@@ -72,8 +81,37 @@ export default function BlockBedsPage({ params }) {
     return { totalCapacity, totalAllocated, totalNotAllocated, totalFreeingTomorrow, totalReserved };
   }, [bedsState, allocatedCount]);
 
+  const selectedAllocations = useMemo(() => {
+    if (!bedsState?.beds || !Array.isArray(selectedBeds)) return [];
+    return selectedBeds
+      .map((n) => ({ bedNumber: n, data: bedsState.beds[n] }))
+      .filter((x) => x.data != null);
+  }, [selectedBeds, bedsState]);
+
+  const selectionIdenticalDetails = useMemo(() => {
+    if (selectedAllocations.length === 0) return null;
+    const first = selectedAllocations[0].data;
+    const keys = ['name', 'phone', 'gender', 'startDate', 'endDate'];
+    const allSame = selectedAllocations.every((x) => keys.every((k) => (x.data?.[k] || '') === (first?.[k] || '')));
+    return allSame ? first : null;
+  }, [selectedAllocations]);
+
   function openAllocate(n, data) {
     setModal({ open: true, bedNumber: n, data });
+  }
+
+  function openBatchEdit() {
+    if (!Array.isArray(selectedBeds) || selectedBeds.length === 0) {
+      showNotification('info', 'Select one or more beds to batch edit.');
+      return;
+    }
+    if (!selectionIdenticalDetails) {
+      showNotification('info', 'Selected beds have different details. Select beds with identical details to batch edit.');
+      return;
+    }
+    // Use the same AllocateModal, but treat as batch edit by setting bedNumber to a label
+    setBatchSelection([...selectedBeds]);
+    setModal({ open: true, bedNumber: 'Multiple', data: { ...selectionIdenticalDetails } });
   }
 
   function showNotification(type, message) {
@@ -85,50 +123,84 @@ export default function BlockBedsPage({ params }) {
   }
 
   async function handleSave(payload) {
-    const n = modal.bedNumber;
+    const isBatchEdit = modal.bedNumber === 'Multiple' && Array.isArray(selectedBeds) && selectedBeds.length > 0;
+    const n = isBatchEdit ? null : modal.bedNumber;
     const isEdit = Boolean(modal.data);
     try {
       setPending(true);
-      // Optimistic update: ensure status present so stats rerender correctly
-      setBedsState((s) => ({ 
-        ...s, 
-        beds: { 
-          ...s.beds, 
-          [n]: { 
-            ...(s.beds?.[n] || {}),
-            ...payload,
-            status: isEdit ? (s.beds?.[n]?.status || 'confirmed') : 'confirmed'
-          } 
-        } 
-      }));
-      
-      if (isEdit) {
-        const updated = await editAllocation(id, Number(tent), Number(block), n, payload);
-        // If API returns authoritative allocation, sync it (fallback to optimistic if not)
-        if (updated && typeof updated === 'object') {
-          setBedsState((s) => ({ ...s, beds: { ...s.beds, [n]: { ...s.beds?.[n], ...updated, status: updated.status || (s.beds?.[n]?.status || 'confirmed') } } }));
+      if (isBatchEdit) {
+        // Optimistic update for all selected
+        setBedsState((s) => {
+          const nextBeds = { ...s.beds };
+          (batchSelection && batchSelection.length ? batchSelection : selectedBeds).forEach((bn) => {
+            if (!nextBeds[bn]) return; // skip empty
+            nextBeds[bn] = { ...(nextBeds[bn] || {}), ...payload, status: nextBeds[bn]?.status || 'confirmed' };
+          });
+          return { ...s, beds: nextBeds };
+        });
+
+        // Apply edits in series (or small batches)
+        const targetList = (batchSelection && batchSelection.length ? batchSelection : selectedBeds);
+        for (const bn of targetList) {
+          // Skip if not allocated
+          if (!bedsState?.beds?.[bn]) continue;
+          try {
+            const updated = await editAllocation(id, Number(tent), Number(block), bn, payload);
+            if (updated && typeof updated === 'object') {
+              setBedsState((s) => ({ ...s, beds: { ...s.beds, [bn]: { ...s.beds?.[bn], ...updated, status: updated.status || (s.beds?.[bn]?.status || 'confirmed') } } }));
+            }
+          } catch (err) {
+            // best-effort: revert this bed
+            setBedsState((s) => ({ ...s, beds: { ...s.beds, [bn]: bedsState?.beds?.[bn] } }));
+            console.error('Batch edit failed for bed', bn, err);
+          }
         }
-        showNotification('success', `Bed ${n} allocation updated successfully for ${payload.name}`);
+        const count = (batchSelection && batchSelection.length ? batchSelection.length : selectedBeds.length);
+        showNotification('success', `Updated ${count} allocations`);
       } else {
-        const created = await allocateBed(id, Number(tent), Number(block), n, payload);
-        if (created && typeof created === 'object') {
-          setBedsState((s) => ({ ...s, beds: { ...s.beds, [n]: { ...s.beds?.[n], ...created, status: created.status || 'confirmed' } } }));
+        // Optimistic update: ensure status present so stats rerender correctly
+        setBedsState((s) => ({ 
+          ...s, 
+          beds: { 
+            ...s.beds, 
+            [n]: { 
+              ...(s.beds?.[n] || {}),
+              ...payload,
+              status: isEdit ? (s.beds?.[n]?.status || 'confirmed') : 'confirmed'
+            } 
+          } 
+        }));
+        
+        if (isEdit) {
+          const updated = await editAllocation(id, Number(tent), Number(block), n, payload);
+          // If API returns authoritative allocation, sync it (fallback to optimistic if not)
+          if (updated && typeof updated === 'object') {
+            setBedsState((s) => ({ ...s, beds: { ...s.beds, [n]: { ...s.beds?.[n], ...updated, status: updated.status || (s.beds?.[n]?.status || 'confirmed') } } }));
+          }
+          showNotification('success', `Bed ${n} allocation updated successfully for ${payload.name}`);
+        } else {
+          const created = await allocateBed(id, Number(tent), Number(block), n, payload);
+          if (created && typeof created === 'object') {
+            setBedsState((s) => ({ ...s, beds: { ...s.beds, [n]: { ...s.beds?.[n], ...created, status: created.status || 'confirmed' } } }));
+          }
+          showNotification('success', `Bed ${n} allocated successfully to ${payload.name}`);
         }
-        showNotification('success', `Bed ${n} allocated successfully to ${payload.name}`);
       }
-      
+
       setModal({ open: false, bedNumber: null, data: null });
     } catch (e) {
       // Revert optimistic update on error
-      setBedsState((s) => {
-        const reverted = { ...s.beds };
-        if (isEdit) {
-          reverted[n] = modal.data; // Restore original data
-        } else {
-          delete reverted[n]; // Remove allocation
-        }
-        return { ...s, beds: reverted };
-      });
+      if (n != null) {
+        setBedsState((s) => {
+          const reverted = { ...s.beds };
+          if (isEdit) {
+            reverted[n] = modal.data; // Restore original data
+          } else {
+            delete reverted[n]; // Remove allocation
+          }
+          return { ...s, beds: reverted };
+        });
+      }
       
       const errorMessage = e.message || (isEdit ? 'Failed to update allocation' : 'Failed to allocate bed');
       showNotification('error', errorMessage);
@@ -165,6 +237,64 @@ export default function BlockBedsPage({ params }) {
       setPending(false);
     }
   }
+
+  async function handleBatchDeallocate() {
+    if (!Array.isArray(selectedBeds) || selectedBeds.length === 0) {
+      showNotification('info', 'Select one or more allocated beds to deallocate.');
+      return;
+    }
+    
+    // Only deallocate those that actually have an allocation
+    const targets = selectedAllocations.map(x => x.bedNumber);
+    
+    if (targets.length === 0) {
+      showNotification('info', 'No allocated beds in your selection.');
+      return;
+    }
+    
+    // Show confirmation modal
+    setConfirmDeallocate(targets);
+  }
+
+  async function executeDeallocation(targets) {
+    const original = { ...bedsState?.beds };
+    setDeallocating(true);
+    
+    try {
+      // Single batch request then refresh block detail
+      const resp = await deallocateBedsBatch(id, Number(tent), Number(block), targets);
+      const success = Number(resp?.success || 0);
+      
+      // Refresh state from server to avoid any local drift
+      const blockRes = await fetchBlockDetail(id, Number(tent), Number(block));
+      setMeta(blockRes.meta);
+      setBedsState({ capacity: blockRes.blockSize, beds: blockRes.beds });
+      setSelectedBeds([]);
+      
+      if (success > 0) showNotification('success', `Deallocated ${success} bed(s)`); 
+      else showNotification('error', 'No beds were deallocated');
+    } catch (e) {
+      showNotification('error', e.message || 'Batch deallocation failed');
+      setBedsState((s) => ({ ...s, beds: original }));
+    } finally {
+      setDeallocating(false);
+      setConfirmDeallocate(null);
+    }
+  }
+
+  // Reallocate helpers
+  function getTodayIST() {
+    const now = new Date();
+    const istOffsetMs = 5.5 * 60 * 60 * 1000;
+    const ist = new Date(now.getTime() + istOffsetMs);
+    return ist.toISOString().split('T')[0];
+  }
+
+  // Reallocate helpers removed per request
+
+  // Reallocate flow removed per request
+
+  // Reallocate flow removed per request
 
   async function handleBulkBooking(formData) {
     const { name, phone, maleCount, femaleCount, startDate, endDate } = formData;
@@ -366,10 +496,62 @@ export default function BlockBedsPage({ params }) {
         </div>
       </section>
 
+      {/* Controls above grid: phone filter + batch actions */}
+      <section className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative z-50" data-preserve-selection="true">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative w-full sm:w-64">
+            <input
+              value={phoneFilter}
+              onChange={(e) => setPhoneFilter(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              placeholder="Filter by 10-digit phone"
+              className="w-full rounded-lg border border-gray-600 bg-gray-700 text-white placeholder-gray-400 p-2 pr-10"
+              inputMode="numeric"
+              maxLength={10}
+            />
+            {phoneFilter && (
+              <button
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-300 hover:text-white"
+                onClick={() => setPhoneFilter('')}
+                title="Clear"
+              >
+                ×
+              </button>
+            )}
+          </div>
+          {phoneFilter && phoneFilter.length !== 10 && (
+            <span className="text-xs text-amber-300">Enter exactly 10 digits</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={openBatchEdit}
+            disabled={selectedAllocations.length === 0}
+            data-preserve-selection="true"
+            className="px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed relative z-50 pointer-events-auto"
+          >
+            Batch Edit
+          </button>
+          <button
+            type="button"
+            onClick={handleBatchDeallocate}
+            disabled={deallocating || selectedAllocations.length === 0}
+            data-preserve-selection="true"
+            className="px-3 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed relative z-50 pointer-events-auto"
+          >
+            {deallocating ? 'Deallocating...' : 'Batch Deallocate'}
+          </button>
+          {/* Reallocate button removed per request */}
+        </div>
+      </section>
+
       <BedGrid
         capacity={bedsState.capacity}
         beds={bedsState.beds}
         onSelect={openAllocate}
+        selectedBeds={selectedBeds}
+        onSelectionChange={setSelectedBeds}
+        filterPhone={phoneFilter}
       />
 
       <AllocateModal
@@ -394,6 +576,42 @@ export default function BlockBedsPage({ params }) {
         notification={notification}
         onClose={closeNotification}
       />
+
+      {/* Confirmation Modal for Batch Deallocate */}
+      {confirmDeallocate && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]" onClick={() => !deallocating && setConfirmDeallocate(null)}>
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Confirm Deallocation</h3>
+            <p className="text-gray-700 mb-6">
+              Are you sure you want to deallocate <span className="font-semibold">{confirmDeallocate.length} bed(s)</span>?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmDeallocate(null)}
+                disabled={deallocating}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => executeDeallocation(confirmDeallocate)}
+                disabled={deallocating}
+                className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {deallocating && (
+                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                )}
+                {deallocating ? 'Deallocating...' : 'Deallocate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reallocate modal removed per request */}
     </main>
   );
 }

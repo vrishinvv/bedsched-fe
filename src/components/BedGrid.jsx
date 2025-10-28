@@ -1,44 +1,72 @@
 'use client';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-export default function BedGrid({ capacity = 100, beds = {}, onSelect }) {
+export default function BedGrid({
+    capacity = 100,
+    beds = {},
+    onSelect,
+    // Optional multi-select props
+    selectedBeds = [],
+    onSelectionChange,
+    // Optional phone filter: if provided and valid (10 digits), non-matching beds are dimmed
+    filterPhone = ''
+}) {
     // beds: { [bedNumber]: allocationOrNull }
-    const items = Array.from({ length: capacity }, (_, i) => i + 1);
-    console.log('Rendering BedGrid with capacity:', capacity, 'and beds:', beds);
+    const items = useMemo(() => Array.from({ length: capacity }, (_, i) => i + 1), [capacity]);
+    const [anchor, setAnchor] = useState(null); // for ctrl/cmd range selection
+    const containerRef = useRef(null);
     
-    // Helper function to get today's date in YYYY-MM-DD format (IST)
-    const getTodayIST = () => {
-        const now = new Date();
-        // Convert to IST (UTC+5:30)
-        const istOffset = 5.5 * 60 * 60 * 1000;
-        const istTime = new Date(now.getTime() + istOffset);
-        
-        // Format as YYYY-MM-DD
-        return istTime.toISOString().split('T')[0];
-    };
+    // Helper: get today's date in YYYY-MM-DD for IST using stable timezone formatting
+    const todayIST = useMemo(() => {
+        try {
+            // en-CA yields YYYY-MM-DD
+            return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+        } catch {
+            // Fallback: toLocaleDateString
+            return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        }
+    }, []);
+
+    const toNum = (yyyyMmDd) => yyyyMmDd ? Number(yyyyMmDd.replace(/-/g, '')) : NaN;
     
     // Helper function to determine bed status
     const getBedStatus = (allocation) => {
         if (!allocation) return 'available';
-        if (allocation.status === 'reserved' && allocation.reservedExpiresAt) {
+        if (allocation.status === 'reserved') {
+            // Treat null/absent expiry as active (align with backend semantics)
+            if (!allocation.reservedExpiresAt) return 'reserved';
             const expires = new Date(allocation.reservedExpiresAt).getTime();
             if (Date.now() < expires) return 'reserved';
+            // If reservation expired, treat as available (ignore date range)
+            return 'available';
         }
         
-        const today = getTodayIST();
+        const today = todayIST;
         const startDate = allocation.startDate;
         const endDate = allocation.endDate;
         
         if (!startDate || !endDate) return 'available';
         
         // Check if today is within the booking period
-        if (today >= startDate && today <= endDate) {
+        const tN = toNum(today), sN = toNum(startDate), eN = toNum(endDate);
+        if (Number.isFinite(tN) && Number.isFinite(sN) && Number.isFinite(eN) && tN >= sN && tN <= eN) {
             return 'current'; // Currently occupied
-        } else if (startDate > today) {
+        } else if (Number.isFinite(sN) && Number.isFinite(tN) && sN > tN) {
             return 'future'; // Future allocation
         } else {
             return 'available'; // Past allocation (treat as available)
         }
     };
+
+    // Precompute statuses to avoid recalculating in render loop
+    const statuses = useMemo(() => {
+        const map = new Map();
+        for (let n of items) {
+            const allocation = beds?.[n];
+            map.set(n, getBedStatus(allocation));
+        }
+        return map;
+    }, [items, beds, todayIST]);
     
     // Helper function to format date for display as dd/mm/yyyy
     const formatDate = (dateString) => {
@@ -48,8 +76,67 @@ export default function BedGrid({ capacity = 100, beds = {}, onSelect }) {
         return `${day}/${month}/${year}`;
     };
     
+    // Normalize phone filter (digits only)
+    const normalizedPhone = useMemo(() => (filterPhone || '').replace(/\D/g, ''), [filterPhone]);
+
+    const isSelected = (n) => Array.isArray(selectedBeds) && selectedBeds.includes(n);
+
+    function emitSelection(next) {
+        if (typeof onSelectionChange === 'function') onSelectionChange(next);
+    }
+
+    const handleClick = useCallback((e, n, allocation) => {
+        const isCtrlOrMeta = e.ctrlKey || e.metaKey; // support macOS cmd key too
+
+        if (isCtrlOrMeta) {
+            // Range select behavior: first ctrl/cmd-click sets anchor; second selects inclusive range
+            if (anchor == null) {
+                setAnchor(n);
+                emitSelection([n]);
+            } else {
+                const [start, end] = anchor < n ? [anchor, n] : [n, anchor];
+                const range = Array.from({ length: end - start + 1 }, (_, i) => start + i);
+                emitSelection(range);
+                setAnchor(null);
+            }
+            return;
+        }
+
+        // Regular click: open allocation modal/callback
+        setAnchor(null);
+        onSelect?.(n, allocation || null);
+    }, [anchor, onSelect]);
+
+    // Clear selection when clicking outside the grid or pressing Escape
+    useEffect(() => {
+        function onDocClick(ev) {
+            if (!Array.isArray(selectedBeds) || selectedBeds.length === 0) return;
+            const node = containerRef.current;
+            if (!node) return;
+            // Don't clear if clicking on elements that preserve selection (e.g., toolbar buttons)
+            const preserve = ev.target && typeof ev.target.closest === 'function' && ev.target.closest('[data-preserve-selection="true"]');
+            if (preserve) return;
+            if (!node.contains(ev.target)) {
+                setAnchor(null);
+                emitSelection([]);
+            }
+        }
+        function onKey(ev) {
+            if (ev.key === 'Escape' && Array.isArray(selectedBeds) && selectedBeds.length > 0) {
+                setAnchor(null);
+                emitSelection([]);
+            }
+        }
+        document.addEventListener('click', onDocClick);
+        document.addEventListener('keydown', onKey);
+        return () => {
+            document.removeEventListener('click', onDocClick);
+            document.removeEventListener('keydown', onKey);
+        };
+    }, [selectedBeds]);
+
     return (
-        <div className="p-3 sm:p-6 bg-gray-800 rounded-2xl shadow-2xl">
+        <div ref={containerRef} className="p-3 sm:p-6 bg-gray-800 rounded-2xl shadow-2xl">
             {/* Header */}
             <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
@@ -73,6 +160,19 @@ export default function BedGrid({ capacity = 100, beds = {}, onSelect }) {
                         <div className="w-3 h-3 bg-blue-500 rounded-full shadow-lg"></div>
                         <span className="text-gray-300">Reserved</span>
                     </div>
+                    {Array.isArray(selectedBeds) && selectedBeds.length > 0 && (
+                        <div className="flex items-center gap-2 ml-2">
+                            <div className="w-3 h-3 rounded-full shadow-lg ring-2 ring-yellow-300 bg-transparent"></div>
+                            <span className="text-gray-300">Selected ({selectedBeds.length})</span>
+                            <button
+                                onClick={() => { setAnchor(null); emitSelection([]); }}
+                                className="ml-1 px-2 py-0.5 rounded bg-gray-700 text-gray-200 hover:bg-gray-600"
+                                title="Clear selection (Esc)"
+                            >
+                                Clear
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -81,7 +181,7 @@ export default function BedGrid({ capacity = 100, beds = {}, onSelect }) {
                 <div className="inline-flex items-center gap-2 bg-gray-700/50 rounded-lg px-3 py-1">
                     <span className="text-xs text-gray-400">Today (IST):</span>
                     <span className="text-sm font-medium text-white">
-                        {formatDate(getTodayIST())}
+                        {formatDate(todayIST)}
                     </span>
                 </div>
             </div>
@@ -90,7 +190,8 @@ export default function BedGrid({ capacity = 100, beds = {}, onSelect }) {
             <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 lg:grid-cols-16 xl:grid-cols-20 gap-2 sm:gap-3">
                 {items.map((n) => {
                     const allocation = beds?.[n];
-                    const status = getBedStatus(allocation);
+                    const status = statuses.get(n);
+                    const phoneMatch = allocation?.phone && normalizedPhone.length === 10 && allocation.phone === normalizedPhone;
                     
                     // Define styles based on status
                     const getStatusStyles = () => {
@@ -126,7 +227,7 @@ export default function BedGrid({ capacity = 100, beds = {}, onSelect }) {
                     
                     // Generate tooltip text
                     const getTooltipText = () => {
-                        if (!allocation) return `Bed ${n}: Available`;
+                        if (status === 'available') return `Bed ${n}: Available`;
                         
                         const startDate = formatDate(allocation.startDate);
                         const endDate = formatDate(allocation.endDate);
@@ -142,19 +243,21 @@ export default function BedGrid({ capacity = 100, beds = {}, onSelect }) {
                             case 'future':
                                 return `Bed ${n}: ${allocation.name} (${startDate} - ${endDate}) - Future Booking`;
                             default:
-                                return `Bed ${n}: ${allocation.name} (${startDate} - ${endDate}) - Past Booking`;
+                                return `Bed ${n}: Available`;
                         }
                     };
                     
                     return (
                         <button
                             key={n}
-                            onClick={() => onSelect(n, allocation || null)}
+                            onClick={(e) => handleClick(e, n, status === 'available' ? null : (allocation || null))}
                             className={`
                                 group relative aspect-square w-full rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold
                                 shadow-lg transition-all duration-300 ease-out transform cursor-pointer
                                 hover:scale-110 hover:shadow-xl hover:z-10
                                 ${styles.bg} ${styles.shadow}
+                                ${normalizedPhone.length === 10 && !phoneMatch ? 'opacity-40' : ''}
+                                ${isSelected(n) ? 'ring-4 ring-yellow-300 ring-offset-2 ring-offset-gray-800' : ''}
                             `}
                             title={getTooltipText()}
                         >
@@ -166,6 +269,9 @@ export default function BedGrid({ capacity = 100, beds = {}, onSelect }) {
                             
                             {/* Subtle pattern overlay */}
                             <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/10 to-transparent" />
+                            {phoneMatch && (
+                                <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-300 rounded-full shadow" title="Phone match" />
+                            )}
                         </button>
                     );
                 })}

@@ -139,6 +139,8 @@ export async function fetchBlockDetail(locationId, tentIndex, blockIndex) {
   return handle(res, 'Failed to fetch block detail');
 }
 
+// Reallocate-related helpers removed per request
+
 /**
  * Update location capacity
  */
@@ -209,6 +211,17 @@ export async function updateBlock(locationId, tentIndex, blockIndex, payload) {
   });
   return handle(res, 'Failed to update block');
 }
+
+export async function deallocateBedsBatch(locationId, tentIndex, blockIndex, bedNumbers) {
+  const res = await fetch(`${API_BASE_URL}/api/locations/${locationId}/tents/${tentIndex}/blocks/${blockIndex}/beds/deallocate-batch`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ bedNumbers }),
+  });
+  return handle(res, 'Failed to batch deallocate beds');
+}
+
+// Reallocate-related helpers removed per request
 
 // Auth helpers
 export async function login(username, password) {

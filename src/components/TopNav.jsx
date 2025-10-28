@@ -1,9 +1,11 @@
 "use client";
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { getMe } from '@/lib/api';
 
 export default function TopNav() {
+  const pathname = usePathname();
   const [user, setUser] = useState(null);
   const [open, setOpen] = useState(false);
 
@@ -20,9 +22,8 @@ export default function TopNav() {
 
   const isAdmin = user?.role === 'admin';
 
-  if (!user) {
-    return null; // Don't show nav until user is loaded
-  }
+  // Hide nav on the login page
+  if (pathname === '/login') return null;
 
   return (
     <nav className="text-sm">
@@ -93,6 +94,9 @@ export default function TopNav() {
                   </Link>
                 </li>
               </>
+            )}
+            {!isAdmin && (
+              <li className="px-3 py-2 text-gray-500 text-xs">Signed in{user?.username ? ` as ${user.username}` : ''}</li>
             )}
           </ul>
         </div>
