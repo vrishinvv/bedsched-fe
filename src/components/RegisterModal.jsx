@@ -49,6 +49,7 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
     try {
       setPending(true);
       setResult(null);
+      closeNote(); // Clear any previous notifications immediately
       // Basic validations
       if (!/^\d{10}$/.test(form.phone)) {
         show('error', 'Please enter a valid 10-digit phone number.');
@@ -246,9 +247,9 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
 
           <div className="flex items-center justify-between gap-3 border-t px-4 sm:px-6 py-3 sm:py-4 bg-gray-50 sticky bottom-0">
             {/* Explain disabled state */}
-            {!canReserve && !result && (
+            {!canReserve && !result && !pending && (
               <div className="text-xs text-red-600 space-y-1">
-                <div className="font-medium">Can’t reserve yet:</div>
+                <div className="font-medium">Can't reserve yet:</div>
                 <ul className="list-disc pl-4">
                   {validationErrors.map((e, i) => (<li key={i}>{e}</li>))}
                 </ul>

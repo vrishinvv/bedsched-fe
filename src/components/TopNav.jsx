@@ -8,6 +8,7 @@ export default function TopNav() {
   const pathname = usePathname();
   const [user, setUser] = useState(null);
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -16,9 +17,11 @@ export default function TopNav() {
         setUser(res.user || null);
       } catch (e) {
         setUser(null);
+      } finally {
+        setLoading(false);
       }
     })();
-  }, []);
+  }, [pathname]); // Re-fetch when pathname changes (e.g., after login redirect)
 
   const isAdmin = user?.role === 'admin';
 
@@ -49,9 +52,9 @@ export default function TopNav() {
       <div
         role="dialog"
         aria-modal="true"
-        className={`fixed right-0 top-0 z-50 h-full w-72 max-w-[85vw] bg-gray-900/95 backdrop-blur border-l border-white/10 transform transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`fixed right-0 top-0 z-50 h-full w-72 max-w-[85vw] bg-gray-900/95 backdrop-blur border-l border-white/10 transform transition-transform duration-300 flex flex-col ${open ? 'translate-x-0' : 'translate-x-full'}`}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 flex-shrink-0">
           <div className="text-base font-semibold text-white">Menu</div>
           <button
             aria-label="Close menu"
@@ -64,8 +67,9 @@ export default function TopNav() {
           </button>
         </div>
 
-        <div className="px-2 py-2 pb-safe">
-          <ul className="space-y-1">
+        <div className="flex-1 overflow-y-auto px-2 py-2">
+          <ul className="space-y-1">{!loading && (
+            <>
             <li>
               <Link onClick={() => setOpen(false)} href="/" className="block px-3 py-2 rounded-md text-gray-200 hover:bg-white/10 hover:text-white transition-colors">
                 Dashboard
@@ -95,11 +99,20 @@ export default function TopNav() {
                 </li>
               </>
             )}
-            {!isAdmin && (
-              <li className="px-3 py-2 text-gray-500 text-xs">Signed in{user?.username ? ` as ${user.username}` : ''}</li>
-            )}
+            </>
+          )}
           </ul>
         </div>
+
+        {/* User info at bottom */}
+        {!loading && user && (
+          <div className="flex-shrink-0 p-4 border-t border-white/10 bg-gray-900/50">
+            <div className="text-gray-400 text-xs">
+              Signed in{user.username ? ` as ${user.username}` : ''}
+              {isAdmin && <span className="ml-2 px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded text-[10px] font-medium">ADMIN</span>}
+            </div>
+          </div>
+        )}
       </div>
     </nav>
   );
