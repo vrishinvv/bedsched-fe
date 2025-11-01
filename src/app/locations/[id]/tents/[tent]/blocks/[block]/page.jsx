@@ -53,10 +53,11 @@ export default function BlockBedsPage({ params }) {
     })();
   }, [id, tent, block]);
 
-  const allocatedCount = useMemo(
-    () => Object.values(bedsState?.beds || {}).filter(b => b && b.status === 'confirmed').length,
-    [bedsState]
-  );
+  const allocatedCount = useMemo(() => {
+    // Backend now correctly filters by end_date >= TODAY, so we just count confirmed beds
+    // The backend only returns current and future allocations
+    return Object.values(bedsState?.beds || {}).filter(b => b && b.status === 'confirmed').length;
+  }, [bedsState]);
 
   const stats = useMemo(() => {
     if (!bedsState) return { totalCapacity: 0, totalAllocated: 0, totalNotAllocated: 0, totalFreeingTomorrow: 0, totalReserved: 0 };
