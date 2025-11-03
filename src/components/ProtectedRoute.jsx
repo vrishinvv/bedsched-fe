@@ -26,7 +26,7 @@ export default function ProtectedRoute({ children, adminOnly = false }) {
         }
         
         // If admin only, check role
-        if (adminOnly && me.user.role !== 'admin') {
+        if (adminOnly && !['admin', 'location_user'].includes(me.user.role)) {
           router.push('/');
           return;
         }

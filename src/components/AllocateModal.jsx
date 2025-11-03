@@ -15,11 +15,15 @@ export default function AllocateModal({
   const [form, setForm] = useState({
     name: '',
     phone: '',
+    aadharNumber: '',
     gender: 'Male',
     startDate: '',
     endDate: '',
   });
   const ref = useRef(null);
+
+  const MIN_DATE = '2025-11-03';
+  const MAX_DATE = '2025-11-24';
 
   // Helper function to get today's date in YYYY-MM-DD format (IST)
   const getTodayDate = () => {
@@ -49,6 +53,7 @@ export default function AllocateModal({
         setForm({
           name: initialData.name || '',
           phone: initialData.phone || '',
+          aadharNumber: initialData.aadharNumber || '',
           gender: initialData.gender || 'Male',
           startDate: initialData.startDate || '',
           endDate: initialData.endDate || '',
@@ -66,6 +71,7 @@ export default function AllocateModal({
         setForm({
           name: '',
           phone: '',
+          aadharNumber: '',
           gender: defaultGender,
           startDate: '',
           endDate: '',
@@ -142,6 +148,15 @@ export default function AllocateModal({
       setForm((f) => ({ ...f, phone: digits }));
       return;
     }
+    // Format Aadhar: digits only, max 12, display with spaces every 4 digits
+    if (name === 'aadharNumber') {
+      const digits = value.replace(/\D/g, '').slice(0, 12);
+      const formatted = digits.replace(/(\d{4})(\d{0,4})(\d{0,4})/, (match, g1, g2, g3) => {
+        return [g1, g2, g3].filter(Boolean).join(' ');
+      });
+      setForm((f) => ({ ...f, aadharNumber: formatted }));
+      return;
+    }
     setForm((f) => ({ ...f, [name]: value }));
   }
 
@@ -155,11 +170,20 @@ export default function AllocateModal({
       return alert('Please enter a valid 10-digit phone number.');
     }
 
+    // Validate Aadhar: if provided, must be exactly 12 digits
+    const aadharDigits = form.aadharNumber.replace(/\D/g, '');
+    if (form.aadharNumber && aadharDigits.length !== 12) {
+      return alert('Aadhar number must be exactly 12 digits.');
+    }
+
     const today = getTodayDate();
     
-    // End date must be today or in the future (for both new and edits)
-    if (form.endDate < today) {
-      return alert('End date must be today or in the future.');
+    // Validate date range
+    if (form.startDate < MIN_DATE || form.startDate > MAX_DATE) {
+      return alert(`Start date must be between ${MIN_DATE} and ${MAX_DATE}.`);
+    }
+    if (form.endDate < MIN_DATE || form.endDate > MAX_DATE) {
+      return alert(`End date must be between ${MIN_DATE} and ${MAX_DATE}.`);
     }
     
     // End date cannot be before start date
@@ -178,7 +202,8 @@ export default function AllocateModal({
 
     const payload = {
       ...form,
-      gender: selectedGender
+      gender: selectedGender,
+      aadharNumber: aadharDigits || undefined // Send without spaces, omit if empty
     };
     
     // Remove status from payload if it exists (backend doesn't need it for update)
@@ -198,7 +223,8 @@ export default function AllocateModal({
     if (!/^\d{10}$/.test(form.phone)) errs.push('Enter a valid 10-digit phone number');
     if (!form.startDate) errs.push('Start date is required');
     if (!form.endDate) errs.push('End date is required');
-    if (form.endDate && form.endDate < todayDate) errs.push('End date must be today or later');
+    if (form.startDate && (form.startDate < MIN_DATE || form.startDate > MAX_DATE)) errs.push('Start date must be Nov 3-24, 2025');
+    if (form.endDate && (form.endDate < MIN_DATE || form.endDate > MAX_DATE)) errs.push('End date must be Nov 3-24, 2025');
     if (form.startDate && form.endDate && form.endDate < form.startDate) errs.push('End date cannot be before start date');
     const selectedGender = form.gender || 'Male';
     if (genderRestriction === 'male_only' && selectedGender.toLowerCase() !== 'male') errs.push('This tent is restricted to male guests only');
@@ -208,9 +234,9 @@ export default function AllocateModal({
   const canSave = validationErrors.length === 0 && !pending;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={!pending ? onClose : undefined} />
-      <div ref={ref} className="relative w-full h-full sm:h-auto sm:max-w-lg rounded-none sm:rounded-2xl bg-white p-4 sm:p-5 shadow-xl overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center" data-preserve-selection="true" onClick={(e) => e.stopPropagation()}>
+      <div className="absolute inset-0 bg-black/40" onClick={!pending ? onClose : undefined} data-preserve-selection="true" />
+      <div ref={ref} className="relative w-full h-full sm:h-auto sm:max-w-lg rounded-none sm:rounded-2xl bg-white p-4 sm:p-5 shadow-xl overflow-y-auto" data-preserve-selection="true" onClick={(e) => e.stopPropagation()}>
         {/* Enhanced loading overlay with skeleton */}
         {pending && (
           <div className="absolute inset-0 bg-white/95 rounded-2xl flex flex-col items-center justify-center z-10 p-8">
@@ -287,6 +313,21 @@ export default function AllocateModal({
             />
           </div>
           <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Aadhar Number (Optional)</label>
+            <input 
+              name="aadharNumber" 
+              value={form.aadharNumber} 
+              onChange={handleChange} 
+              disabled={pending}
+              type="tel"
+              inputMode="numeric"
+              maxLength={14}
+              className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
+              placeholder="1234 5678 9012" 
+            />
+            <p className="text-xs text-gray-500 mt-1">12 digits (optional)</p>
+          </div>
+          <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Gender*</label>
             <select 
               name="gender" 
@@ -310,10 +351,12 @@ export default function AllocateModal({
               name="startDate" 
               value={form.startDate} 
               onChange={handleChange}
+              min={MIN_DATE}
+              max={MAX_DATE}
               disabled={pending}
               className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
             />
-            <p className="text-xs text-gray-500 mt-1">Can be any date (past, present, or future)</p>
+            <p className="text-xs text-gray-500 mt-1">Nov 3-24, 2025</p>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">End date*</label>
@@ -322,11 +365,12 @@ export default function AllocateModal({
               name="endDate" 
               value={form.endDate} 
               onChange={handleChange}
-              min={todayDate}
+              min={MIN_DATE}
+              max={MAX_DATE}
               disabled={pending}
               className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
             />
-            <p className="text-xs text-gray-500 mt-1">Must be today or later</p>
+            <p className="text-xs text-gray-500 mt-1">Nov 3-24, 2025</p>
           </div>
         </div>
         

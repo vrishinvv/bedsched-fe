@@ -221,6 +221,15 @@ export async function deallocateBedsBatch(locationId, tentIndex, blockIndex, bed
   return handle(res, 'Failed to batch deallocate beds');
 }
 
+export async function editAllocationsBatch(locationId, tentIndex, blockIndex, bedNumbers, updates) {
+  const res = await fetch(`${API_BASE_URL}/api/locations/${locationId}/tents/${tentIndex}/blocks/${blockIndex}/beds/batch-edit`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ bedNumbers, updates }),
+  });
+  return handle(res, 'Failed to batch edit allocations');
+}
+
 // Reallocate-related helpers removed per request
 
 // Auth helpers

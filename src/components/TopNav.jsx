@@ -1,11 +1,12 @@
 "use client";
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
-import { getMe } from '@/lib/api';
+import { usePathname, useRouter } from 'next/navigation';
+import { getMe, logout } from '@/lib/api';
 
 export default function TopNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const [user, setUser] = useState(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -23,7 +24,18 @@ export default function TopNav() {
     })();
   }, [pathname]); // Re-fetch when pathname changes (e.g., after login redirect)
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setOpen(false);
+      router.push('/login');
+    } catch (e) {
+      console.error('Logout failed:', e);
+    }
+  };
+
   const isAdmin = user?.role === 'admin';
+  const isLocationUser = user?.role === 'location_user';
 
   // Hide nav on the login page
   if (pathname === '/login') return null;
@@ -75,7 +87,7 @@ export default function TopNav() {
                 Dashboard
               </Link>
             </li>
-            {isAdmin && (
+            {(isAdmin || isLocationUser) && (
               <>
                 <li>
                   <Link onClick={() => setOpen(false)} href="/admin/confirm" className="block px-3 py-2 rounded-md text-gray-200 hover:bg-white/10 hover:text-white transition-colors">
@@ -99,6 +111,14 @@ export default function TopNav() {
                 </li>
               </>
             )}
+            <li className="pt-2">
+              <button
+                onClick={handleLogout}
+                className="w-full text-left px-3 py-2 rounded-md text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors"
+              >
+                Logout
+              </button>
+            </li>
             </>
           )}
           </ul>
@@ -110,6 +130,7 @@ export default function TopNav() {
             <div className="text-gray-400 text-xs">
               Signed in{user.username ? ` as ${user.username}` : ''}
               {isAdmin && <span className="ml-2 px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded text-[10px] font-medium">ADMIN</span>}
+              {isLocationUser && <span className="ml-2 px-2 py-0.5 bg-green-500/20 text-green-300 rounded text-[10px] font-medium">LOCATION</span>}
             </div>
           </div>
         )}

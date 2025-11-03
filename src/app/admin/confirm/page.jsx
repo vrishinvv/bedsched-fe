@@ -2,7 +2,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { searchAllocationsByPhone, confirmAllocations } from '@/lib/api';
+import { searchAllocationsByPhone, confirmAllocations, getMe } from '@/lib/api';
 import Notification from '@/components/Notification';
 import SearchResultCard from '@/components/SearchResultCard';
 import { TreeSkeleton } from '@/components/Skeleton';
@@ -18,14 +18,32 @@ function AdminConfirmContent() {
   const [note, setNote] = useState(null);
   const [filter, setFilter] = useState({ locationId: '', tentIndex: '', blockIndex: '' });
   const [filterBatchId, setFilterBatchId] = useState(null);
+  const [userLocationId, setUserLocationId] = useState(null);
 
   const show = (type, message) => setNote({ type, message });
 
   const onSearch = async () => {
+    if (!phone || !/^\d{10}$/.test(phone)) {
+      show('error', 'Please enter a valid 10-digit phone number');
+      return;
+    }
     try {
       setLoading(true);
       const res = await searchAllocationsByPhone(phone);
-      setResults(res);
+      const me = await getMe().catch(() => null);
+      
+      let batches = res.batches || [];
+      
+      // Filter for location_user role
+      if (me?.user?.role === 'location_user' && me?.user?.locationId) {
+        setUserLocationId(me.user.locationId);
+        batches = batches.map(batch => ({
+          ...batch,
+          items: batch.items.filter(item => Number(item.locationId) === Number(me.user.locationId))
+        })).filter(batch => batch.items.length > 0);
+      }
+      
+      setResults({ ...res, batches });
       setSelectedIds([]);
     } catch (e) {
       show('error', e.message || 'Search failed');
@@ -56,7 +74,20 @@ function AdminConfirmContent() {
         try {
           setLoading(true);
           const res = await searchAllocationsByPhone(qp);
-          setResults(res);
+          const me = await getMe().catch(() => null);
+          
+          let batches = res.batches || [];
+          
+          // Filter for location_user role
+          if (me?.user?.role === 'location_user' && me?.user?.locationId) {
+            setUserLocationId(me.user.locationId);
+            batches = batches.map(batch => ({
+              ...batch,
+              items: batch.items.filter(item => Number(item.locationId) === Number(me.user.locationId))
+            })).filter(batch => batch.items.length > 0);
+          }
+          
+          setResults({ ...res, batches });
           setSelectedIds([]);
         } catch (e) {
           show('error', e.message || 'Search failed');
@@ -129,12 +160,15 @@ function AdminConfirmContent() {
         <div className="flex items-center gap-2">
           <input
             type="tel"
-            placeholder="Enter phone number"
+            inputMode="numeric"
+            pattern="\\d{10}"
+            maxLength={10}
+            placeholder="Enter 10-digit phone number"
             className="flex-1 min-w-0 rounded-lg border border-white/10 px-3 py-2 bg-black/40 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm sm:text-base touch-manipulation"
             value={phone}
-            onChange={(e)=>setPhone(e.target.value)}
+            onChange={(e)=>setPhone(e.target.value.replace(/\D/g, '').slice(0,10))}
           />
-          <button onClick={onSearch} disabled={loading || !phone} className="px-3 sm:px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-medium disabled:opacity-50 text-sm sm:text-base touch-manipulation whitespace-nowrap">Search</button>
+          <button onClick={onSearch} disabled={loading || !phone || phone.length !== 10} className="px-3 sm:px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-medium disabled:opacity-50 text-sm sm:text-base touch-manipulation whitespace-nowrap">Search</button>
         </div>
       </section>
 

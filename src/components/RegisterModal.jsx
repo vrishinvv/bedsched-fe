@@ -6,6 +6,7 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
   const [form, setForm] = useState({
     contactName: defaultValues.contactName || '',
     phone: defaultValues.phone || '',
+    aadharNumber: '',
     isFamily: defaultValues.isFamily ?? false,
     maleCount: defaultValues.maleCount || 0,
     femaleCount: defaultValues.femaleCount || 0,
@@ -17,6 +18,9 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
   const [confirmCtx, setConfirmCtx] = useState(null); // { type: 'mixed-blocks'|'split', preview: [...] }
   const [result, setResult] = useState(null); // store reservation result for summary
 
+  const MIN_DATE = '2025-11-03';
+  const MAX_DATE = '2025-11-24';
+
   const getTodayIST = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
   // Reset modal state on reopen so it doesn't retain old state
@@ -25,6 +29,7 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
       setForm({
         contactName: defaultValues.contactName || '',
         phone: defaultValues.phone || '',
+        aadharNumber: '',
         isFamily: defaultValues.isFamily ?? false,
         maleCount: defaultValues.maleCount || 0,
         femaleCount: defaultValues.femaleCount || 0,
@@ -55,13 +60,21 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
         show('error', 'Please enter a valid 10-digit phone number.');
         return;
       }
+      const aadharDigits = form.aadharNumber.replace(/\D/g, '');
+      if (form.aadharNumber && aadharDigits.length !== 12) {
+        show('error', 'Aadhar number must be exactly 12 digits.');
+        return;
+      }
       if (!form.startDate || !form.endDate) {
         show('error', 'Start and End dates are required.');
         return;
       }
-      const today = getTodayIST();
-      if (form.endDate < today) {
-        show('error', 'End date must be today or later.');
+      if (form.startDate < MIN_DATE || form.startDate > MAX_DATE) {
+        show('error', `Start date must be between ${MIN_DATE} and ${MAX_DATE}.`);
+        return;
+      }
+      if (form.endDate < MIN_DATE || form.endDate > MAX_DATE) {
+        show('error', `End date must be between ${MIN_DATE} and ${MAX_DATE}.`);
         return;
       }
       if (form.endDate < form.startDate) {
@@ -71,6 +84,7 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
       const payload = {
         contactName: form.contactName || undefined,
         phone: form.phone,
+        aadharNumber: aadharDigits || undefined,
         isFamily: !!form.isFamily,
         maleCount: parseInt(form.maleCount || 0, 10),
         femaleCount: parseInt(form.femaleCount || 0, 10),
@@ -100,10 +114,12 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
   const validationErrors = (() => {
     const errs = [];
     if (!/^\d{10}$/.test(form.phone)) errs.push('Enter a valid 10-digit phone number');
+    const aadharDigits = form.aadharNumber.replace(/\D/g, '');
+    if (form.aadharNumber && aadharDigits.length !== 12) errs.push('Aadhar must be exactly 12 digits');
     if (!form.startDate) errs.push('Start date is required');
     if (!form.endDate) errs.push('End date is required');
-    const today = getTodayIST();
-    if (form.endDate && form.endDate < today) errs.push('End date must be today or later');
+    if (form.startDate && (form.startDate < MIN_DATE || form.startDate > MAX_DATE)) errs.push('Start date must be Nov 3-24, 2025');
+    if (form.endDate && (form.endDate < MIN_DATE || form.endDate > MAX_DATE)) errs.push('End date must be Nov 3-24, 2025');
     if (form.startDate && form.endDate && form.endDate < form.startDate) errs.push('End date cannot be before start date');
     if (total <= 0) errs.push('Add at least 1 person (male or female)');
     return errs;
@@ -156,7 +172,7 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
           {result && (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-900 p-3">
               <div className="font-semibold mb-2">Reserved Summary (Gender Breakdown)</div>
-              <ul className="space-y-2 text-sm">
+              <ul className="space-y-2 text-sm max-h-80 overflow-y-auto">
                 {grouped().map((g) => (
                   <li key={`${g.locationId}-${g.tentIndex}-${g.blockIndex}`} className="border-b border-emerald-200 pb-2 last:border-0">
                     <div className="flex items-center gap-2 mb-1">
@@ -204,6 +220,26 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
             </div>
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Aadhar Number</label>
+            <input
+              type="tel"
+              className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+              value={form.aadharNumber}
+              onChange={(e)=>{
+                const digits = e.target.value.replace(/\D/g, '').slice(0, 12);
+                const formatted = digits.replace(/(\d{4})(\d{0,4})(\d{0,4})/, (match, g1, g2, g3) => {
+                  return [g1, g2, g3].filter(Boolean).join(' ');
+                });
+                setForm(f=>({...f, aadharNumber: formatted }));
+              }}
+              inputMode="numeric"
+              maxLength={14}
+              placeholder="1234 5678 9012"
+            />
+            <p className="text-xs text-gray-500 mt-1">12 digits (optional)</p>
+          </div>
+
           <div className="flex items-center gap-3">
             <input id="isFamily" type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked={!!form.isFamily} onChange={(e)=>setForm(f=>({...f, isFamily: e.target.checked }))} />
             <label htmlFor="isFamily" className="text-sm text-gray-700">Family (prefer together)</label>
@@ -229,11 +265,13 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">Start Date</label>
-              <input type="date" className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900" value={form.startDate} onChange={(e)=>setForm(f=>({...f, startDate: e.target.value }))} />
+              <input type="date" min={MIN_DATE} max={MAX_DATE} className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900" value={form.startDate} onChange={(e)=>setForm(f=>({...f, startDate: e.target.value }))} />
+              <p className="text-xs text-gray-500 mt-1">Nov 3-24, 2025</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">End Date</label>
-              <input type="date" min={getTodayIST()} className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900" value={form.endDate} onChange={(e)=>setForm(f=>({...f, endDate: e.target.value }))} />
+              <input type="date" min={MIN_DATE} max={MAX_DATE} className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900" value={form.endDate} onChange={(e)=>setForm(f=>({...f, endDate: e.target.value }))} />
+              <p className="text-xs text-gray-500 mt-1">Nov 3-24, 2025</p>
             </div>
           </div>
 

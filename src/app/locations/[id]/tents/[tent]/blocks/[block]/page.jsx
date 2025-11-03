@@ -14,6 +14,7 @@ import {
   bulkAllocateBeds,
   updateBlock,
   deallocateBedsBatch,
+  editAllocationsBatch,
 } from '@/lib/api';
 
 export default function BlockBedsPage({ params }) {
@@ -124,7 +125,7 @@ export default function BlockBedsPage({ params }) {
   }
 
   async function handleSave(payload) {
-    const isBatchEdit = modal.bedNumber === 'Multiple' && Array.isArray(selectedBeds) && selectedBeds.length > 0;
+    const isBatchEdit = modal.bedNumber === 'Multiple' && Array.isArray(batchSelection) && batchSelection.length > 0;
     const n = isBatchEdit ? null : modal.bedNumber;
     const isEdit = Boolean(modal.data);
     try {
@@ -140,24 +141,36 @@ export default function BlockBedsPage({ params }) {
           return { ...s, beds: nextBeds };
         });
 
-        // Apply edits in series (or small batches)
+        // Single batch edit API call
         const targetList = (batchSelection && batchSelection.length ? batchSelection : selectedBeds);
-        for (const bn of targetList) {
-          // Skip if not allocated
-          if (!bedsState?.beds?.[bn]) continue;
-          try {
-            const updated = await editAllocation(id, Number(tent), Number(block), bn, payload);
-            if (updated && typeof updated === 'object') {
-              setBedsState((s) => ({ ...s, beds: { ...s.beds, [bn]: { ...s.beds?.[bn], ...updated, status: updated.status || (s.beds?.[bn]?.status || 'confirmed') } } }));
-            }
-          } catch (err) {
-            // best-effort: revert this bed
-            setBedsState((s) => ({ ...s, beds: { ...s.beds, [bn]: bedsState?.beds?.[bn] } }));
-            console.error('Batch edit failed for bed', bn, err);
+        const bedNumbers = targetList.filter(bn => bedsState?.beds?.[bn]); // Only allocated beds
+        
+        if (bedNumbers.length > 0) {
+          const resp = await editAllocationsBatch(id, Number(tent), Number(block), bedNumbers, payload);
+          const { success = 0, errors = [] } = resp || {};
+          
+          // Update state with authoritative data from server if needed
+          // For now, optimistic update is sufficient
+          
+          if (success > 0) {
+            showNotification('success', `Updated ${success} allocation(s)`);
           }
+          if (errors.length > 0) {
+            // Revert failed beds
+            setBedsState((s) => {
+              const nextBeds = { ...s.beds };
+              errors.forEach(({ bedNumber }) => {
+                if (bedsState?.beds?.[bedNumber]) {
+                  nextBeds[bedNumber] = bedsState.beds[bedNumber];
+                }
+              });
+              return { ...s, beds: nextBeds };
+            });
+            showNotification('error', `Failed to update ${errors.length} bed(s)`);
+          }
+        } else {
+          showNotification('info', 'No allocated beds to update');
         }
-        const count = (batchSelection && batchSelection.length ? batchSelection.length : selectedBeds.length);
-        showNotification('success', `Updated ${count} allocations`);
       } else {
         // Optimistic update: ensure status present so stats rerender correctly
         setBedsState((s) => ({ 
@@ -189,6 +202,7 @@ export default function BlockBedsPage({ params }) {
       }
 
       setModal({ open: false, bedNumber: null, data: null });
+      setBatchSelection([]);
     } catch (e) {
       // Revert optimistic update on error
       if (n != null) {
@@ -526,7 +540,7 @@ export default function BlockBedsPage({ params }) {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={openBatchEdit}
+            onClick={(e) => { e.stopPropagation(); openBatchEdit(); }}
             disabled={selectedAllocations.length === 0}
             data-preserve-selection="true"
             className="px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed relative z-50 pointer-events-auto"
@@ -535,7 +549,7 @@ export default function BlockBedsPage({ params }) {
           </button>
           <button
             type="button"
-            onClick={handleBatchDeallocate}
+            onClick={(e) => { e.stopPropagation(); handleBatchDeallocate(); }}
             disabled={deallocating || selectedAllocations.length === 0}
             data-preserve-selection="true"
             className="px-3 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed relative z-50 pointer-events-auto"

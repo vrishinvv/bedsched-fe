@@ -14,20 +14,27 @@ export default function Page() {
   const [err, setErr] = useState('');
   const [regOpen, setRegOpen] = useState(false);
   const [role, setRole] = useState(null);
+  const [locationId, setLocationId] = useState(null);
   const [adminSearch, setAdminSearch] = useState('');
 
   useEffect(() => {
     (async () => {
       try {
         const data = await fetchLocations();
-        setLocations(data);
+        console.log('[Dashboard] Raw locations data:', data);
         const me = await getMe().catch(()=>null);
+        console.log('[Dashboard] User data:', me);
         if (!me || !me.user) {
           // Not authenticated, redirect to login
           router.push('/login');
           return;
         }
         setRole(me?.user?.role || null);
+        setLocationId(me?.user?.locationId || null);
+        
+        // Show all locations for all roles - filtering is only for clickability
+        console.log('[Dashboard] Showing all locations:', data);
+        setLocations(data);
       } catch (e) {
         setErr(e.message);
       } finally {
@@ -182,11 +189,12 @@ export default function Page() {
         </div>
       </section>
 
-      {/* Location cards - visible to all, clickable only for admin */}
+      {/* Location cards - visible to all, clickable based on role */}
       <section className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {locations.map((loc) => (
-          <LocationCard key={loc.id} location={loc} isClickable={role === 'admin'} />
-        ))}
+        {locations.map((loc) => {
+          const isClickable = role === 'admin' || (role === 'location_user' && Number(loc.id) === Number(locationId));
+          return <LocationCard key={loc.id} location={loc} isClickable={isClickable} />;
+        })}
       </section>
       
       {/* Dashboard user message */}

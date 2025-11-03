@@ -11,6 +11,7 @@ export default function BulkAllocateModal({
   const [form, setForm] = useState({
     name: '',
     phone: '',
+    aadharNumber: '',
     maleCount: 0,
     femaleCount: 0,
     startDate: '',
@@ -19,6 +20,9 @@ export default function BulkAllocateModal({
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState(null); // { success: [], errors: [] }
   const ref = useRef(null);
+
+  const MIN_DATE = '2025-11-03';
+  const MAX_DATE = '2025-11-24';
 
   // Helper function to get today's date in YYYY-MM-DD format (IST)
   const getTodayDate = () => {
@@ -45,6 +49,7 @@ export default function BulkAllocateModal({
       setForm({
         name: '',
         phone: '',
+        aadharNumber: '',
         maleCount: 0,
         femaleCount: 0,
         startDate: '',
@@ -71,7 +76,15 @@ export default function BulkAllocateModal({
     const { name, value } = e.target;
     if (name === 'phone') {
       const digits = value.replace(/\D/g, '').slice(0, 10);
-      setForm((f) => ({ ...f, phone: digits }));
+      setForm(f => ({ ...f, phone: digits }));
+      return;
+    }
+    if (name === 'aadharNumber') {
+      const digits = value.replace(/\D/g, '').slice(0, 12);
+      const formatted = digits.replace(/(\d{4})(\d{0,4})(\d{0,4})/, (match, g1, g2, g3) => {
+        return [g1, g2, g3].filter(Boolean).join(' ');
+      });
+      setForm(f => ({ ...f, aadharNumber: formatted }));
       return;
     }
     setForm((f) => ({ ...f, [name]: value }));
@@ -89,6 +102,12 @@ export default function BulkAllocateModal({
 
     if (!/^\d{10}$/.test(form.phone)) {
       return alert('Please enter a valid 10-digit phone number.');
+    }
+
+    // Validate Aadhar: if provided, must be exactly 12 digits
+    const aadharDigits = form.aadharNumber.replace(/\D/g, '');
+    if (form.aadharNumber && aadharDigits.length !== 12) {
+      return alert('Aadhar number must be exactly 12 digits.');
     }
 
     const today = getTodayDate();
@@ -112,6 +131,7 @@ export default function BulkAllocateModal({
       const result = await onSave({
         name: form.name,
         phone: form.phone,
+        aadharNumber: aadharDigits || undefined,
         maleCount: isMaleOnly || isMixed ? form.maleCount : 0,
         femaleCount: isFemaleOnly || isMixed ? form.femaleCount : 0,
         startDate: form.startDate,
@@ -135,7 +155,8 @@ export default function BulkAllocateModal({
     if (!/^\d{10}$/.test(form.phone)) errs.push('Enter a valid 10-digit phone number');
     if (!form.startDate) errs.push('Start date is required');
     if (!form.endDate) errs.push('End date is required');
-    if (form.endDate && form.endDate < todayDate) errs.push('End date must be today or later');
+    if (form.startDate && (form.startDate < MIN_DATE || form.startDate > MAX_DATE)) errs.push('Start date must be Nov 3-24, 2025');
+    if (form.endDate && (form.endDate < MIN_DATE || form.endDate > MAX_DATE)) errs.push('End date must be Nov 3-24, 2025');
     if (form.startDate && form.endDate && form.endDate < form.startDate) errs.push('End date cannot be before start date');
     const totalCount = (isMixed ? (form.maleCount + form.femaleCount) : (isMaleOnly ? form.maleCount : form.femaleCount));
     if (totalCount <= 0) errs.push('Specify at least 1 person to book');
@@ -149,55 +170,59 @@ export default function BulkAllocateModal({
     const hasErrors = result.errors && result.errors.length > 0;
     
     return (
-      <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center">
-        <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-        <div ref={ref} className="relative w-full h-full sm:h-auto sm:max-w-lg rounded-none sm:rounded-2xl bg-white p-4 sm:p-6 shadow-xl overflow-y-auto">
-          <h3 className="mb-4 text-xl font-semibold text-gray-900">
-            Booking Results
-          </h3>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" data-preserve-selection="true" onClick={(e) => e.stopPropagation()}>
+        <div className="absolute inset-0 bg-black/40" onClick={onClose} data-preserve-selection="true" />
+        <div ref={ref} className="relative w-full max-w-lg max-h-[90vh] rounded-2xl bg-white shadow-xl flex flex-col overflow-hidden" data-preserve-selection="true" onClick={(e) => e.stopPropagation()}>
+          <div className="flex-shrink-0 p-4 sm:p-6 border-b border-gray-200">
+            <h3 className="text-xl font-semibold text-gray-900">
+              Booking Results
+            </h3>
+          </div>
 
-          {hasSuccess && (
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-3">
-                <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <h4 className="text-lg font-semibold text-green-700">Successfully Booked ({result.success.length})</h4>
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 min-h-0">
+            {hasSuccess && (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <h4 className="text-lg font-semibold text-green-700">Successfully Booked ({result.success.length})</h4>
+                </div>
+                <div className="space-y-2 bg-green-50 border border-green-200 rounded-lg p-4 max-h-80 overflow-y-auto">
+                  {result.success.map((booking, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-green-900">Bed {booking.bedNumber}</span>
+                      <span className="text-green-700">{booking.gender} - {booking.name}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="space-y-2 bg-green-50 border border-green-200 rounded-lg p-4">
-                {result.success.map((booking, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-green-900">Bed {booking.bedNumber}</span>
-                    <span className="text-green-700">{booking.gender} - {booking.name}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+            )}
 
-          {hasErrors && (
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-3">
-                <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <h4 className="text-lg font-semibold text-red-700">Errors ({result.errors.length})</h4>
+            {hasErrors && (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <h4 className="text-lg font-semibold text-red-700">Errors ({result.errors.length})</h4>
+                </div>
+                <div className="space-y-2 bg-red-50 border border-red-200 rounded-lg p-4 max-h-80 overflow-y-auto">
+                  {result.errors.map((error, idx) => (
+                    <div key={idx} className="text-sm text-red-700">
+                      {error.bedNumber && <span className="font-medium">Bed {error.bedNumber}: </span>}
+                      {error.message}
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="space-y-2 bg-red-50 border border-red-200 rounded-lg p-4">
-                {result.errors.map((error, idx) => (
-                  <div key={idx} className="text-sm text-red-700">
-                    {error.bedNumber && <span className="font-medium">Bed {error.bedNumber}: </span>}
-                    {error.message}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          <div className="sticky bottom-0 bg-white pt-3 pb-3 flex justify-end border-t">
+          <div className="flex-shrink-0 bg-white p-4 sm:p-6 border-t border-gray-200">
             <button 
               onClick={onClose}
-              className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black"
+              className="w-full sm:w-auto rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black"
             >
               Close
             </button>
@@ -208,9 +233,9 @@ export default function BulkAllocateModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={!pending ? onClose : undefined} />
-      <div ref={ref} className="relative w-full h-full sm:h-auto sm:max-w-lg rounded-none sm:rounded-2xl bg-white p-4 sm:p-5 shadow-xl overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center" data-preserve-selection="true">
+      <div className="absolute inset-0 bg-black/40" onClick={!pending ? onClose : undefined} data-preserve-selection="true" />
+      <div ref={ref} className="relative w-full h-full sm:h-auto sm:max-w-lg rounded-none sm:rounded-2xl bg-white p-4 sm:p-5 shadow-xl overflow-y-auto" data-preserve-selection="true">
         {/* Loading overlay */}
         {pending && (
           <div className="absolute inset-0 bg-white/95 rounded-2xl flex flex-col items-center justify-center z-10 p-8">
@@ -290,6 +315,23 @@ export default function BulkAllocateModal({
             />
           </div>
 
+          {/* Aadhar */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Aadhar Number</label>
+            <input 
+              name="aadharNumber" 
+              value={form.aadharNumber} 
+              onChange={handleChange} 
+              disabled={pending}
+              type="tel"
+              inputMode="numeric"
+              maxLength={14}
+              className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
+              placeholder="1234 5678 9012" 
+            />
+            <p className="text-xs text-gray-500 mt-1">12 digits (optional)</p>
+          </div>
+
           {/* Count inputs */}
           <div className="grid grid-cols-2 gap-3">
             {(isMaleOnly || isMixed) && (
@@ -335,9 +377,12 @@ export default function BulkAllocateModal({
                 name="startDate" 
                 value={form.startDate} 
                 onChange={handleChange}
+                min={MIN_DATE}
+                max={MAX_DATE}
                 disabled={pending}
                 className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
               />
+              <p className="text-xs text-gray-500 mt-1">Nov 3-24, 2025</p>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">End date*</label>
@@ -346,10 +391,12 @@ export default function BulkAllocateModal({
                 name="endDate" 
                 value={form.endDate} 
                 onChange={handleChange}
-                min={todayDate}
+                min={MIN_DATE}
+                max={MAX_DATE}
                 disabled={pending}
                 className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
               />
+              <p className="text-xs text-gray-500 mt-1">Nov 3-24, 2025</p>
             </div>
           </div>
         </div>

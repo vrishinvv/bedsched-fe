@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { searchAllocationsByPhone, updatePhoneByPhone, updateContactNameByPhone, updateEndDateByPhone, deallocateByPhone } from "@/lib/api";
+import { searchAllocationsByPhone, updatePhoneByPhone, updateContactNameByPhone, updateEndDateByPhone, deallocateByPhone, getMe } from "@/lib/api";
 import Notification from "@/components/Notification";
 import { TreeSkeleton } from '@/components/Skeleton';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -19,12 +19,29 @@ function EditByPhoneContent() {
   const [expanded, setExpanded] = useState({});
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [filterBatchId, setFilterBatchId] = useState(null);
+  const [userLocationId, setUserLocationId] = useState(null);
+
+  const MIN_DATE = '2025-11-03';
+  const MAX_DATE = '2025-11-24';
 
   const load = async (ph) => {
     setLoading(true); setNotification(null); setSelectedIds(new Set());
     try {
       const res = await searchAllocationsByPhone(ph);
-      setData(res.batches || []);
+      const me = await getMe().catch(() => null);
+      
+      let batches = res.batches || [];
+      
+      // Filter for location_user role
+      if (me?.user?.role === 'location_user' && me?.user?.locationId) {
+        setUserLocationId(me.user.locationId);
+        batches = batches.map(batch => ({
+          ...batch,
+          items: batch.items.filter(item => Number(item.locationId) === Number(me.user.locationId))
+        })).filter(batch => batch.items.length > 0);
+      }
+      
+      setData(batches);
       // Set newPhone to match search phone by default
       setNewPhone(ph);
       // Don't pre-fill contact name and end date - let user specify
@@ -112,6 +129,10 @@ function EditByPhoneContent() {
   const onUpdateEndDate = async (date, allocationIds = null) => {
     if (!date || !date.trim()) {
       setNotification({ type: 'error', message: 'End date cannot be empty' });
+      return;
+    }
+    if (date < MIN_DATE || date > MAX_DATE) {
+      setNotification({ type: 'error', message: `End date must be between ${MIN_DATE} and ${MAX_DATE}` });
       return;
     }
     const ids = allocationIds !== null ? allocationIds : (selectedIds.size > 0 ? Array.from(selectedIds) : undefined);
@@ -278,12 +299,15 @@ function EditByPhoneContent() {
         <div className="flex items-center gap-2">
           <input
             type="tel"
-            placeholder="Enter phone number to search"
+            inputMode="numeric"
+            pattern="\\d{10}"
+            maxLength={10}
+            placeholder="Enter 10-digit phone number"
             className="flex-1 rounded-lg border border-white/10 px-3 py-2 bg-black/40 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             value={phone}
-            onChange={(e)=>setPhone(e.target.value)}
+            onChange={(e)=>setPhone(e.target.value.replace(/\D/g, '').slice(0,10))}
           />
-          <button onClick={()=>phone && load(phone)} disabled={!phone || loading} className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium disabled:opacity-50">Search</button>
+          <button onClick={()=>phone && load(phone)} disabled={!phone || phone.length !== 10 || loading} className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium disabled:opacity-50">Search</button>
         </div>
       </section>
 
@@ -322,8 +346,10 @@ function EditByPhoneContent() {
                 type="date" 
                 value={endDate} 
                 onChange={(e)=>setEndDate(e.target.value)}
-                min={new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })}
+                min={MIN_DATE}
+                max={MAX_DATE}
               />
+              <p className="text-xs text-gray-400 mt-1">Nov 3-24, 2025</p>
             </div>
           </div>
         </section>

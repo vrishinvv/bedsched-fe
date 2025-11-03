@@ -1,12 +1,15 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { fetchDepartures } from "@/lib/api";
+import { fetchDepartures, getMe } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { TreeSkeleton } from "@/components/Skeleton";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
 function DeparturesContent() {
+  const MIN_DATE = '2025-11-03';
+  const MAX_DATE = '2025-11-24';
+  
   const getTodayIST = () => {
     const now = new Date();
     const istOffset = 5.5 * 60 * 60 * 1000;
@@ -21,13 +24,23 @@ function DeparturesContent() {
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState({}); // { 'loc-1': true, 'loc-1-tent-2': true, ... }
   const [filter, setFilter] = useState({ locationId: '', tentIndex: '', blockIndex: '' });
+  const [userLocationId, setUserLocationId] = useState(null);
   const router = useRouter();
 
   const load = async (d) => {
     setLoading(true); setError("");
     try {
       const { items } = await fetchDepartures(d);
-      setItems(items || []);
+      const me = await getMe().catch(() => null);
+      
+      // Filter for location_user role
+      let filteredData = items || [];
+      if (me?.user?.role === 'location_user' && me?.user?.locationId) {
+        setUserLocationId(me.user.locationId);
+        filteredData = filteredData.filter(item => Number(item.location_id) === Number(me.user.locationId));
+      }
+      
+      setItems(filteredData);
     } catch (e) {
       setError(e.message || "Failed to load departures");
     } finally {
@@ -160,6 +173,8 @@ function DeparturesContent() {
               type="date" 
               value={date} 
               onChange={(e)=>{ setDate(e.target.value); setSelectedFilter('custom'); load(e.target.value); }} 
+              min={MIN_DATE}
+              max={MAX_DATE}
               className="px-2 py-1.5 rounded border border-white/10 bg-black/40 text-white text-xs sm:text-sm min-w-[120px] touch-manipulation" 
             />
             <button

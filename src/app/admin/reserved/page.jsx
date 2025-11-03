@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { fetchReservedActive } from "@/lib/api";
+import { fetchReservedActive, getMe } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { TreeSkeleton } from "@/components/Skeleton";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -18,7 +18,15 @@ function ReservedActiveContent() {
     setLoading(true); setError("");
     try {
       const { items } = await fetchReservedActive();
-      setItems(items || []);
+      const me = await getMe().catch(() => null);
+      
+      // Filter for location_user role
+      let filteredData = items || [];
+      if (me?.user?.role === 'location_user' && me?.user?.locationId) {
+        filteredData = filteredData.filter(item => Number(item.location_id) === Number(me.user.locationId));
+      }
+      
+      setItems(filteredData);
     } catch (e) {
       setError(e.message || "Failed to load reserved");
     } finally {
