@@ -56,6 +56,26 @@ async function handle(res, fallbackMsg) {
 }
 
 /**
+ * Generate view URL for a photo key
+ */
+export async function generatePhotoViewUrl(photoKey) {
+  if (!photoKey) return null;
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/photo-view-url`, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ key: photoKey }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.viewUrl;
+  } catch (error) {
+    console.error('Failed to generate view URL:', error);
+    return null;
+  }
+}
+
+/**
  * Fetch all locations with their capacity and allocation data
  */
 export async function fetchLocations() {

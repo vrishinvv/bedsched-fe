@@ -47,10 +47,35 @@ export default function AllocateModal({
   const [aadhaarPhoto, setAadhaarPhoto] = useState({ blob: null, dataUrl: null });
   const [uploading, setUploading] = useState(false); // Local uploading state
   const [uploadProgress, setUploadProgress] = useState(0); // Upload progress percentage
+  const [displayProgress, setDisplayProgress] = useState(0); // Animated display progress
+  const [preFetchedUrls, setPreFetchedUrls] = useState({ person: null, aadhaar: null }); // Pre-fetched upload URLs
   const ref = useRef(null);
 
   const MIN_DATE = '2025-11-03';
   const MAX_DATE = '2025-11-24';
+
+  // Smooth animation for progress number
+  useEffect(() => {
+    if (uploadProgress === displayProgress) return;
+    
+    const duration = 300; // 300ms animation
+    const steps = 20;
+    const stepValue = (uploadProgress - displayProgress) / steps;
+    const stepDuration = duration / steps;
+    
+    let currentStep = 0;
+    const interval = setInterval(() => {
+      currentStep++;
+      if (currentStep >= steps) {
+        setDisplayProgress(uploadProgress);
+        clearInterval(interval);
+      } else {
+        setDisplayProgress(prev => Math.round(prev + stepValue));
+      }
+    }, stepDuration);
+    
+    return () => clearInterval(interval);
+  }, [uploadProgress, displayProgress]);
 
   // Helper function to get today's date in YYYY-MM-DD format (IST)
   const getTodayDate = () => {
@@ -78,6 +103,11 @@ export default function AllocateModal({
     if (open) {
       // Reset uploading state when modal opens
       setUploading(false);
+      setUploadProgress(0);
+      setDisplayProgress(0);
+      
+      // Pre-fetch upload URLs in background (non-blocking)
+      prefetchUploadUrls();
       
       if (initialData) {
         setForm({
@@ -89,7 +119,7 @@ export default function AllocateModal({
           endDate: initialData.endDate || '',
           status: initialData.status || undefined, // Preserve status for reserved beds
         });
-        // Set existing photo URLs if available - reset immediately to avoid showing stale photos
+        // Set existing photo URLs if available - MUST reset to avoid stale data
         setPersonPhoto({ 
           blob: null, 
           dataUrl: initialData.personPhotoUrl || null 
@@ -205,6 +235,13 @@ export default function AllocateModal({
     setForm((f) => ({ ...f, [name]: value }));
   }
 
+  // Helper function to generate S3 key (same pattern as backend)
+  function generatePhotoKey(photoType) {
+    const timestamp = Date.now();
+    const uuid = crypto.randomUUID();
+    return `location-${locationId}/tent-${tentIndex}/block-${blockIndex}/${timestamp}-${uuid}-${photoType}.jpg`;
+  }
+
   async function handleSave() {
     if (!form.name || !form.startDate || !form.endDate || !form.phone) {
       return alert('Name, phone, start & end dates are required');
@@ -258,76 +295,134 @@ export default function AllocateModal({
     try {
       setUploading(true);
       setUploadProgress(0);
+      setDisplayProgress(0);
       
-      // Upload photos to S3 if new photos were captured
+      console.log('Starting parallel upload + save process...');
+      
+      // Generate photo keys upfront (don't wait for backend!)
       let personPhotoKey = initialData?.personPhotoKey;
       let aadhaarPhotoKey = initialData?.aadhaarPhotoKey;
 
-      const photosToUpload = [];
-      if (personPhoto.blob) photosToUpload.push('person');
-      if (aadhaarPhoto.blob) photosToUpload.push('aadhaar');
-      
-      const totalSteps = photosToUpload.length + 1; // photos + API call
-      let completedSteps = 0;
-
       if (personPhoto.blob) {
-        setUploadProgress(Math.round((completedSteps / totalSteps) * 100));
-        const uploadResult = await uploadPhotoToS3(personPhoto.blob, 'person');
-        personPhotoKey = uploadResult.key;
-        completedSteps++;
-        setUploadProgress(Math.round((completedSteps / totalSteps) * 100));
+        personPhotoKey = generatePhotoKey('person');
       }
-
       if (aadhaarPhoto.blob) {
-        setUploadProgress(Math.round((completedSteps / totalSteps) * 100));
-        const uploadResult = await uploadPhotoToS3(aadhaarPhoto.blob, 'aadhaar');
-        aadhaarPhotoKey = uploadResult.key;
-        completedSteps++;
-        setUploadProgress(Math.round((completedSteps / totalSteps) * 100));
+        aadhaarPhotoKey = generatePhotoKey('aadhaar');
       }
 
+      // Prepare backend payload (we have keys already!)
       const payload = {
         ...form,
         gender: selectedGender,
-        aadharNumber: aadharDigits || undefined, // Send without spaces, omit if empty
+        aadharNumber: aadharDigits || undefined,
         personPhotoKey,
         aadhaarPhotoKey
       };
       
-      // Remove status from payload if it exists (backend doesn't need it for update)
       if (payload.status) {
         delete payload.status;
       }
 
-      setUploadProgress(Math.round((completedSteps / totalSteps) * 100));
-      onSave(payload);
+      // Upload photos to S3 and save to backend IN PARALLEL! 🚀
+      const parallelPromises = [];
+      
+      if (personPhoto.blob) {
+        console.log('Uploading person photo with key:', personPhotoKey);
+        parallelPromises.push(
+          uploadPhotoToS3(personPhoto.blob, 'person', personPhotoKey).then(() => {
+            console.log('Person photo uploaded');
+            return 'person';
+          })
+        );
+      }
+      
+      if (aadhaarPhoto.blob) {
+        console.log('Uploading aadhaar photo with key:', aadhaarPhotoKey);
+        parallelPromises.push(
+          uploadPhotoToS3(aadhaarPhoto.blob, 'aadhaar', aadhaarPhotoKey).then(() => {
+            console.log('Aadhaar photo uploaded');
+            return 'aadhaar';
+          })
+        );
+      }
+      
+      // Add backend save to parallel promises
+      setUploadProgress(20);
+      parallelPromises.push(
+        onSave(payload).then(() => {
+          console.log('Backend save complete');
+          return 'backend';
+        })
+      );
+
+      // Wait for EVERYTHING in parallel
+      console.log('Waiting for all operations (S3 uploads + backend save)...');
+      await Promise.all(parallelPromises);
+      console.log('All operations complete!');
+      setUploadProgress(100);
     } catch (error) {
-      console.error('Photo upload failed:', error);
+      console.error('Operation failed:', error);
       setUploading(false);
       setUploadProgress(0);
-      alert('Failed to upload photos. Please try again.');
+      alert('Failed to save. Please try again.');
+    }
+  }
+
+  // Pre-fetch upload URLs in background when modal opens
+  async function prefetchUploadUrls() {
+    try {
+      // Fetch both URLs in parallel
+      const [personUrlResponse, aadhaarUrlResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/upload-url`, {
+          method: 'POST',
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ photoType: 'person', locationId, tentIndex, blockIndex })
+        }),
+        fetch(`${API_BASE_URL}/api/upload-url`, {
+          method: 'POST',
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ photoType: 'aadhaar', locationId, tentIndex, blockIndex })
+        })
+      ]);
+
+      if (personUrlResponse.ok && aadhaarUrlResponse.ok) {
+        const personData = await personUrlResponse.json();
+        const aadhaarData = await aadhaarUrlResponse.json();
+        
+        setPreFetchedUrls({
+          person: personData,
+          aadhaar: aadhaarData
+        });
+      }
+    } catch (error) {
+      // Silent fail - will fetch on-demand if pre-fetch fails
+      console.log('Pre-fetch upload URLs failed, will fetch on-demand:', error);
     }
   }
 
   // Helper function to upload photo to S3
-  async function uploadPhotoToS3(blob, photoType) {
-    // Get pre-signed upload URL from backend
-    const response = await fetch(`${API_BASE_URL}/api/upload-url`, {
-      method: 'POST',
-      headers: authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({
-        photoType,
-        locationId,
-        tentIndex,
-        blockIndex
-      })
-    });
+  async function uploadPhotoToS3(blob, photoType, key) {
+    let uploadUrl;
+    
+    // Use pre-fetched URL if available, otherwise fetch with our key
+    if (preFetchedUrls[photoType] && preFetchedUrls[photoType].key === key) {
+      console.log(`Using pre-fetched URL for ${photoType}`);
+      ({ uploadUrl } = preFetchedUrls[photoType]);
+    } else {
+      console.log(`Fetching URL with our pre-generated key for ${photoType}`);
+      // Fetch with our pre-generated key
+      const response = await fetch(`${API_BASE_URL}/api/upload-url`, {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ photoType, locationId, tentIndex, blockIndex, key })
+      });
 
-    if (!response.ok) {
-      throw new Error('Failed to get upload URL');
+      if (!response.ok) {
+        throw new Error('Failed to get upload URL');
+      }
+
+      ({ uploadUrl } = await response.json());
     }
-
-    const { uploadUrl, key } = await response.json();
 
     // Upload directly to S3
     const uploadResponse = await fetch(uploadUrl, {
@@ -397,13 +492,13 @@ export default function AllocateModal({
                     strokeDashoffset={226 - (226 * uploadProgress) / 100}
                     strokeLinecap="round"
                     style={{
-                      transition: 'stroke-dashoffset 0.3s ease',
+                      transition: 'stroke-dashoffset 0.5s ease-out',
                     }}
                   />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <span className="text-blue-600 font-semibold text-sm">
-                    {uploading ? `${uploadProgress}%` : '✓'}
+                    {uploading ? `${displayProgress}%` : '✓'}
                   </span>
                 </div>
               </div>
@@ -544,18 +639,20 @@ export default function AllocateModal({
               <h4 className="text-sm font-semibold text-gray-900 mb-3">📸 Photo Verification*</h4>
               
               <CameraCapture
-                key={`person-${bedNumber}-${initialData?.personPhotoUrl || 'new'}`}
+                key={`person-${bedNumber}-${open}-${initialData?.personPhotoUrl || 'new'}`}
                 label="Person Photo"
                 onCapture={(blob, dataUrl) => setPersonPhoto({ blob, dataUrl })}
                 existingPhotoUrl={initialData?.personPhotoUrl || null}
+                autoOpen={!isEdit} // Auto-open for new bookings
               />
               
               <div className="mt-4">
                 <CameraCapture
-                  key={`aadhaar-${bedNumber}-${initialData?.aadhaarPhotoUrl || 'new'}`}
+                  key={`aadhaar-${bedNumber}-${open}-${initialData?.aadhaarPhotoUrl || 'new'}`}
                   label="Aadhaar Card Photo"
                   onCapture={(blob, dataUrl) => setAadhaarPhoto({ blob, dataUrl })}
                   existingPhotoUrl={initialData?.aadhaarPhotoUrl || null}
+                  autoOpen={!isEdit} // Auto-open for new bookings
                 />
               </div>
             </div>

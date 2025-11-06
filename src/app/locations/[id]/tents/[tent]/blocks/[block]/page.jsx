@@ -15,6 +15,7 @@ import {
   updateBlock,
   deallocateBedsBatch,
   editAllocationsBatch,
+  generatePhotoViewUrl,
 } from '@/lib/api';
 
 export default function BlockBedsPage({ params }) {
@@ -196,13 +197,20 @@ export default function BlockBedsPage({ params }) {
           const updated = await editAllocation(id, Number(tent), Number(block), n, payload);
           // If API returns authoritative allocation, sync it
           if (updated && typeof updated === 'object') {
+            // Generate view URLs from keys if new photos were uploaded
+            const personPhotoUrl = updated.personPhotoKey 
+              ? await generatePhotoViewUrl(updated.personPhotoKey)
+              : s.beds?.[n]?.personPhotoUrl; // Preserve existing URL if no new photo
+            const aadhaarPhotoUrl = updated.aadhaarPhotoKey
+              ? await generatePhotoViewUrl(updated.aadhaarPhotoKey)
+              : s.beds?.[n]?.aadhaarPhotoUrl; // Preserve existing URL if no new photo
+            
             setBedsState((s) => {
               const mergedData = { 
                 ...s.beds?.[n], 
-                ...updated, 
-                // Preserve photo URLs if not in response
-                personPhotoUrl: updated.personPhotoUrl || s.beds?.[n]?.personPhotoUrl,
-                aadhaarPhotoUrl: updated.aadhaarPhotoUrl || s.beds?.[n]?.aadhaarPhotoUrl,
+                ...updated,
+                personPhotoUrl,
+                aadhaarPhotoUrl,
                 status: updated.status || (s.beds?.[n]?.status || 'confirmed') 
               };
               return { 
@@ -218,13 +226,20 @@ export default function BlockBedsPage({ params }) {
         } else {
           const created = await allocateBed(id, Number(tent), Number(block), n, payload);
           if (created && typeof created === 'object') {
+            // Generate view URLs from keys
+            const personPhotoUrl = created.personPhotoKey 
+              ? await generatePhotoViewUrl(created.personPhotoKey)
+              : null;
+            const aadhaarPhotoUrl = created.aadhaarPhotoKey
+              ? await generatePhotoViewUrl(created.aadhaarPhotoKey)
+              : null;
+            
             setBedsState((s) => {
               const mergedData = { 
                 ...s.beds?.[n], 
-                ...created, 
-                // Preserve photo URLs if not in response
-                personPhotoUrl: created.personPhotoUrl || s.beds?.[n]?.personPhotoUrl,
-                aadhaarPhotoUrl: created.aadhaarPhotoUrl || s.beds?.[n]?.aadhaarPhotoUrl,
+                ...created,
+                personPhotoUrl,
+                aadhaarPhotoUrl,
                 status: created.status || 'confirmed' 
               };
               return { 

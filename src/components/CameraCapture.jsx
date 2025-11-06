@@ -10,8 +10,9 @@ import { useState, useRef, useCallback, useEffect } from 'react';
  * @param {string} props.label - Label for the capture button (e.g., "Person Photo")
  * @param {function} props.onCapture - Callback with (blob, dataUrl) when photo is captured
  * @param {string} props.existingPhotoUrl - Optional existing photo URL to display
+ * @param {boolean} props.autoOpen - If true, automatically opens camera on mount
  */
-export default function CameraCapture({ label, onCapture, existingPhotoUrl }) {
+export default function CameraCapture({ label, onCapture, existingPhotoUrl, autoOpen = false }) {
   const [stream, setStream] = useState(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState(null);
@@ -21,6 +22,7 @@ export default function CameraCapture({ label, onCapture, existingPhotoUrl }) {
   const canvasRef = useRef(null);
   const prevUrlRef = useRef(existingPhotoUrl);
   const savedPhotoRef = useRef(null); // Store photo before retake
+  const hasAutoOpenedRef = useRef(false); // Track if we've auto-opened
   
   // Track URL changes to show loader for new images
   if (prevUrlRef.current !== existingPhotoUrl) {
@@ -39,6 +41,14 @@ export default function CameraCapture({ label, onCapture, existingPhotoUrl }) {
       setImageLoading(true);
     }
   }, [existingPhotoUrl]);
+
+  // Auto-open camera if autoOpen is true and no existing photo
+  useEffect(() => {
+    if (autoOpen && !existingPhotoUrl && !photoDataUrl && !hasAutoOpenedRef.current) {
+      hasAutoOpenedRef.current = true;
+      startCamera();
+    }
+  }, [autoOpen, existingPhotoUrl, photoDataUrl]);
 
   const startCamera = async () => {
     setError(null);
