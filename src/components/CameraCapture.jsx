@@ -16,9 +16,11 @@ export default function CameraCapture({ label, onCapture, existingPhotoUrl }) {
   const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState(null);
   const [imageLoading, setImageLoading] = useState(!!existingPhotoUrl);
+  const [cameraLoading, setCameraLoading] = useState(false);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const prevUrlRef = useRef(existingPhotoUrl);
+  const savedPhotoRef = useRef(null); // Store photo before retake
   
   // Track URL changes to show loader for new images
   if (prevUrlRef.current !== existingPhotoUrl) {
@@ -40,6 +42,7 @@ export default function CameraCapture({ label, onCapture, existingPhotoUrl }) {
 
   const startCamera = async () => {
     setError(null);
+    setCameraLoading(true);
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { 
@@ -50,6 +53,7 @@ export default function CameraCapture({ label, onCapture, existingPhotoUrl }) {
       });
       setStream(mediaStream);
       setIsCapturing(true);
+      setCameraLoading(false);
       
       // Wait for video element to be ready
       setTimeout(() => {
@@ -60,6 +64,7 @@ export default function CameraCapture({ label, onCapture, existingPhotoUrl }) {
     } catch (err) {
       console.error('Camera access error:', err);
       setError('Camera access denied or not available');
+      setCameraLoading(false);
     }
   };
 
@@ -69,7 +74,15 @@ export default function CameraCapture({ label, onCapture, existingPhotoUrl }) {
       setStream(null);
     }
     setIsCapturing(false);
-  }, [stream]);
+    setCameraLoading(false);
+    
+    // Restore saved photo if user cancels
+    if (savedPhotoRef.current) {
+      setPhotoDataUrl(savedPhotoRef.current.dataUrl);
+      onCapture(savedPhotoRef.current.blob, savedPhotoRef.current.dataUrl);
+      savedPhotoRef.current = null;
+    }
+  }, [stream, onCapture]);
 
   const compressImage = async (blob) => {
     return new Promise((resolve) => {
@@ -127,7 +140,9 @@ export default function CameraCapture({ label, onCapture, existingPhotoUrl }) {
       const reader = new FileReader();
       reader.onloadend = () => {
         const dataUrl = reader.result;
+        setImageLoading(false); // Reset loading state for newly captured photo
         setPhotoDataUrl(dataUrl);
+        savedPhotoRef.current = null; // Clear saved photo after successful capture
         stopCamera();
         onCapture(compressedBlob, dataUrl);
       };
@@ -135,10 +150,15 @@ export default function CameraCapture({ label, onCapture, existingPhotoUrl }) {
     }, 'image/jpeg');
   };
 
-  const retake = () => {
+  const retake = async () => {
+    setImageLoading(false);
+    // Save current photo in case user cancels
+    savedPhotoRef.current = { 
+      blob: null, // We don't have the blob for existing photos
+      dataUrl: photoDataUrl 
+    };
     setPhotoDataUrl(null);
-    onCapture(null, null);
-    startCamera();
+    await startCamera();
   };
 
   const deletePhoto = () => {
@@ -156,7 +176,7 @@ export default function CameraCapture({ label, onCapture, existingPhotoUrl }) {
         </div>
       )}
 
-      {!isCapturing && !photoDataUrl && (
+      {!isCapturing && !photoDataUrl && !cameraLoading && (
         <button
           type="button"
           onClick={startCamera}
@@ -164,6 +184,13 @@ export default function CameraCapture({ label, onCapture, existingPhotoUrl }) {
         >
           📷 Capture {label}
         </button>
+      )}
+
+      {cameraLoading && !isCapturing && (
+        <div className="w-full px-4 py-3 bg-blue-50 text-blue-600 rounded border border-blue-200 flex items-center justify-center gap-2">
+          <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <span>Opening camera...</span>
+        </div>
       )}
 
       {isCapturing && (
@@ -197,12 +224,12 @@ export default function CameraCapture({ label, onCapture, existingPhotoUrl }) {
 
       {photoDataUrl && !isCapturing && (
         <div className="space-y-2">
-          {imageLoading ? (
+          {imageLoading && photoDataUrl.startsWith('http') ? (
             <div className="relative border-2 border-green-500 rounded overflow-hidden bg-gray-100 aspect-[4/3] flex items-center justify-center">
               <div className="animate-pulse text-gray-400 text-sm">Loading photo...</div>
             </div>
           ) : null}
-          <div className="relative border-2 border-green-500 rounded overflow-hidden" style={{ display: imageLoading ? 'none' : 'block' }}>
+          <div className="relative border-2 border-green-500 rounded overflow-hidden" style={{ display: imageLoading && photoDataUrl.startsWith('http') ? 'none' : 'block' }}>
             <img 
               src={photoDataUrl} 
               alt={label} 

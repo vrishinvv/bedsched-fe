@@ -27,6 +27,7 @@ export default function SearchPage() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [editPhotos, setEditPhotos] = useState({ person: {}, aadhaar: {} });
@@ -50,7 +51,7 @@ export default function SearchPage() {
     }
 
     const aadharDigits = editForm.aadharNumber?.replace(/\D/g, '');
-    if (!aadharDigits || aadharDigits.length !== 12) {
+    if (aadharDigits && aadharDigits.length !== 12) {
       newErrors.aadharNumber = 'Valid 12-digit Aadhar number is required';
     }
 
@@ -71,14 +72,9 @@ export default function SearchPage() {
     }
 
     const hasPersonPhoto = editPhotos.person?.blob || editPhotos.person?.dataUrl;
-    const hasAadhaarPhoto = editPhotos.aadhaar?.blob || editPhotos.aadhaar?.dataUrl;
 
     if (!hasPersonPhoto) {
       newErrors.personPhoto = 'Person photo is required';
-    }
-
-    if (!hasAadhaarPhoto) {
-      newErrors.aadhaarPhoto = 'Aadhaar photo is required';
     }
 
     return newErrors;
@@ -163,6 +159,7 @@ export default function SearchPage() {
   }, []);
 
   const saveEdit = useCallback(async (allocation) => {
+    setSaving(true);
     try {
       // Upload new photos if captured
       let personPhotoKey = allocation.person_photo_key;
@@ -211,6 +208,8 @@ export default function SearchPage() {
     } catch (error) {
       console.error('Save error:', error);
       setNotification({ type: 'error', message: 'Failed to save changes' });
+    } finally {
+      setSaving(false);
     }
   }, [editForm, editPhotos, uploadPhotoToS3, searchByPhone]);
 
@@ -317,10 +316,11 @@ export default function SearchPage() {
                         </button>
                         <button
                           onClick={() => saveEdit(allocation)}
-                          disabled={!isFormValid}
-                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={!isFormValid || saving}
+                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                         >
-                          Save Changes
+                          {saving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                          {saving ? 'Saving...' : 'Save Changes'}
                         </button>
                       </div>
                     </div>
@@ -350,14 +350,13 @@ export default function SearchPage() {
                         {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Aadhar Number *</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Aadhar Number</label>
                         <input
                           type="tel"
                           inputMode="numeric"
                           value={editForm.aadharNumber}
                           onChange={handleAadharChange}
                           maxLength={14}
-                          required
                           className={`w-full p-2 border rounded-lg text-gray-900 ${errors.aadharNumber ? 'border-red-500' : 'border-gray-300'}`}
                           placeholder="1234 5678 9012"
                         />
@@ -416,11 +415,10 @@ export default function SearchPage() {
                       </div>
                       <div>
                         <CameraCapture
-                          label="Aadhaar Photo *"
+                          label="Aadhaar Photo"
                           onCapture={handleAadhaarPhotoCapture}
                           existingPhotoUrl={editPhotos.aadhaar.dataUrl}
                         />
-                        {errors.aadhaarPhoto && <p className="text-red-500 text-xs mt-1">{errors.aadhaarPhoto}</p>}
                       </div>
                     </div>
                   </div>
