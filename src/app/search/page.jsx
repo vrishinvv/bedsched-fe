@@ -6,6 +6,23 @@ import CameraCapture from '@/components/CameraCapture';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+function getToken() {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage.getItem('bs_token');
+  } catch {
+    return null;
+  }
+}
+
+function authHeaders(extra = {}) {
+  const token = getToken();
+  return {
+    ...(extra || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 export default function SearchPage() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [results, setResults] = useState([]);
@@ -80,7 +97,7 @@ export default function SearchPage() {
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE_URL}/api/allocations/by-phone/${phoneNumber}`, {
-        credentials: 'include',
+        headers: authHeaders(),
       });
 
       if (!response.ok) {
@@ -126,8 +143,7 @@ export default function SearchPage() {
   const uploadPhotoToS3 = useCallback(async (blob, photoType, locationId, tentIndex, blockIndex) => {
     const response = await fetch(`${API_BASE_URL}/api/upload-url`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ photoType, locationId, tentIndex, blockIndex }),
     });
 
@@ -177,8 +193,7 @@ export default function SearchPage() {
       // Update allocation
       const response = await fetch(`${API_BASE_URL}/api/allocations/${allocation.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           ...editForm,
           personPhotoKey,

@@ -237,6 +237,7 @@ export async function login(username, password) {
   const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({ username, password }),
   });
   const data = await handle(res, 'Login failed');
@@ -254,7 +255,7 @@ export async function logout() {
       window.localStorage.removeItem('bs_token');
     }
   } catch {}
-  try { await fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST' }); } catch {}
+  try { await fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' }); } catch {}
   return { ok: true };
 }
 
@@ -262,6 +263,7 @@ export async function getMe() {
   const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
     method: 'GET',
     headers: authHeaders(),
+    credentials: 'include',
   });
   return handle(res, 'Failed to get session');
 }

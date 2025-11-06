@@ -5,6 +5,23 @@ import CameraCapture from '@/components/CameraCapture';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+function getToken() {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage.getItem('bs_token');
+  } catch {
+    return null;
+  }
+}
+
+function authHeaders(extra = {}) {
+  const token = getToken();
+  return {
+    ...(extra || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 export default function AllocateModal({
   open,
   onClose,
@@ -28,6 +45,8 @@ export default function AllocateModal({
   });
   const [personPhoto, setPersonPhoto] = useState({ blob: null, dataUrl: null });
   const [aadhaarPhoto, setAadhaarPhoto] = useState({ blob: null, dataUrl: null });
+  const [uploading, setUploading] = useState(false); // Local uploading state
+  const [uploadProgress, setUploadProgress] = useState(0); // Upload progress percentage
   const ref = useRef(null);
 
   const MIN_DATE = '2025-11-03';
@@ -57,6 +76,9 @@ export default function AllocateModal({
 
   useEffect(() => {
     if (open) {
+      // Reset uploading state when modal opens
+      setUploading(false);
+      
       if (initialData) {
         setForm({
           name: initialData.name || '',
@@ -67,17 +89,15 @@ export default function AllocateModal({
           endDate: initialData.endDate || '',
           status: initialData.status || undefined, // Preserve status for reserved beds
         });
-        // Set existing photo URLs if available
-        if (initialData.personPhotoUrl) {
-          setPersonPhoto({ blob: null, dataUrl: initialData.personPhotoUrl });
-        } else {
-          setPersonPhoto({ blob: null, dataUrl: null });
-        }
-        if (initialData.aadhaarPhotoUrl) {
-          setAadhaarPhoto({ blob: null, dataUrl: initialData.aadhaarPhotoUrl });
-        } else {
-          setAadhaarPhoto({ blob: null, dataUrl: null });
-        }
+        // Set existing photo URLs if available - reset immediately to avoid showing stale photos
+        setPersonPhoto({ 
+          blob: null, 
+          dataUrl: initialData.personPhotoUrl || null 
+        });
+        setAadhaarPhoto({ 
+          blob: null, 
+          dataUrl: initialData.aadhaarPhotoUrl || null 
+        });
       } else {
         // Set default gender based on restriction
         let defaultGender = 'Male';
@@ -98,8 +118,12 @@ export default function AllocateModal({
         setPersonPhoto({ blob: null, dataUrl: null });
         setAadhaarPhoto({ blob: null, dataUrl: null });
       }
+    } else {
+      // Reset photo state when modal closes to prevent stale data
+      setPersonPhoto({ blob: null, dataUrl: null });
+      setAadhaarPhoto({ blob: null, dataUrl: null });
     }
-  }, [open, initialData, genderRestriction]);
+  }, [open, bedNumber, initialData, genderRestriction]);
 
   useEffect(() => {
     function onKey(e) { if (e.key === 'Escape') onClose(); }
@@ -232,18 +256,34 @@ export default function AllocateModal({
     }
 
     try {
+      setUploading(true);
+      setUploadProgress(0);
+      
       // Upload photos to S3 if new photos were captured
       let personPhotoKey = initialData?.personPhotoKey;
       let aadhaarPhotoKey = initialData?.aadhaarPhotoKey;
 
+      const photosToUpload = [];
+      if (personPhoto.blob) photosToUpload.push('person');
+      if (aadhaarPhoto.blob) photosToUpload.push('aadhaar');
+      
+      const totalSteps = photosToUpload.length + 1; // photos + API call
+      let completedSteps = 0;
+
       if (personPhoto.blob) {
+        setUploadProgress(Math.round((completedSteps / totalSteps) * 100));
         const uploadResult = await uploadPhotoToS3(personPhoto.blob, 'person');
         personPhotoKey = uploadResult.key;
+        completedSteps++;
+        setUploadProgress(Math.round((completedSteps / totalSteps) * 100));
       }
 
       if (aadhaarPhoto.blob) {
+        setUploadProgress(Math.round((completedSteps / totalSteps) * 100));
         const uploadResult = await uploadPhotoToS3(aadhaarPhoto.blob, 'aadhaar');
         aadhaarPhotoKey = uploadResult.key;
+        completedSteps++;
+        setUploadProgress(Math.round((completedSteps / totalSteps) * 100));
       }
 
       const payload = {
@@ -259,9 +299,12 @@ export default function AllocateModal({
         delete payload.status;
       }
 
+      setUploadProgress(Math.round((completedSteps / totalSteps) * 100));
       onSave(payload);
     } catch (error) {
       console.error('Photo upload failed:', error);
+      setUploading(false);
+      setUploadProgress(0);
       alert('Failed to upload photos. Please try again.');
     }
   }
@@ -271,8 +314,7 @@ export default function AllocateModal({
     // Get pre-signed upload URL from backend
     const response = await fetch(`${API_BASE_URL}/api/upload-url`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         photoType,
         locationId,
@@ -322,20 +364,51 @@ export default function AllocateModal({
     if (genderRestriction === 'female_only' && selectedGender.toLowerCase() !== 'female') errs.push('This tent is restricted to female guests only');
     return errs;
   })();
-  const canSave = validationErrors.length === 0 && !pending;
+  const canSave = validationErrors.length === 0 && !pending && !uploading;
+  const isProcessing = pending || uploading;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4" data-preserve-selection="true" onClick={(e) => e.stopPropagation()}>
-      <div className="absolute inset-0 bg-black/40" onClick={!pending ? onClose : undefined} data-preserve-selection="true" />
+      <div className="absolute inset-0 bg-black/40" onClick={!isProcessing ? onClose : undefined} data-preserve-selection="true" />
       <div ref={ref} className="relative w-full max-w-lg max-h-[95vh] flex flex-col rounded-2xl bg-white shadow-xl overflow-hidden" data-preserve-selection="true" onClick={(e) => e.stopPropagation()}>
         <div className="overflow-y-auto flex-1 p-4 sm:p-5">
-        {/* Enhanced loading overlay with skeleton */}
-        {pending && (
+        {/* Enhanced loading overlay with skeleton and progress */}
+        {isProcessing && (
           <div className="absolute inset-0 bg-white/95 rounded-2xl flex flex-col items-center justify-center z-10 p-8">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-6 h-6 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-              <span className="text-gray-700 font-medium">
-                {isEdit ? 'Updating allocation...' : 'Allocating bed...'}
+            <div className="flex flex-col items-center gap-3 mb-6">
+              <div className="relative w-20 h-20">
+                <svg className="w-20 h-20 transform -rotate-90">
+                  <circle
+                    cx="40"
+                    cy="40"
+                    r="36"
+                    stroke="#e5e7eb"
+                    strokeWidth="8"
+                    fill="none"
+                  />
+                  <circle
+                    cx="40"
+                    cy="40"
+                    r="36"
+                    stroke="#3b82f6"
+                    strokeWidth="8"
+                    fill="none"
+                    strokeDasharray="226"
+                    strokeDashoffset={226 - (226 * uploadProgress) / 100}
+                    strokeLinecap="round"
+                    style={{
+                      transition: 'stroke-dashoffset 0.3s ease',
+                    }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-blue-600 font-semibold text-sm">
+                    {uploading ? `${uploadProgress}%` : '✓'}
+                  </span>
+                </div>
+              </div>
+              <span className="text-gray-700 font-medium text-center">
+                {uploading ? 'Uploading photos...' : (isEdit ? 'Updating allocation...' : 'Allocating bed...')}
               </span>
             </div>
             
@@ -384,7 +457,7 @@ export default function AllocateModal({
               name="name" 
               value={form.name} 
               onChange={handleChange} 
-              disabled={pending}
+              disabled={isProcessing}
               className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
               placeholder="Full name" 
             />
@@ -395,7 +468,7 @@ export default function AllocateModal({
               name="phone" 
               value={form.phone} 
               onChange={handleChange} 
-              disabled={pending}
+              disabled={isProcessing}
               type="tel"
               inputMode="numeric"
               pattern="\\d{10}"
@@ -410,7 +483,7 @@ export default function AllocateModal({
               name="aadharNumber" 
               value={form.aadharNumber} 
               onChange={handleChange} 
-              disabled={pending}
+              disabled={isProcessing}
               type="tel"
               inputMode="numeric"
               maxLength={14}
@@ -425,7 +498,7 @@ export default function AllocateModal({
               name="gender" 
               value={form.gender} 
               onChange={handleChange} 
-              disabled={pending}
+              disabled={isProcessing}
               className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
               {availableGenders.map(option => (
@@ -445,7 +518,7 @@ export default function AllocateModal({
               onChange={handleChange}
               min={MIN_DATE}
               max={MAX_DATE}
-              disabled={pending}
+              disabled={isProcessing}
               className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
             />
             <p className="text-xs text-gray-500 mt-1">Nov 3-24, 2025</p>
@@ -459,7 +532,7 @@ export default function AllocateModal({
               onChange={handleChange}
               min={MIN_DATE}
               max={MAX_DATE}
-              disabled={pending}
+              disabled={isProcessing}
               className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
             />
             <p className="text-xs text-gray-500 mt-1">Nov 3-24, 2025</p>
@@ -471,16 +544,18 @@ export default function AllocateModal({
               <h4 className="text-sm font-semibold text-gray-900 mb-3">📸 Photo Verification*</h4>
               
               <CameraCapture
+                key={`person-${bedNumber}-${initialData?.personPhotoUrl || 'new'}`}
                 label="Person Photo"
                 onCapture={(blob, dataUrl) => setPersonPhoto({ blob, dataUrl })}
-                existingPhotoUrl={personPhoto.dataUrl}
+                existingPhotoUrl={initialData?.personPhotoUrl || null}
               />
               
               <div className="mt-4">
                 <CameraCapture
+                  key={`aadhaar-${bedNumber}-${initialData?.aadhaarPhotoUrl || 'new'}`}
                   label="Aadhaar Card Photo"
                   onCapture={(blob, dataUrl) => setAadhaarPhoto({ blob, dataUrl })}
-                  existingPhotoUrl={aadhaarPhoto.dataUrl}
+                  existingPhotoUrl={initialData?.aadhaarPhotoUrl || null}
                 />
               </div>
             </div>
@@ -499,7 +574,7 @@ export default function AllocateModal({
           {isEdit ? (
             <button 
               onClick={onDelete} 
-              disabled={pending}
+              disabled={isProcessing}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Deallocate
@@ -508,7 +583,7 @@ export default function AllocateModal({
           <div className="flex gap-2">
             <button 
               onClick={onClose} 
-              disabled={pending}
+              disabled={isProcessing}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
@@ -519,7 +594,7 @@ export default function AllocateModal({
               title={!canSave ? validationErrors[0] : undefined}
               className="rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {pending && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+              {isProcessing && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
               {isEdit ? 'Save changes' : 'Allocate'}
             </button>
           </div>

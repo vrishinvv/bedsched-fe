@@ -13,15 +13,29 @@ import { useState, useRef, useCallback, useEffect } from 'react';
  */
 export default function CameraCapture({ label, onCapture, existingPhotoUrl }) {
   const [stream, setStream] = useState(null);
-  const [photoDataUrl, setPhotoDataUrl] = useState(existingPhotoUrl || null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState(null);
+  const [imageLoading, setImageLoading] = useState(!!existingPhotoUrl);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const prevUrlRef = useRef(existingPhotoUrl);
+  
+  // Track URL changes to show loader for new images
+  if (prevUrlRef.current !== existingPhotoUrl) {
+    prevUrlRef.current = existingPhotoUrl;
+    if (existingPhotoUrl) {
+      setImageLoading(true);
+    }
+  }
+  
+  const [photoDataUrl, setPhotoDataUrl] = useState(existingPhotoUrl || null);
 
-  // Update photoDataUrl when existingPhotoUrl changes (when modal opens with different bed)
+  // Update photoDataUrl when existingPhotoUrl changes
   useEffect(() => {
     setPhotoDataUrl(existingPhotoUrl || null);
+    if (existingPhotoUrl) {
+      setImageLoading(true);
+    }
   }, [existingPhotoUrl]);
 
   const startCamera = async () => {
@@ -183,8 +197,19 @@ export default function CameraCapture({ label, onCapture, existingPhotoUrl }) {
 
       {photoDataUrl && !isCapturing && (
         <div className="space-y-2">
-          <div className="relative border-2 border-green-500 rounded overflow-hidden">
-            <img src={photoDataUrl} alt={label} className="w-full" />
+          {imageLoading ? (
+            <div className="relative border-2 border-green-500 rounded overflow-hidden bg-gray-100 aspect-[4/3] flex items-center justify-center">
+              <div className="animate-pulse text-gray-400 text-sm">Loading photo...</div>
+            </div>
+          ) : null}
+          <div className="relative border-2 border-green-500 rounded overflow-hidden" style={{ display: imageLoading ? 'none' : 'block' }}>
+            <img 
+              src={photoDataUrl} 
+              alt={label} 
+              className="w-full"
+              onLoad={() => setImageLoading(false)}
+              onError={() => setImageLoading(false)}
+            />
             <div className="absolute top-2 right-2 bg-green-500 text-white px-2 py-1 rounded text-xs">
               ✓ Captured
             </div>
