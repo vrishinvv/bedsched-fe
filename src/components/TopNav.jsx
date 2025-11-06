@@ -87,6 +87,11 @@ export default function TopNav() {
                 Dashboard
               </Link>
             </li>
+            <li>
+              <Link onClick={() => setOpen(false)} href="/search" className="block px-3 py-2 rounded-md text-gray-200 hover:bg-white/10 hover:text-white transition-colors">
+                🔍 Search Bookings
+              </Link>
+            </li>
             {(isAdmin || isLocationUser) && (
               <>
                 <li>

@@ -173,6 +173,12 @@ export default function BlockBedsPage({ params }) {
         }
       } else {
         // Optimistic update: ensure status present so stats rerender correctly
+        // Preserve existing photo URLs to avoid losing them
+        const existingPhotos = {
+          personPhotoUrl: bedsState?.beds?.[n]?.personPhotoUrl,
+          aadhaarPhotoUrl: bedsState?.beds?.[n]?.aadhaarPhotoUrl,
+        };
+        
         setBedsState((s) => ({ 
           ...s, 
           beds: { 
@@ -180,6 +186,7 @@ export default function BlockBedsPage({ params }) {
             [n]: { 
               ...(s.beds?.[n] || {}),
               ...payload,
+              ...existingPhotos, // Preserve photo URLs
               status: isEdit ? (s.beds?.[n]?.status || 'confirmed') : 'confirmed'
             } 
           } 
@@ -187,15 +194,47 @@ export default function BlockBedsPage({ params }) {
         
         if (isEdit) {
           const updated = await editAllocation(id, Number(tent), Number(block), n, payload);
-          // If API returns authoritative allocation, sync it (fallback to optimistic if not)
+          // If API returns authoritative allocation, sync it
           if (updated && typeof updated === 'object') {
-            setBedsState((s) => ({ ...s, beds: { ...s.beds, [n]: { ...s.beds?.[n], ...updated, status: updated.status || (s.beds?.[n]?.status || 'confirmed') } } }));
+            setBedsState((s) => {
+              const mergedData = { 
+                ...s.beds?.[n], 
+                ...updated, 
+                // Preserve photo URLs if not in response
+                personPhotoUrl: updated.personPhotoUrl || s.beds?.[n]?.personPhotoUrl,
+                aadhaarPhotoUrl: updated.aadhaarPhotoUrl || s.beds?.[n]?.aadhaarPhotoUrl,
+                status: updated.status || (s.beds?.[n]?.status || 'confirmed') 
+              };
+              return { 
+                ...s, 
+                beds: { 
+                  ...s.beds, 
+                  [n]: mergedData
+                } 
+              };
+            });
           }
           showNotification('success', `Bed ${n} allocation updated successfully for ${payload.name}`);
         } else {
           const created = await allocateBed(id, Number(tent), Number(block), n, payload);
           if (created && typeof created === 'object') {
-            setBedsState((s) => ({ ...s, beds: { ...s.beds, [n]: { ...s.beds?.[n], ...created, status: created.status || 'confirmed' } } }));
+            setBedsState((s) => {
+              const mergedData = { 
+                ...s.beds?.[n], 
+                ...created, 
+                // Preserve photo URLs if not in response
+                personPhotoUrl: created.personPhotoUrl || s.beds?.[n]?.personPhotoUrl,
+                aadhaarPhotoUrl: created.aadhaarPhotoUrl || s.beds?.[n]?.aadhaarPhotoUrl,
+                status: created.status || 'confirmed' 
+              };
+              return { 
+                ...s, 
+                beds: { 
+                  ...s.beds, 
+                  [n]: mergedData
+                } 
+              };
+            });
           }
           showNotification('success', `Bed ${n} allocated successfully to ${payload.name}`);
         }
@@ -578,6 +617,9 @@ export default function BlockBedsPage({ params }) {
         onDelete={handleDelete}
         pending={pending}
         genderRestriction={genderRestriction}
+        locationId={id}
+        tentIndex={Number(tent)}
+        blockIndex={Number(block)}
       />
 
       <BulkAllocateModal

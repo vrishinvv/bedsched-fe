@@ -1,6 +1,9 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import Skeleton from '@/components/Skeleton';
+import CameraCapture from '@/components/CameraCapture';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function AllocateModal({
   open,
@@ -11,6 +14,9 @@ export default function AllocateModal({
   onDelete,
   pending = false, // Add pending prop
   genderRestriction = 'both', // Block-level gender restriction
+  locationId,
+  tentIndex,
+  blockIndex,
 }) {
   const [form, setForm] = useState({
     name: '',
@@ -20,6 +26,8 @@ export default function AllocateModal({
     startDate: '',
     endDate: '',
   });
+  const [personPhoto, setPersonPhoto] = useState({ blob: null, dataUrl: null });
+  const [aadhaarPhoto, setAadhaarPhoto] = useState({ blob: null, dataUrl: null });
   const ref = useRef(null);
 
   const MIN_DATE = '2025-11-03';
@@ -59,6 +67,17 @@ export default function AllocateModal({
           endDate: initialData.endDate || '',
           status: initialData.status || undefined, // Preserve status for reserved beds
         });
+        // Set existing photo URLs if available
+        if (initialData.personPhotoUrl) {
+          setPersonPhoto({ blob: null, dataUrl: initialData.personPhotoUrl });
+        } else {
+          setPersonPhoto({ blob: null, dataUrl: null });
+        }
+        if (initialData.aadhaarPhotoUrl) {
+          setAadhaarPhoto({ blob: null, dataUrl: initialData.aadhaarPhotoUrl });
+        } else {
+          setAadhaarPhoto({ blob: null, dataUrl: null });
+        }
       } else {
         // Set default gender based on restriction
         let defaultGender = 'Male';
@@ -76,6 +95,8 @@ export default function AllocateModal({
           startDate: '',
           endDate: '',
         });
+        setPersonPhoto({ blob: null, dataUrl: null });
+        setAadhaarPhoto({ blob: null, dataUrl: null });
       }
     }
   }, [open, initialData, genderRestriction]);
@@ -160,7 +181,7 @@ export default function AllocateModal({
     setForm((f) => ({ ...f, [name]: value }));
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!form.name || !form.startDate || !form.endDate || !form.phone) {
       return alert('Name, phone, start & end dates are required');
     }
@@ -174,6 +195,16 @@ export default function AllocateModal({
     const aadharDigits = form.aadharNumber.replace(/\D/g, '');
     if (form.aadharNumber && aadharDigits.length !== 12) {
       return alert('Aadhar number must be exactly 12 digits.');
+    }
+
+    // Validate photos are captured (mandatory for new allocations)
+    if (!isEdit) {
+      if (!personPhoto.blob && !personPhoto.dataUrl) {
+        return alert('Person photo is required. Please capture the photo.');
+      }
+      if (!aadhaarPhoto.blob && !aadhaarPhoto.dataUrl) {
+        return alert('Aadhaar photo is required. Please capture the photo.');
+      }
     }
 
     const today = getTodayDate();
@@ -200,18 +231,76 @@ export default function AllocateModal({
       return alert('This tent is restricted to female guests only. Please select Female as the gender.');
     }
 
-    const payload = {
-      ...form,
-      gender: selectedGender,
-      aadharNumber: aadharDigits || undefined // Send without spaces, omit if empty
-    };
-    
-    // Remove status from payload if it exists (backend doesn't need it for update)
-    if (payload.status) {
-      delete payload.status;
+    try {
+      // Upload photos to S3 if new photos were captured
+      let personPhotoKey = initialData?.personPhotoKey;
+      let aadhaarPhotoKey = initialData?.aadhaarPhotoKey;
+
+      if (personPhoto.blob) {
+        const uploadResult = await uploadPhotoToS3(personPhoto.blob, 'person');
+        personPhotoKey = uploadResult.key;
+      }
+
+      if (aadhaarPhoto.blob) {
+        const uploadResult = await uploadPhotoToS3(aadhaarPhoto.blob, 'aadhaar');
+        aadhaarPhotoKey = uploadResult.key;
+      }
+
+      const payload = {
+        ...form,
+        gender: selectedGender,
+        aadharNumber: aadharDigits || undefined, // Send without spaces, omit if empty
+        personPhotoKey,
+        aadhaarPhotoKey
+      };
+      
+      // Remove status from payload if it exists (backend doesn't need it for update)
+      if (payload.status) {
+        delete payload.status;
+      }
+
+      onSave(payload);
+    } catch (error) {
+      console.error('Photo upload failed:', error);
+      alert('Failed to upload photos. Please try again.');
+    }
+  }
+
+  // Helper function to upload photo to S3
+  async function uploadPhotoToS3(blob, photoType) {
+    // Get pre-signed upload URL from backend
+    const response = await fetch(`${API_BASE_URL}/api/upload-url`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        photoType,
+        locationId,
+        tentIndex,
+        blockIndex
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get upload URL');
     }
 
-    onSave(payload);
+    const { uploadUrl, key } = await response.json();
+
+    // Upload directly to S3
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      body: blob,
+      headers: {
+        'Content-Type': 'image/jpeg'
+      }
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error('Failed to upload to S3');
+    }
+
+    return { key };
   }
 
   const todayDate = getTodayDate();
@@ -221,6 +310,8 @@ export default function AllocateModal({
     const errs = [];
     if (!form.name || !form.name.trim()) errs.push('Name is required');
     if (!/^\d{10}$/.test(form.phone)) errs.push('Enter a valid 10-digit phone number');
+    if (!isEdit && !personPhoto.blob && !personPhoto.dataUrl) errs.push('Person photo is required');
+    if (!isEdit && !aadhaarPhoto.blob && !aadhaarPhoto.dataUrl) errs.push('Aadhaar photo is required');
     if (!form.startDate) errs.push('Start date is required');
     if (!form.endDate) errs.push('End date is required');
     if (form.startDate && (form.startDate < MIN_DATE || form.startDate > MAX_DATE)) errs.push('Start date must be Nov 3-24, 2025');
@@ -234,9 +325,10 @@ export default function AllocateModal({
   const canSave = validationErrors.length === 0 && !pending;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center" data-preserve-selection="true" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4" data-preserve-selection="true" onClick={(e) => e.stopPropagation()}>
       <div className="absolute inset-0 bg-black/40" onClick={!pending ? onClose : undefined} data-preserve-selection="true" />
-      <div ref={ref} className="relative w-full h-full sm:h-auto sm:max-w-lg rounded-none sm:rounded-2xl bg-white p-4 sm:p-5 shadow-xl overflow-y-auto" data-preserve-selection="true" onClick={(e) => e.stopPropagation()}>
+      <div ref={ref} className="relative w-full max-w-lg max-h-[95vh] flex flex-col rounded-2xl bg-white shadow-xl overflow-hidden" data-preserve-selection="true" onClick={(e) => e.stopPropagation()}>
+        <div className="overflow-y-auto flex-1 p-4 sm:p-5">
         {/* Enhanced loading overlay with skeleton */}
         {pending && (
           <div className="absolute inset-0 bg-white/95 rounded-2xl flex flex-col items-center justify-center z-10 p-8">
@@ -372,6 +464,27 @@ export default function AllocateModal({
             />
             <p className="text-xs text-gray-500 mt-1">Nov 3-24, 2025</p>
           </div>
+
+          {/* Photo Capture Section */}
+          <div className="sm:col-span-2 space-y-4 mt-4">
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-semibold text-gray-900 mb-3">📸 Photo Verification*</h4>
+              
+              <CameraCapture
+                label="Person Photo"
+                onCapture={(blob, dataUrl) => setPersonPhoto({ blob, dataUrl })}
+                existingPhotoUrl={personPhoto.dataUrl}
+              />
+              
+              <div className="mt-4">
+                <CameraCapture
+                  label="Aadhaar Card Photo"
+                  onCapture={(blob, dataUrl) => setAadhaarPhoto({ blob, dataUrl })}
+                  existingPhotoUrl={aadhaarPhoto.dataUrl}
+                />
+              </div>
+            </div>
+          </div>
         </div>
         
         <div className="mt-5 sticky bottom-0 bg-white pt-3 pb-3 flex items-center justify-between border-t">
@@ -410,6 +523,7 @@ export default function AllocateModal({
               {isEdit ? 'Save changes' : 'Allocate'}
             </button>
           </div>
+        </div>
         </div>
       </div>
     </div>
