@@ -43,7 +43,7 @@ export default function CameraCapture({ label, onCapture, existingPhotoUrl }) {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { 
-          facingMode: 'user',
+          facingMode: 'environment',
           width: { ideal: 1280 },
           height: { ideal: 720 }
         }
