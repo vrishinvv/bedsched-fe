@@ -61,7 +61,7 @@ export default function BlockCard({ locationId, tentIndex, block }) {
 
         {/* Header */}
         <div className="relative mb-4">
-          <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 pr-20">Block {block.index}</h3>
+          <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 pr-20">{block.name || `Block ${block.index}`}</h3>
         </div>
 
         {/* Main stats */}

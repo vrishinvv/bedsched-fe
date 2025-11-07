@@ -50,6 +50,15 @@ export default function CameraCapture({ label, onCapture, existingPhotoUrl, auto
     }
   }, [autoOpen, existingPhotoUrl, photoDataUrl]);
 
+  // Cleanup: Stop camera when component unmounts
+  useEffect(() => {
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [stream]);
+
   const startCamera = async () => {
     setError(null);
     setCameraLoading(true);

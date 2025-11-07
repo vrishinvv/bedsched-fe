@@ -50,9 +50,9 @@ export default function SearchPage() {
       newErrors.phone = 'Valid 10-digit phone number is required';
     }
 
-    const aadharDigits = editForm.aadharNumber?.replace(/\D/g, '');
-    if (aadharDigits && aadharDigits.length !== 12) {
-      newErrors.aadharNumber = 'Valid 12-digit Aadhar number is required';
+    const emergencyDigits = editForm.emergencyPhone?.replace(/\D/g, '');
+    if (emergencyDigits && emergencyDigits.length !== 10) {
+      newErrors.emergencyPhone = 'Valid 10-digit phone number is required';
     }
 
     if (!editForm.gender) {
@@ -78,7 +78,7 @@ export default function SearchPage() {
     }
 
     return newErrors;
-  }, [editingId, editForm.name, editForm.phone, editForm.aadharNumber, editForm.gender, editForm.startDate, editForm.endDate, editPhotos.person, editPhotos.aadhaar]);
+  }, [editingId, editForm.name, editForm.phone, editForm.emergencyPhone, editForm.gender, editForm.startDate, editForm.endDate, editPhotos.person, editPhotos.aadhaar]);
 
   const isFormValid = editingId && Object.keys(errors).length === 0;
 
@@ -119,7 +119,7 @@ export default function SearchPage() {
     setEditForm({
       name: allocation.name,
       phone: allocation.phone,
-      aadharNumber: allocation.aadhar_number || '',
+      emergencyPhone: allocation.emergency_phone || '',
       gender: allocation.gender,
       startDate: allocation.start_date,
       endDate: allocation.end_date,
@@ -222,12 +222,9 @@ export default function SearchPage() {
     setEditForm(prev => ({ ...prev, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }));
   }, []);
 
-  const handleAadharChange = useCallback((e) => {
-    const digits = e.target.value.replace(/\D/g, '').slice(0, 12);
-    const formatted = digits.replace(/(\d{4})(\d{0,4})(\d{0,4})/, (match, g1, g2, g3) => {
-      return [g1, g2, g3].filter(Boolean).join(' ');
-    });
-    setEditForm(prev => ({ ...prev, aadharNumber: formatted }));
+  const handleEmergencyPhoneChange = useCallback((e) => {
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+    setEditForm(prev => ({ ...prev, emergencyPhone: digits }));
   }, []);
 
   const handleGenderChange = useCallback((e) => {
@@ -350,17 +347,17 @@ export default function SearchPage() {
                         {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Aadhar Number</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Emergency Phone</label>
                         <input
                           type="tel"
                           inputMode="numeric"
-                          value={editForm.aadharNumber}
-                          onChange={handleAadharChange}
-                          maxLength={14}
-                          className={`w-full p-2 border rounded-lg text-gray-900 ${errors.aadharNumber ? 'border-red-500' : 'border-gray-300'}`}
-                          placeholder="1234 5678 9012"
+                          value={editForm.emergencyPhone}
+                          onChange={handleEmergencyPhoneChange}
+                          maxLength={10}
+                          className={`w-full p-2 border rounded-lg text-gray-900 ${errors.emergencyPhone ? 'border-red-500' : 'border-gray-300'}`}
+                          placeholder="10-digit phone"
                         />
-                        {errors.aadharNumber && <p className="text-red-500 text-xs mt-1">{errors.aadharNumber}</p>}
+                        {errors.emergencyPhone && <p className="text-red-500 text-xs mt-1">{errors.emergencyPhone}</p>}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Gender *</label>
@@ -415,7 +412,7 @@ export default function SearchPage() {
                       </div>
                       <div>
                         <CameraCapture
-                          label="Aadhaar Photo"
+                          label="Identity Photo"
                           onCapture={handleAadhaarPhotoCapture}
                           existingPhotoUrl={editPhotos.aadhaar.dataUrl}
                         />
@@ -430,7 +427,7 @@ export default function SearchPage() {
                         <h3 className="text-lg font-semibold text-gray-900">{allocation.name}</h3>
                         <p className="text-sm text-gray-600">
                           {allocation.location_name} • Bed {allocation.bed_number}
-                          {allocation.tent_index && ` • Tent ${allocation.tent_index} Block ${allocation.block_index}`}
+                          {allocation.tent_index && ` • ${allocation.tent_name || `Tent ${allocation.tent_index}`} ${allocation.block_name || `Block ${allocation.block_index}`}`}
                         </p>
                       </div>
                       <button
@@ -446,6 +443,12 @@ export default function SearchPage() {
                         <p className="text-xs text-gray-500">Phone</p>
                         <p className="font-medium text-gray-900">{allocation.phone}</p>
                       </div>
+                      {allocation.emergency_phone && (
+                        <div>
+                          <p className="text-xs text-gray-500">Emergency Phone</p>
+                          <p className="font-medium text-gray-900">{allocation.emergency_phone}</p>
+                        </div>
+                      )}
                       <div>
                         <p className="text-xs text-gray-500">Gender</p>
                         <p className="font-medium text-gray-900">{allocation.gender}</p>
@@ -458,12 +461,6 @@ export default function SearchPage() {
                         <p className="text-xs text-gray-500">End Date</p>
                         <p className="font-medium text-gray-900">{allocation.end_date}</p>
                       </div>
-                      {allocation.aadhar_number && (
-                        <div className="col-span-2">
-                          <p className="text-xs text-gray-500">Aadhar Number</p>
-                          <p className="font-medium text-gray-900">{allocation.aadhar_number}</p>
-                        </div>
-                      )}
                       <div className="col-span-2">
                         <p className="text-xs text-gray-500">Status</p>
                         <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
@@ -488,10 +485,10 @@ export default function SearchPage() {
                       )}
                       {allocation.aadhaarPhotoUrl && (
                         <div>
-                          <p className="text-xs text-gray-500 mb-2">Aadhaar Photo</p>
+                          <p className="text-xs text-gray-500 mb-2">Identity Photo</p>
                           <img
                             src={allocation.aadhaarPhotoUrl}
-                            alt="Aadhaar"
+                            alt="Identity"
                             className="w-full rounded-lg border border-gray-300"
                           />
                         </div>

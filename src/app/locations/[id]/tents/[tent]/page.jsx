@@ -1,6 +1,7 @@
 'use client';
 import { use, useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
+import Breadcrumb from '@/components/Breadcrumb';
 import BlockCard from '@/components/BlockCard';
 import { CardSkeleton, StatCardSkeleton, HeaderSkeleton } from '@/components/Skeleton';
 import { fetchTentBlocks } from '@/lib/api';
@@ -42,7 +43,7 @@ export default function TentBlocksPage({ params }) {
         <HeaderSkeleton />
 
         {/* Stats skeleton */}
-        <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <section className="grid grid-cols-2 gap-4 md:grid-cols-3">
           {Array.from({ length: 4 }).map((_, i) => (
             <StatCardSkeleton key={i} />
           ))}
@@ -60,10 +61,18 @@ export default function TentBlocksPage({ params }) {
 
   if (err) return <div className="text-red-400">{err}</div>;
 
-  const { location, tent: tentMeta, blocks } = data;
+  const { location, blocks } = data;
+  const tentInfo = data.tentInfo || data.tent || {}; // Handle both tentInfo and tent properties
+
+  const breadcrumbItems = [
+    { label: 'Home', href: '/' },
+    { label: location.name, href: `/locations/${id}` },
+    { label: `Tent ${tent}`, href: `/locations/${id}/tents/${tent}` }
+  ];
 
   return (
     <main className="space-y-6 p-3 sm:p-4">
+      <Breadcrumb items={breadcrumbItems} />
       {/* Enhanced Header with Purple Breadcrumb */}
       <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-purple-900/20 via-purple-800/20 to-indigo-900/20 border border-purple-500/20 p-4 sm:p-6">
         <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
@@ -77,7 +86,7 @@ export default function TentBlocksPage({ params }) {
             </Link>
           </nav>
           <h2 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
-            {location.name} | Tent {tentMeta.index}
+            {location.name} | Tent {tentInfo.index || tent}
           </h2>
           <div className="flex items-center gap-4">
             <p className="text-xs sm:text-sm text-purple-200/80">Managing {blocks.length} block{blocks.length !== 1 ? 's' : ''} • {stats.totalCapacity} total beds</p>
@@ -86,7 +95,7 @@ export default function TentBlocksPage({ params }) {
       </section>
 
       {/* Enhanced Dashboard */}
-      <section className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-5">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3">
         <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/10 via-blue-500/10 to-cyan-500/10 border border-blue-500/20 p-5 backdrop-blur-sm transition-all duration-300 hover:scale-105">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-400/5 to-transparent pointer-events-none" />
           <div className="relative">
@@ -139,18 +148,7 @@ export default function TentBlocksPage({ params }) {
           </div>
         </div>
 
-        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600/10 via-purple-500/10 to-indigo-500/10 border border-indigo-500/20 p-5 backdrop-blur-sm transition-all duration-300 hover:scale-105 col-span-2 md:col-span-1">
-          <div className="absolute inset-0 bg-gradient-to-br from-indigo-400/5 to-transparent pointer-events-none" />
-          <div className="relative">
-            <div className="p-2 bg-indigo-500/20 rounded-xl w-fit mb-3">
-              <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div className="text-xs text-indigo-300/70 font-medium">Active Reservations</div>
-            <div className="text-2xl font-bold text-white">{stats.totalReserved.toLocaleString()}</div>
-          </div>
-        </div>
+
       </section>
 
       <section className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -158,7 +156,7 @@ export default function TentBlocksPage({ params }) {
           <BlockCard
             key={b.index}
             locationId={location.id}
-            tentIndex={tentMeta.index}
+            tentIndex={tentInfo.index || tent}
             block={b}
           />
         ))}

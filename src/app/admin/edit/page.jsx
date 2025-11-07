@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { searchAllocationsByPhone, updatePhoneByPhone, updateContactNameByPhone, updateEndDateByPhone, deallocateByPhone, getMe } from "@/lib/api";
+import { searchAllocationsByPhone, updatePhoneByPhone, updateNameByPhone, updateEmergencyPhoneByPhone, updateEndDateByPhone, deallocateByPhone, getMe } from "@/lib/api";
 import Notification from "@/components/Notification";
 import { TreeSkeleton } from '@/components/Skeleton';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -12,6 +12,7 @@ function EditByPhoneContent() {
   const [phone, setPhone] = useState(sp.get('phone') || '');
   const [newPhone, setNewPhone] = useState('');
   const [contactName, setContactName] = useState('');
+  const [emergencyPhone, setEmergencyPhone] = useState('');
   const [endDate, setEndDate] = useState('');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -44,8 +45,9 @@ function EditByPhoneContent() {
       setData(batches);
       // Set newPhone to match search phone by default
       setNewPhone(ph);
-      // Don't pre-fill contact name and end date - let user specify
+      // Don't pre-fill contact name, emergency phone and end date - let user specify
       setContactName('');
+      setEmergencyPhone('');
       setEndDate('');
     } catch (e) {
       setNotification({ type: 'error', message: e.message || 'Failed to load' });
@@ -107,20 +109,45 @@ function EditByPhoneContent() {
   const onUpdateContact = async (name, allocationIds = null) => {
     // Don't update if name is empty or just whitespace
     if (!name || !name.trim()) {
-      setNotification({ type: 'error', message: 'Contact name cannot be empty' });
+      setNotification({ type: 'error', message: 'Name cannot be empty' });
       return;
     }
     const ids = allocationIds !== null ? allocationIds : (selectedIds.size > 0 ? Array.from(selectedIds) : undefined);
     try {
       setLoading(true);
-      await updateContactNameByPhone({ phone, contactName: name.trim(), allocationIds: ids });
-      setNotification({ type: 'success', message: 'Contact name updated' });
+      await updateNameByPhone({ phone, name: name.trim(), allocationIds: ids });
+      setNotification({ type: 'success', message: 'Name updated' });
       setContactName(name.trim());
       // Reload without clearing selection
       const res = await searchAllocationsByPhone(phone);
       setData(res.batches || []);
     } catch (e) { 
       setNotification({ type: 'error', message: e.message || 'Failed to update contact' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onUpdateEmergencyPhone = async (emergencyPhoneValue, allocationIds = null) => {
+    // Allow empty emergency phone (it's optional)
+    if (emergencyPhoneValue && emergencyPhoneValue.trim()) {
+      // Must be a 10-digit number if provided
+      if (!/^\d{10}$/.test(emergencyPhoneValue.trim())) {
+        setNotification({ type: 'error', message: 'Please enter a valid 10-digit emergency phone number.' });
+        return;
+      }
+    }
+    const ids = allocationIds !== null ? allocationIds : (selectedIds.size > 0 ? Array.from(selectedIds) : undefined);
+    try {
+      setLoading(true);
+      await updateEmergencyPhoneByPhone({ phone, emergencyPhone: emergencyPhoneValue ? emergencyPhoneValue.trim() : null, allocationIds: ids });
+      setNotification({ type: 'success', message: 'Emergency phone updated' });
+      setEmergencyPhone(emergencyPhoneValue ? emergencyPhoneValue.trim() : '');
+      // Reload without clearing selection
+      const res = await searchAllocationsByPhone(phone);
+      setData(res.batches || []);
+    } catch (e) { 
+      setNotification({ type: 'error', message: e.message || 'Failed to update emergency phone' });
     } finally {
       setLoading(false);
     }
@@ -203,15 +230,17 @@ function EditByPhoneContent() {
     // Check if any field has a value
     const hasPhoneChange = newPhone && newPhone.trim() && newPhone !== phone;
     const hasContactName = contactName && contactName.trim();
+    const hasEmergencyPhone = emergencyPhone && emergencyPhone.trim();
     const hasEndDate = endDate && endDate.trim();
     
-    if (!hasPhoneChange && !hasContactName && !hasEndDate) {
+    if (!hasPhoneChange && !hasContactName && !hasEmergencyPhone && !hasEndDate) {
       setNotification({ type: 'error', message: 'Please fill in at least one field to update' });
       return;
     }
     
     if (hasPhoneChange) await onUpdatePhone(newPhone, ids);
     if (hasContactName) await onUpdateContact(contactName, ids);
+    if (hasEmergencyPhone) await onUpdateEmergencyPhone(emergencyPhone, ids);
     if (hasEndDate) await onUpdateEndDate(endDate, ids);
     
     // Clear selections for items in this batch after successful update
@@ -315,7 +344,7 @@ function EditByPhoneContent() {
       {data && data.length > 0 && (
         <section className="rounded-2xl border border-white/10 bg-black/40 backdrop-blur p-4 mb-4">
           <h3 className="text-sm font-medium text-gray-300 mb-3">Update Fields</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
               <label className="block text-sm text-gray-300 mb-1">New Phone Number</label>
               <input 
@@ -337,6 +366,19 @@ function EditByPhoneContent() {
                 value={contactName} 
                 onChange={(e)=>setContactName(e.target.value)}
                 placeholder="Enter name" 
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-300 mb-1">Emergency Phone</label>
+              <input 
+                className="w-full px-3 py-2 rounded border border-white/10 bg-black/40 text-white placeholder-gray-400" 
+                type="tel" 
+                inputMode="numeric"
+                pattern="\\d{10}"
+                maxLength={10}
+                value={emergencyPhone} 
+                onChange={(e)=>setEmergencyPhone(e.target.value.replace(/\D/g, '').slice(0,10))}
+                placeholder="10-digit (optional)" 
               />
             </div>
             <div>
@@ -466,7 +508,7 @@ function EditByPhoneContent() {
                                             <svg className={`w-4 h-4 text-indigo-300 transition-transform ${tentExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
                                             </svg>
-                                            <span className="font-medium text-white">Tent {tent.index}</span>
+                                            <span className="font-medium text-white">{tent.name || `Tent ${tent.index}`}</span>
                                           </div>
                                           <span className="text-sm text-gray-300">{tent.items.length}</span>
                                         </div>
@@ -486,7 +528,7 @@ function EditByPhoneContent() {
                                                       <svg className={`w-3 h-3 text-blue-300 transition-transform ${blockExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
                                                       </svg>
-                                                      <span className="text-sm text-gray-200">Block {block.index}</span>
+                                                      <span className="text-sm text-gray-200">{block.name || `Block ${block.index}`}</span>
                                                     </div>
                                                     <span className="text-xs text-gray-400">{block.items.length}</span>
                                                   </div>
@@ -494,20 +536,27 @@ function EditByPhoneContent() {
                                                   {blockExpanded && (
                                                     <div className="bg-black/40 divide-y divide-white/5">
                                                       {block.beds.map((bed) => (
-                                                        <div key={bed.id} className="px-4 py-2 pl-28 flex items-center justify-between hover:bg-white/5">
-                                                          <div className="flex items-center gap-3">
-                                                            <input type="checkbox" checked={selectedIds.has(bed.id)} onChange={() => toggleSelection(bed.id)} className="rounded" />
-                                                            <span className="text-xs text-gray-400">Bed {bed.bedNumber}</span>
-                                                            <span className={`px-1.5 py-0.5 rounded text-xs ${bed.gender?.toLowerCase() === 'male' ? 'bg-blue-500/20 text-blue-200' : 'bg-pink-500/20 text-pink-200'}`}>
-                                                              {bed.gender}
-                                                            </span>
-                                                            <span className={`px-2 py-0.5 rounded-full text-xs ${bed.status === 'reserved' ? 'bg-blue-500/20 border border-blue-400/30 text-blue-200' : 'bg-emerald-500/20 border border-emerald-400/30 text-emerald-200'}`}>
-                                                              {bed.status}
-                                                            </span>
+                                                        <div key={bed.id} className="px-4 py-2 pl-28 hover:bg-white/5">
+                                                          <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-3">
+                                                              <input type="checkbox" checked={selectedIds.has(bed.id)} onChange={() => toggleSelection(bed.id)} className="rounded" />
+                                                              <span className="text-xs text-gray-400">Bed {bed.bedNumber}</span>
+                                                              <span className={`px-1.5 py-0.5 rounded text-xs ${bed.gender?.toLowerCase() === 'male' ? 'bg-blue-500/20 text-blue-200' : 'bg-pink-500/20 text-pink-200'}`}>
+                                                                {bed.gender}
+                                                              </span>
+                                                              <span className={`px-2 py-0.5 rounded-full text-xs ${bed.status === 'reserved' ? 'bg-blue-500/20 border border-blue-400/30 text-blue-200' : 'bg-emerald-500/20 border border-emerald-400/30 text-emerald-200'}`}>
+                                                                {bed.status}
+                                                              </span>
+                                                            </div>
+                                                            <div className="text-xs text-gray-400">
+                                                              {new Date(bed.startDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' })} → {new Date(bed.endDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' })}
+                                                            </div>
                                                           </div>
-                                                          <div className="text-xs text-gray-400">
-                                                            {new Date(bed.startDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' })} → {new Date(bed.endDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' })}
-                                                          </div>
+                                                          {bed.emergencyPhone && (
+                                                            <div className="text-xs text-gray-400 ml-9 mt-1">
+                                                              Emergency: {bed.emergencyPhone}
+                                                            </div>
+                                                          )}
                                                         </div>
                                                       ))}
                                                     </div>

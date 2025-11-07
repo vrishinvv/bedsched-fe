@@ -324,13 +324,22 @@ export async function updatePhoneByPhone({ oldPhone, newPhone, batchId, allocati
   return handle(res, 'Failed to update phone');
 }
 
-export async function updateContactNameByPhone({ phone, contactName, batchId, allocationIds }) {
-  const res = await fetch(`${API_BASE_URL}/api/allocations/by-phone/update-contact`, {
+export async function updateNameByPhone({ phone, name, batchId, allocationIds }) {
+  const res = await fetch(`${API_BASE_URL}/api/allocations/by-phone/update-name`, {
     method: 'PATCH',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ phone, contactName, batchId, allocationIds }),
+    body: JSON.stringify({ phone, name, batchId, allocationIds }),
   });
-  return handle(res, 'Failed to update contact name');
+  return handle(res, 'Failed to update name');
+}
+
+export async function updateEmergencyPhoneByPhone({ phone, emergencyPhone, batchId, allocationIds }) {
+  const res = await fetch(`${API_BASE_URL}/api/allocations/by-phone/update-emergency-phone`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ phone, emergencyPhone, batchId, allocationIds }),
+  });
+  return handle(res, 'Failed to update emergency phone');
 }
 
 export async function updateEndDateByPhone({ phone, endDate, batchId, allocationIds }) {
@@ -358,7 +367,32 @@ export async function fetchDepartures(date) {
   return handle(res, 'Failed to fetch departures');
 }
 
+export async function fetchCurrentlyOccupied() {
+  const res = await fetch(`${API_BASE_URL}/api/allocations/currently-occupied`, { headers: authHeaders() });
+  return handle(res, 'Failed to fetch currently occupied');
+}
+
 export async function fetchReservedActive() {
   const res = await fetch(`${API_BASE_URL}/api/allocations/reserved-active`, { headers: authHeaders() });
   return handle(res, 'Failed to fetch active reserved');
 }
+
+export async function fetchAnalytics(filters = {}) {
+  const url = new URL(`${API_BASE_URL}/api/admin/analytics`);
+  if (filters.startDate) url.searchParams.set('startDate', filters.startDate);
+  if (filters.endDate) url.searchParams.set('endDate', filters.endDate);
+  if (filters.locationId) url.searchParams.set('locationId', filters.locationId);
+  if (filters.tentIndex) url.searchParams.set('tentIndex', filters.tentIndex);
+  if (filters.blockIndex) url.searchParams.set('blockIndex', filters.blockIndex);
+  const res = await fetch(url.toString(), { headers: authHeaders() });
+  return handle(res, 'Failed to fetch analytics');
+}
+
+export async function triggerBackup() {
+  const res = await fetch(`${API_BASE_URL}/api/admin/trigger-backup`, { headers: authHeaders() });
+  return handle(res, 'Failed to trigger backup');
+}
+
+// Alias for backward compatibility
+export const getLocations = fetchLocations;
+

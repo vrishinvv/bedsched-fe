@@ -91,18 +91,14 @@ export default function Page() {
             Global Overview
           </h2>
           <p className="text-sm sm:text-base text-blue-200/80">Monitor accommodation across all locations</p>
+          {/* Reserve button - commented out
           <div className="mt-4 flex items-center gap-2 sm:gap-3 flex-wrap">
             <button onClick={()=>setRegOpen(true)} className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium shadow text-sm sm:text-base touch-manipulation">
               <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
               Reserve
             </button>
-            {/* {role === 'admin' && (
-              <Link href="/admin/confirm" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-900 text-white font-medium shadow">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12M8 12h12M8 17h12M3 7h.01M3 12h.01M3 17h.01"/></svg>
-                Search & Confirm
-              </Link>
-            )} */}
           </div>
+          */}
         </div>
       </section>
 
@@ -172,8 +168,8 @@ export default function Page() {
           </div>
         </div>
 
-        {/* Reserved Active */}
-        <div className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-sky-600/10 via-blue-500/10 to-indigo-500/10 border border-sky-500/20 p-3 sm:p-5 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:border-sky-400/40 touch-manipulation col-span-2 md:col-span-1">
+        {/* Reserved Active - commented out */}
+        {/* <div className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-sky-600/10 via-blue-500/10 to-indigo-500/10 border border-sky-500/20 p-3 sm:p-5 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:border-sky-400/40 touch-manipulation col-span-2 md:col-span-1">
           <div className="absolute inset-0 bg-gradient-to-br from-sky-400/5 to-transparent pointer-events-none" />
           <div className="relative">
             <div className="flex items-center justify-between mb-2 sm:mb-3">
@@ -186,7 +182,7 @@ export default function Page() {
             <div className="text-[10px] sm:text-xs text-sky-300/70 font-medium mb-1">Active Reservations</div>
             <div className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-1">{stats.totalReserved.toLocaleString()}</div>
           </div>
-        </div>
+        </div> */}
       </section>
 
       {/* Location cards - visible to all, clickable based on role */}
@@ -197,7 +193,7 @@ export default function Page() {
         })}
       </section>
       
-      {/* Dashboard user message */}
+      {/* Dashboard user message
       {role === 'dashboard' && (
         <div className="text-center py-4">
           <div className="inline-block px-6 py-3 rounded-xl bg-blue-50 border border-blue-200">
@@ -206,7 +202,7 @@ export default function Page() {
             </p>
           </div>
         </div>
-      )}
+      )} */}
 
       {err ? <p className="text-sm text-amber-400">{err}</p> : null}
 

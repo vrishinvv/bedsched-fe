@@ -263,17 +263,18 @@ export default function BedGrid({
                         
                         const startDate = formatDate(allocation.startDate);
                         const endDate = formatDate(allocation.endDate);
+                        const emergencyInfo = allocation.emergencyPhone ? ` | Emergency: ${allocation.emergencyPhone}` : '';
                         
                         switch (status) {
                             case 'reserved': {
                                 const expiresAt = allocation.reservedExpiresAt ? new Date(allocation.reservedExpiresAt) : null;
                                 const expiresStr = expiresAt ? expiresAt.toLocaleString() : 'Soon';
-                                return `Bed ${n}: Reserved by ${allocation.name || 'contact'} (${startDate} - ${endDate}) until ${expiresStr}`;
+                                return `Bed ${n}: Reserved by ${allocation.name || 'contact'} (${startDate} - ${endDate}) until ${expiresStr}${emergencyInfo}`;
                             }
                             case 'current':
-                                return `Bed ${n}: ${allocation.name} (${startDate} - ${endDate}) - Currently Occupied`;
+                                return `Bed ${n}: ${allocation.name} (${startDate} - ${endDate}) - Currently Occupied${emergencyInfo}`;
                             case 'future':
-                                return `Bed ${n}: ${allocation.name} (${startDate} - ${endDate}) - Future Booking`;
+                                return `Bed ${n}: ${allocation.name} (${startDate} - ${endDate}) - Future Booking${emergencyInfo}`;
                             default:
                                 return `Bed ${n}: Available`;
                         }

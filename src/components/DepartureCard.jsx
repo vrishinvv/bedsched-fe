@@ -28,7 +28,7 @@ export default function DepartureCard({ group, onPhoneClick }) {
               <div className="flex-1 space-y-1">
                 <div className="flex items-center gap-3">
                   <div className="text-base font-medium text-white">
-                    {item.contact_name || 'No name'}
+                    {item.name || 'No name'}
                   </div>
                   <button
                     onClick={() => onPhoneClick(item.phone)}

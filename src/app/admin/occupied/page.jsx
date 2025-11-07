@@ -1,24 +1,12 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { fetchDepartures, getMe } from "@/lib/api";
+import { fetchCurrentlyOccupied, getMe } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { TreeSkeleton } from "@/components/Skeleton";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
-function DeparturesContent() {
-  const MIN_DATE = '2025-11-03';
-  const MAX_DATE = '2025-11-24';
-  
-  const getTodayIST = () => {
-    const now = new Date();
-    const istOffset = 5.5 * 60 * 60 * 1000;
-    const istDate = new Date(now.getTime() + istOffset);
-    return istDate.toISOString().slice(0,10);
-  };
-  
-  const [date, setDate] = useState(() => getTodayIST());
-  const [selectedFilter, setSelectedFilter] = useState('today'); // 'today-1', 'today', 'tomorrow', or 'custom'
+function CurrentlyOccupiedContent() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -27,10 +15,10 @@ function DeparturesContent() {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const router = useRouter();
 
-  const load = async (d) => {
+  const load = async () => {
     setLoading(true); setError("");
     try {
-      const { items } = await fetchDepartures(d);
+      const { items } = await fetchCurrentlyOccupied();
       const me = await getMe().catch(() => null);
       
       // Filter for location_user role
@@ -42,13 +30,13 @@ function DeparturesContent() {
       
       setItems(filteredData);
     } catch (e) {
-      setError(e.message || "Failed to load departures");
+      setError(e.message || "Failed to load currently occupied");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(date); }, []);
+  useEffect(() => { load(); }, []);
 
   // Sort handler
   const handleSort = (key) => {
@@ -117,7 +105,8 @@ function DeparturesContent() {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `departures_${date}.csv`);
+    const today = new Date().toISOString().slice(0,10);
+    link.setAttribute('download', `currently_occupied_${today}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -126,45 +115,29 @@ function DeparturesContent() {
 
   return (
     <div className="p-3 sm:p-4 max-w-7xl mx-auto">
-      <section className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-900/20 via-purple-900/20 to-fuchsia-900/20 border border-indigo-500/20 p-4 sm:p-6 mb-4 sm:mb-6">
+      <section className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-emerald-900/20 via-teal-900/20 to-cyan-900/20 border border-emerald-500/20 p-4 sm:p-6 mb-4 sm:mb-6">
         <div className="relative flex flex-col sm:flex-row items-start sm:items-end justify-between gap-3 sm:gap-4">
           <div className="w-full sm:w-auto">
             <div className="flex items-center gap-2 sm:gap-3 mb-2">
-              <Link href="/" className="inline-flex items-center gap-2 text-indigo-300 hover:underline text-sm sm:text-base touch-manipulation">
+              <Link href="/" className="inline-flex items-center gap-2 text-emerald-300 hover:underline text-sm sm:text-base touch-manipulation">
                 <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                 Back
               </Link>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-indigo-300 to-fuchsia-300 bg-clip-text text-transparent">Departures</h2>
-            <p className="text-sm sm:text-base text-indigo-200/80">View seats expiring on a selected date.</p>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-emerald-300 to-cyan-300 bg-clip-text text-transparent">Currently Occupied</h2>
+            <p className="text-sm sm:text-base text-emerald-200/80">View all confirmed beds currently occupied.</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
-            <button 
-              className={`px-2 sm:px-3 py-1.5 rounded border text-xs sm:text-sm font-medium transition-all touch-manipulation ${selectedFilter === 'today-1' ? 'bg-indigo-600 border-indigo-500 text-white' : 'border-white/10 text-gray-200 hover:bg-white/10 active:bg-white/20'}`}
-              onClick={()=>{ const now = new Date(); const istOffset = 5.5 * 60 * 60 * 1000; const istDate = new Date(now.getTime() + istOffset); istDate.setDate(istDate.getDate()-1); const d=istDate.toISOString().slice(0,10); setDate(d); setSelectedFilter('today-1'); load(d); }}
+            <button
+              onClick={load}
+              className="inline-flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-medium text-xs sm:text-sm transition-all touch-manipulation"
             >
-              Yesterday
+              <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span className="hidden sm:inline">Refresh</span>
+              <span className="sm:hidden">Refresh</span>
             </button>
-            <button 
-              className={`px-2 sm:px-3 py-1.5 rounded border text-xs sm:text-sm font-medium transition-all touch-manipulation ${selectedFilter === 'today' ? 'bg-indigo-600 border-indigo-500 text-white' : 'border-white/10 text-gray-200 hover:bg-white/10 active:bg-white/20'}`}
-              onClick={()=>{ const d=getTodayIST(); setDate(d); setSelectedFilter('today'); load(d); }}
-            >
-              Today
-            </button>
-            <button 
-              className={`px-2 sm:px-3 py-1.5 rounded border text-xs sm:text-sm font-medium transition-all touch-manipulation ${selectedFilter === 'tomorrow' ? 'bg-indigo-600 border-indigo-500 text-white' : 'border-white/10 text-gray-200 hover:bg-white/10 active:bg-white/20'}`}
-              onClick={()=>{ const now = new Date(); const istOffset = 5.5 * 60 * 60 * 1000; const istDate = new Date(now.getTime() + istOffset); istDate.setDate(istDate.getDate()+1); const d=istDate.toISOString().slice(0,10); setDate(d); setSelectedFilter('tomorrow'); load(d); }}
-            >
-              Tomorrow
-            </button>
-            <input 
-              type="date" 
-              value={date} 
-              onChange={(e)=>{ setDate(e.target.value); setSelectedFilter('custom'); load(e.target.value); }} 
-              min={MIN_DATE}
-              max={MAX_DATE}
-              className="px-2 py-1.5 rounded border border-white/10 bg-black/40 text-white text-xs sm:text-sm min-w-[120px] touch-manipulation" 
-            />
             <button
               onClick={downloadCSV}
               disabled={!items.length}
@@ -185,7 +158,7 @@ function DeparturesContent() {
 
       {/* Filters */}
       {!loading && items.length > 0 && (
-        <section className="rounded-xl sm:rounded-2xl border border-gray-200 bg-white/70 backdrop-blur p-3 sm:p-4">
+        <section className="rounded-xl sm:rounded-2xl border border-gray-200 bg-white/70 backdrop-blur p-3 sm:p-4 mb-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Location</label>
@@ -222,8 +195,8 @@ function DeparturesContent() {
       )}
 
       <div className="space-y-2">
-        {!loading && !filteredItems.length && items.length > 0 && <div className="text-sm text-gray-300">No departures match the selected filters</div>}
-        {!loading && !items.length && <div className="text-sm text-gray-300">No departures for {date}</div>}
+        {!loading && !filteredItems.length && items.length > 0 && <div className="text-sm text-gray-300">No occupied beds match the selected filters</div>}
+        {!loading && !items.length && <div className="text-sm text-gray-300">No beds currently occupied</div>}
         {filteredItems.length > 0 && (
           <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg overflow-hidden shadow-2xl">
             <div className="overflow-x-auto">
@@ -366,10 +339,10 @@ function DeparturesContent() {
   );
 }
 
-export default function DeparturesPage() {
+export default function CurrentlyOccupiedPage() {
   return (
     <ProtectedRoute adminOnly={true}>
-      <DeparturesContent />
+      <CurrentlyOccupiedContent />
     </ProtectedRoute>
   );
 }

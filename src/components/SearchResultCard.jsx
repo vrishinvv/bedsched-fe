@@ -156,7 +156,7 @@ export default function SearchResultCard({ batch, filter = {}, onViewLocation, s
                               <svg className={`w-4 h-4 text-purple-300 transition-transform ${tentExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
                               </svg>
-                              <span className="font-medium text-white">Tent {tent.index}</span>
+                              <span className="font-medium text-white">{tent.name || `Tent ${tent.index}`}</span>
                             </div>
                             <span className="text-sm text-gray-300">{tent.items.length}</span>
                           </div>
@@ -178,7 +178,7 @@ export default function SearchResultCard({ batch, filter = {}, onViewLocation, s
                                         <svg className={`w-3 h-3 text-blue-300 transition-transform ${blockExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
                                         </svg>
-                                        <span className="text-sm text-gray-200">Block {block.index}</span>
+                                        <span className="text-sm text-gray-200">{block.name || `Block ${block.index}`}</span>
                                       </div>
                                       <span className="text-xs text-gray-400">{block.beds.length}</span>
                                     </div>

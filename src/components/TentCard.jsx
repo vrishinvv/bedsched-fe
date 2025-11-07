@@ -60,7 +60,7 @@ export default function TentCard({ locationId, tent }) {
 
         {/* Header */}
         <div className="relative mb-4">
-          <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 pr-20">Tent {tent.index}</h3>
+          <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 pr-20">{tent.name || `Tent ${tent.index}`}</h3>
           <div className="flex items-center gap-2" />
         </div>
 

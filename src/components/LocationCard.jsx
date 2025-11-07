@@ -2,12 +2,26 @@
 import Link from 'next/link';
 import StatPill from './StatPill';
 
+// Landmark mapping for locations
+const LANDMARKS = {
+  'Anand Vilas Enclave': 'Chaitanya Jothi',
+  'Brindavan Enclave': 'Electricity Board',
+  'Sai Sruthi Enclave': 'APSRTC Bus Depo',
+  'Dharmakshetra Enclave': 'Sai Hira Hall',
+  'Shivam Enclave': 'West South',
+  'Sundaram Enclave': 'West North',
+  'New Block B Basement': 'New Block B Basement',
+  'New Block A': 'New Block A',
+  'New Block B': 'New Block B'
+};
+
 export default function LocationCard({ location, isClickable = true }) {
   const allocated = location.allocatedCount ?? 0;
   const total = location.capacity ?? 0;
   const pct = total ? Math.round((allocated / total) * 100) : 0;
   const freeingTomorrow = location.freeingTomorrow ?? 0;
   const reserved = location.reservedCount ?? 0;
+  const landmark = LANDMARKS[location.name];
 
   // Dynamic color based on occupancy
   const getOccupancyColor = () => {
@@ -53,6 +67,15 @@ export default function LocationCard({ location, isClickable = true }) {
       {/* Header */}
       <div className="relative mb-4">
         <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 pr-20">{location.name}</h3>
+        {landmark && (
+          <div className="flex items-center gap-1.5 text-xs text-gray-600">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span className="font-medium">{landmark}</span>
+          </div>
+        )}
       </div>
 
       {/* Main stats */}

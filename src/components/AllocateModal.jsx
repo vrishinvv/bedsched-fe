@@ -38,7 +38,7 @@ export default function AllocateModal({
   const [form, setForm] = useState({
     name: '',
     phone: '',
-    aadharNumber: '',
+    emergencyPhone: '',
     gender: 'Male',
     startDate: '',
     endDate: '',
@@ -113,7 +113,7 @@ export default function AllocateModal({
         setForm({
           name: initialData.name || '',
           phone: initialData.phone || '',
-          aadharNumber: initialData.aadharNumber || '',
+          emergencyPhone: initialData.emergencyPhone || '',
           gender: initialData.gender || 'Male',
           startDate: initialData.startDate || '',
           endDate: initialData.endDate || '',
@@ -140,7 +140,7 @@ export default function AllocateModal({
         setForm({
           name: '',
           phone: '',
-          aadharNumber: '',
+          emergencyPhone: '',
           gender: defaultGender,
           startDate: '',
           endDate: '',
@@ -218,18 +218,9 @@ export default function AllocateModal({
   function handleChange(e) {
     const { name, value } = e.target;
     // Sanitize phone: digits only, max 10
-    if (name === 'phone') {
+    if (name === 'phone' || name === 'emergencyPhone') {
       const digits = value.replace(/\D/g, '').slice(0, 10);
-      setForm((f) => ({ ...f, phone: digits }));
-      return;
-    }
-    // Format Aadhar: digits only, max 12, display with spaces every 4 digits
-    if (name === 'aadharNumber') {
-      const digits = value.replace(/\D/g, '').slice(0, 12);
-      const formatted = digits.replace(/(\d{4})(\d{0,4})(\d{0,4})/, (match, g1, g2, g3) => {
-        return [g1, g2, g3].filter(Boolean).join(' ');
-      });
-      setForm((f) => ({ ...f, aadharNumber: formatted }));
+      setForm((f) => ({ ...f, [name]: digits }));
       return;
     }
     setForm((f) => ({ ...f, [name]: value }));
@@ -252,10 +243,10 @@ export default function AllocateModal({
       return alert('Please enter a valid 10-digit phone number.');
     }
 
-    // Validate Aadhar: if provided, must be exactly 12 digits
-    const aadharDigits = form.aadharNumber.replace(/\D/g, '');
-    if (form.aadharNumber && aadharDigits.length !== 12) {
-      return alert('Aadhar number must be exactly 12 digits.');
+    // Validate Emergency Phone: if provided, must be exactly 10 digits
+    const emergencyDigits = form.emergencyPhone.replace(/\D/g, '');
+    if (form.emergencyPhone && emergencyDigits.length !== 10) {
+      return alert('Emergency phone must be exactly 10 digits.');
     }
 
     // Validate photos are captured (mandatory for new allocations)
@@ -264,7 +255,7 @@ export default function AllocateModal({
         return alert('Person photo is required. Please capture the photo.');
       }
       if (!aadhaarPhoto.blob && !aadhaarPhoto.dataUrl) {
-        return alert('Aadhaar photo is required. Please capture the photo.');
+        return alert('Identity photo is required. Please capture the photo.');
       }
     }
 
@@ -314,7 +305,7 @@ export default function AllocateModal({
       const payload = {
         ...form,
         gender: selectedGender,
-        aadharNumber: aadharDigits || undefined,
+        emergencyPhone: emergencyDigits || undefined,
         personPhotoKey,
         aadhaarPhotoKey
       };
@@ -573,19 +564,20 @@ export default function AllocateModal({
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Aadhar Number (Optional)</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Emergency Phone (Optional)</label>
             <input 
-              name="aadharNumber" 
-              value={form.aadharNumber} 
+              name="emergencyPhone" 
+              value={form.emergencyPhone} 
               onChange={handleChange} 
               disabled={isProcessing}
               type="tel"
               inputMode="numeric"
-              maxLength={14}
+              pattern="\\d{10}"
+              maxLength={10}
               className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
-              placeholder="1234 5678 9012" 
+              placeholder="10-digit phone" 
             />
-            <p className="text-xs text-gray-500 mt-1">12 digits (optional)</p>
+            <p className="text-xs text-gray-500 mt-1">Alternative contact number</p>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Gender*</label>
@@ -649,7 +641,7 @@ export default function AllocateModal({
               <div className="mt-4">
                 <CameraCapture
                   key={`aadhaar-${bedNumber}-${open}-${initialData?.aadhaarPhotoUrl || 'new'}`}
-                  label="Aadhaar Card Photo"
+                  label="Identity Card Photo"
                   onCapture={(blob, dataUrl) => setAadhaarPhoto({ blob, dataUrl })}
                   existingPhotoUrl={initialData?.aadhaarPhotoUrl || null}
                   autoOpen={!isEdit} // Auto-open for new bookings

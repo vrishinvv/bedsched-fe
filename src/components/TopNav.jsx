@@ -89,31 +89,45 @@ export default function TopNav() {
             </li>
             <li>
               <Link onClick={() => setOpen(false)} href="/search" className="block px-3 py-2 rounded-md text-gray-200 hover:bg-white/10 hover:text-white transition-colors">
-                🔍 Search Bookings
+                Search
               </Link>
             </li>
             {(isAdmin || isLocationUser) && (
               <>
+                {/* Search & Confirm link - commented out
                 <li>
                   <Link onClick={() => setOpen(false)} href="/admin/confirm" className="block px-3 py-2 rounded-md text-gray-200 hover:bg-white/10 hover:text-white transition-colors">
                     Search & Confirm
                   </Link>
                 </li>
-                <li>
+                */}
+                {/* <li>
                   <Link onClick={() => setOpen(false)} href="/admin/edit" className="block px-3 py-2 rounded-md text-gray-200 hover:bg-white/10 hover:text-white transition-colors">
-                    Edit
+                    Bulk Edit
                   </Link>
-                </li>
-                <li>
+                </li> */}
+                {/* <li>
                   <Link onClick={() => setOpen(false)} href="/admin/reserved" className="block px-3 py-2 rounded-md text-gray-200 hover:bg-white/10 hover:text-white transition-colors">
                     Active Reservations
                   </Link>
-                </li>
+                </li> */}
                 <li>
                   <Link onClick={() => setOpen(false)} href="/admin/departures" className="block px-3 py-2 rounded-md text-gray-200 hover:bg-white/10 hover:text-white transition-colors">
                     Departures
                   </Link>
                 </li>
+                <li>
+                  <Link onClick={() => setOpen(false)} href="/admin/occupied" className="block px-3 py-2 rounded-md text-gray-200 hover:bg-white/10 hover:text-white transition-colors">
+                    Currently Occupied
+                  </Link>
+                </li>
+                {isAdmin && (
+                  <li>
+                    <Link onClick={() => setOpen(false)} href="/admin/analytics" className="block px-3 py-2 rounded-md text-gray-200 hover:bg-white/10 hover:text-white transition-colors">
+                      Analytics
+                    </Link>
+                  </li>
+                )}
               </>
             )}
             <li className="pt-2">
