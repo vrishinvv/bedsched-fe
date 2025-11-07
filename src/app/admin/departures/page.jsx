@@ -92,12 +92,12 @@ function DeparturesContent() {
 
   const downloadCSV = () => {
     // Prepare CSV data
-    const headers = ['Location ID', 'Location Name', 'Tent Index', 'Block Index', 'Bed Number', 'Name', 'Phone', 'Gender', 'Start Date', 'End Date', 'Status'];
+    const headers = ['Location ID', 'Location Name', 'Tent Name', 'Block Name', 'Bed Number', 'Name', 'Phone', 'Gender', 'Start Date', 'End Date', 'Status'];
     const rows = filteredItems.map(item => [
       item.location_id,
       item.location_name || '',
-      item.tent_index,
-      item.block_index,
+      item.tent_name || `Tent ${item.tent_index}`,
+      item.block_name || `Block ${item.block_index}`,
       item.bed_number,
       item.name || '',
       item.phone || '',
