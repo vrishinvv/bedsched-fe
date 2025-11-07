@@ -136,11 +136,11 @@ export default function SearchPage() {
     setEditPhotos({ person: {}, aadhaar: {} });
   }, []);
 
-  const uploadPhotoToS3 = useCallback(async (blob, photoType, locationId, tentIndex, blockIndex) => {
+  const uploadPhotoToS3 = useCallback(async (blob, photoType, locationId, tentIndex, blockIndex, name, bedNumber) => {
     const response = await fetch(`${API_BASE_URL}/api/upload-url`, {
       method: 'POST',
       headers: authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ photoType, locationId, tentIndex, blockIndex }),
+      body: JSON.stringify({ photoType, locationId, tentIndex, blockIndex, name, bedNumber }),
     });
 
     if (!response.ok) throw new Error('Failed to get upload URL');
@@ -171,7 +171,9 @@ export default function SearchPage() {
           'person',
           allocation.location_id,
           allocation.tent_index || 0,
-          allocation.block_index || 0
+          allocation.block_index || 0,
+          editForm.name || allocation.name,
+          allocation.bed_number
         );
         personPhotoKey = result.key;
       }
@@ -182,7 +184,9 @@ export default function SearchPage() {
           'aadhaar',
           allocation.location_id,
           allocation.tent_index || 0,
-          allocation.block_index || 0
+          allocation.block_index || 0,
+          editForm.name || allocation.name,
+          allocation.bed_number
         );
         aadhaarPhotoKey = result.key;
       }

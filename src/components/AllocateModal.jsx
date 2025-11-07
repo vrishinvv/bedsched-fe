@@ -226,11 +226,22 @@ export default function AllocateModal({
     setForm((f) => ({ ...f, [name]: value }));
   }
 
-  // Helper function to generate S3 key (same pattern as backend)
+  // Helper function to generate S3 key with format: {bedNumber}-{ddmmyyyy}-{hhmm}-{name}-{type}
   function generatePhotoKey(photoType) {
-    const timestamp = Date.now();
-    const uuid = crypto.randomUUID();
-    return `location-${locationId}/tent-${tentIndex}/block-${blockIndex}/${timestamp}-${uuid}-${photoType}.jpg`;
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyy = now.getFullYear();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    
+    // Sanitize name for file path (remove special characters, replace spaces with hyphens)
+    const sanitizedName = (form.name || 'unnamed').replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '-').toLowerCase();
+    
+    // Map photoType to desired suffix
+    const typeSuffix = photoType === 'person' ? 'person' : 'identity';
+    
+    return `location-${locationId}/tent-${tentIndex}/block-${blockIndex}/${bedNumber}-${dd}${mm}${yyyy}-${hh}${min}-${sanitizedName}-${typeSuffix}.jpg`;
   }
 
   async function handleSave() {

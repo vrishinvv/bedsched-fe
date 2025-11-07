@@ -510,7 +510,7 @@ export default function BlockBedsPage({ params }) {
       </section>
 
       {/* Enhanced Dashboard */}
-      <section className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
         <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/10 via-blue-500/10 to-cyan-500/10 border border-blue-500/20 p-5 backdrop-blur-sm transition-all duration-300 hover:scale-105">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-400/5 to-transparent pointer-events-none" />
           <div className="relative">
