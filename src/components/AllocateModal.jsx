@@ -102,7 +102,7 @@ export default function AllocateModal({
 
   useEffect(() => {
     if (open) {
-      // Reset uploading state when modal opens
+      // Reset uploading state when modal opens OR bed number changes
       setUploading(false);
       setUploadProgress(0);
       setDisplayProgress(0);
@@ -352,7 +352,7 @@ export default function AllocateModal({
       // Add backend save to parallel promises
       setUploadProgress(20);
       parallelPromises.push(
-        onSave(payload).then(() => {
+        onSave(payload, saveAndNext).then(() => { // Pass skipClose flag
           console.log('Backend save complete');
           return 'backend';
         })
@@ -364,7 +364,7 @@ export default function AllocateModal({
       console.log('All operations complete!');
       setUploadProgress(100);
       
-      // If save & next, trigger the next bed opening
+      // If save & next, trigger the next bed opening IMMEDIATELY (modal stays open!)
       if (saveAndNext && onSaveAndNext) {
         onSaveAndNext();
       }

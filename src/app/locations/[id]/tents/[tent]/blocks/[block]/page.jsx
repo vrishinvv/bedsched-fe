@@ -112,7 +112,7 @@ export default function BlockBedsPage({ params }) {
     // First, search from current bed to end
     for (let nextBed = currentBed + 1; nextBed <= capacity; nextBed++) {
       if (!bedsState?.beds?.[nextBed]) {
-        // Found next free bed, open it
+        // Found next free bed - instantly update modal state
         setModal({ open: true, bedNumber: nextBed, data: null });
         return;
       }
@@ -121,7 +121,7 @@ export default function BlockBedsPage({ params }) {
     // If not found, wrap around and search from start to current bed
     for (let nextBed = 1; nextBed < currentBed; nextBed++) {
       if (!bedsState?.beds?.[nextBed]) {
-        // Found next free bed, open it
+        // Found next free bed - instantly update modal state
         setModal({ open: true, bedNumber: nextBed, data: null });
         return;
       }
@@ -154,7 +154,7 @@ export default function BlockBedsPage({ params }) {
     setNotification(null);
   }
 
-  async function handleSave(payload) {
+  async function handleSave(payload, skipClose = false) {
     const isBatchEdit = modal.bedNumber === 'Multiple' && Array.isArray(batchSelection) && batchSelection.length > 0;
     const n = isBatchEdit ? null : modal.bedNumber;
     const isEdit = Boolean(modal.data);
@@ -284,7 +284,10 @@ export default function BlockBedsPage({ params }) {
         }
       }
 
-      setModal({ open: false, bedNumber: null, data: null });
+      // Don't close modal if skipClose is true (for Save & Next flow)
+      if (!skipClose) {
+        setModal({ open: false, bedNumber: null, data: null });
+      }
       setBatchSelection([]);
     } catch (e) {
       // Revert optimistic update on error
