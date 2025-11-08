@@ -315,11 +315,11 @@ export default function SearchPage() {
                   /* Edit Mode */
                   <div className="space-y-4">
                     <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-lg font-semibold text-gray-900">Edit Booking</h3>
+                      <h3 className="text-lg font-semibold text-white">Edit Booking</h3>
                       <div className="flex gap-2">
                         <button
                           onClick={cancelEdit}
-                          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
+                          className="px-4 py-2 border border-gray-600 rounded-lg hover:bg-gray-800 text-gray-200"
                         >
                           Cancel
                         </button>
@@ -336,17 +336,17 @@ export default function SearchPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                        <label className="block text-sm font-medium text-gray-200 mb-1">Name *</label>
                         <input
                           value={editForm.name}
                           onChange={handleNameChange}
                           required
-                          className={`w-full p-2 border rounded-lg text-gray-900 ${errors.name ? 'border-red-500' : 'border-gray-300'}`}
+                          className={`w-full p-2 border rounded-lg bg-gray-800 text-white ${errors.name ? 'border-red-500' : 'border-gray-600'}`}
                         />
                         {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
+                        <label className="block text-sm font-medium text-gray-200 mb-1">Phone *</label>
                         <input
                           type="tel"
                           inputMode="numeric"
@@ -354,30 +354,30 @@ export default function SearchPage() {
                           onChange={handlePhoneChange}
                           maxLength={10}
                           required
-                          className={`w-full p-2 border rounded-lg text-gray-900 ${errors.phone ? 'border-red-500' : 'border-gray-300'}`}
+                          className={`w-full p-2 border rounded-lg bg-gray-800 text-white ${errors.phone ? 'border-red-500' : 'border-gray-600'}`}
                         />
                         {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Emergency Phone</label>
+                        <label className="block text-sm font-medium text-gray-200 mb-1">Emergency Phone</label>
                         <input
                           type="tel"
                           inputMode="numeric"
                           value={editForm.emergencyPhone}
                           onChange={handleEmergencyPhoneChange}
                           maxLength={10}
-                          className={`w-full p-2 border rounded-lg text-gray-900 ${errors.emergencyPhone ? 'border-red-500' : 'border-gray-300'}`}
+                          className={`w-full p-2 border rounded-lg bg-gray-800 text-white placeholder-gray-500 ${errors.emergencyPhone ? 'border-red-500' : 'border-gray-600'}`}
                           placeholder="10-digit phone"
                         />
                         {errors.emergencyPhone && <p className="text-red-500 text-xs mt-1">{errors.emergencyPhone}</p>}
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Gender *</label>
+                        <label className="block text-sm font-medium text-gray-200 mb-1">Gender *</label>
                         <select
                           value={editForm.gender}
                           onChange={handleGenderChange}
                           required
-                          className={`w-full p-2 border rounded-lg text-gray-900 ${errors.gender ? 'border-red-500' : 'border-gray-300'}`}
+                          className={`w-full p-2 border rounded-lg bg-gray-800 text-white ${errors.gender ? 'border-red-500' : 'border-gray-600'}`}
                         >
                           <option value="Male">Male</option>
                           <option value="Female">Female</option>
@@ -386,7 +386,7 @@ export default function SearchPage() {
                         {errors.gender && <p className="text-red-500 text-xs mt-1">{errors.gender}</p>}
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Start Date *</label>
+                        <label className="block text-sm font-medium text-gray-200 mb-1">Start Date *</label>
                         <input
                           type="date"
                           value={editForm.startDate}
@@ -394,12 +394,12 @@ export default function SearchPage() {
                           min={MIN_DATE}
                           max={MAX_DATE}
                           required
-                          className={`w-full p-2 border rounded-lg text-gray-900 ${errors.startDate ? 'border-red-500' : 'border-gray-300'}`}
+                          className={`w-full p-2 border rounded-lg bg-gray-800 text-white ${errors.startDate ? 'border-red-500' : 'border-gray-600'}`}
                         />
                         {errors.startDate && <p className="text-red-500 text-xs mt-1">{errors.startDate}</p>}
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">End Date *</label>
+                        <label className="block text-sm font-medium text-gray-200 mb-1">End Date *</label>
                         <input
                           type="date"
                           value={editForm.endDate}
@@ -407,7 +407,7 @@ export default function SearchPage() {
                           min={editForm.startDate || MIN_DATE}
                           max={MAX_DATE}
                           required
-                          className={`w-full p-2 border rounded-lg text-gray-900 ${errors.endDate ? 'border-red-500' : 'border-gray-300'}`}
+                          className={`w-full p-2 border rounded-lg bg-gray-800 text-white ${errors.endDate ? 'border-red-500' : 'border-gray-600'}`}
                         />
                         {errors.endDate && <p className="text-red-500 text-xs mt-1">{errors.endDate}</p>}
                       </div>
@@ -436,8 +436,8 @@ export default function SearchPage() {
                   <div>
                     <div className="flex justify-between items-start mb-4">
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-900">{allocation.name}</h3>
-                        <p className="text-sm text-gray-600">
+                        <h3 className="text-lg font-semibold text-white">{allocation.name}</h3>
+                        <p className="text-sm text-gray-300">
                           {allocation.location_name} • Bed {allocation.bed_number}
                           {allocation.tent_index && ` • ${allocation.tent_name || `Tent ${allocation.tent_index}`} ${allocation.block_name || `Block ${allocation.block_index}`}`}
                         </p>
@@ -452,29 +452,29 @@ export default function SearchPage() {
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                       <div>
-                        <p className="text-xs text-gray-500">Phone</p>
-                        <p className="font-medium text-gray-900">{allocation.phone}</p>
+                        <p className="text-xs text-gray-400">Phone</p>
+                        <p className="font-medium text-white">{allocation.phone}</p>
                       </div>
                       {allocation.emergency_phone && (
                         <div>
-                          <p className="text-xs text-gray-500">Emergency Phone</p>
-                          <p className="font-medium text-gray-900">{allocation.emergency_phone}</p>
+                          <p className="text-xs text-gray-400">Emergency Phone</p>
+                          <p className="font-medium text-white">{allocation.emergency_phone}</p>
                         </div>
                       )}
                       <div>
-                        <p className="text-xs text-gray-500">Gender</p>
-                        <p className="font-medium text-gray-900">{allocation.gender}</p>
+                        <p className="text-xs text-gray-400">Gender</p>
+                        <p className="font-medium text-white">{allocation.gender}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500">Start Date</p>
-                        <p className="font-medium text-gray-900">{allocation.start_date}</p>
+                        <p className="text-xs text-gray-400">Start Date</p>
+                        <p className="font-medium text-white">{allocation.start_date}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500">End Date</p>
-                        <p className="font-medium text-gray-900">{allocation.end_date}</p>
+                        <p className="text-xs text-gray-400">End Date</p>
+                        <p className="font-medium text-white">{allocation.end_date}</p>
                       </div>
                       <div className="col-span-2">
-                        <p className="text-xs text-gray-500">Status</p>
+                        <p className="text-xs text-gray-400">Status</p>
                         <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
                           allocation.status === 'confirmed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
                         }`}>
@@ -487,21 +487,21 @@ export default function SearchPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                       {allocation.personPhotoUrl && (
                         <div>
-                          <p className="text-xs text-gray-500 mb-2">Person Photo</p>
+                          <p className="text-xs text-gray-400 mb-2">Person Photo</p>
                           <img
                             src={allocation.personPhotoUrl}
                             alt="Person"
-                            className="w-full rounded-lg border border-gray-300"
+                            className="w-full rounded-lg border border-gray-600"
                           />
                         </div>
                       )}
                       {allocation.aadhaarPhotoUrl && (
                         <div>
-                          <p className="text-xs text-gray-500 mb-2">Identity Photo</p>
+                          <p className="text-xs text-gray-400 mb-2">Identity Photo</p>
                           <img
                             src={allocation.aadhaarPhotoUrl}
                             alt="Identity"
-                            className="w-full rounded-lg border border-gray-300"
+                            className="w-full rounded-lg border border-gray-600"
                           />
                         </div>
                       )}
