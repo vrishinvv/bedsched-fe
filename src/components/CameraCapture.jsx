@@ -214,12 +214,12 @@ export default function CameraCapture({ label, onCapture, existingPhotoUrl, auto
 
       {isCapturing && (
         <div className="space-y-2">
-          <div className="relative bg-black rounded overflow-hidden">
+          <div className="relative bg-black rounded overflow-hidden max-h-[60vh] md:max-h-[400px]">
             <video
               ref={videoRef}
               autoPlay
               playsInline
-              className="w-full"
+              className="w-full h-full object-cover"
             />
           </div>
           <div className="flex gap-2">
