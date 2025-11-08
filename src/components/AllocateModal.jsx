@@ -51,6 +51,8 @@ export default function AllocateModal({
   const [displayProgress, setDisplayProgress] = useState(0); // Animated display progress
   const [preFetchedUrls, setPreFetchedUrls] = useState({ person: null, aadhaar: null }); // Pre-fetched upload URLs
   const ref = useRef(null);
+  const scrollRef = useRef(null); // Ref for scrollable content area
+  const topRef = useRef(null); // Ref for top element to scroll to
 
   const MIN_DATE = '2025-11-03';
   const MAX_DATE = '2025-11-24';
@@ -102,6 +104,11 @@ export default function AllocateModal({
 
   useEffect(() => {
     if (open) {
+      // Scroll modal content to top when bed number changes
+      if (topRef.current) {
+        topRef.current.scrollIntoView({ behavior: 'instant', block: 'start' });
+      }
+      
       // Reset uploading state when modal opens OR bed number changes
       setUploading(false);
       setUploadProgress(0);
@@ -474,7 +481,7 @@ export default function AllocateModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4" data-preserve-selection="true" onClick={(e) => e.stopPropagation()}>
       <div className="absolute inset-0 bg-black/40" onClick={!isProcessing ? onClose : undefined} data-preserve-selection="true" />
       <div ref={ref} className="relative w-full max-w-lg max-h-[95vh] flex flex-col rounded-2xl bg-white shadow-xl overflow-hidden" data-preserve-selection="true" onClick={(e) => e.stopPropagation()}>
-        <div className="overflow-y-auto flex-1 p-4 sm:p-5">
+        <div ref={scrollRef} className="overflow-y-auto flex-1 p-4 sm:p-5">
         {/* Enhanced loading overlay with skeleton and progress */}
         {isProcessing && (
           <div className="absolute inset-0 bg-white/95 rounded-2xl flex flex-col items-center justify-center z-10 p-8">
@@ -531,7 +538,7 @@ export default function AllocateModal({
           </div>
         )}
 
-        <h3 className="mb-4 text-base sm:text-lg font-semibold text-gray-900">
+        <h3 ref={topRef} className="mb-4 text-base sm:text-lg font-semibold text-gray-900">
           {isEdit ? `Edit allocation — Bed ${bedNumber}` : `Allocate bed — Bed ${bedNumber}`}
         </h3>
         
