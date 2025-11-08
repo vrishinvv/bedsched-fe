@@ -4,7 +4,7 @@ import AuthGate from '@/components/AuthGate';
 import Image from 'next/image';
 
 export const metadata = { 
-  title: 'Sai Nivas',
+  title: 'Sri Sathya Sai Nivas',
   icons: {
     icon: '/logo-left.png',
   }
@@ -41,7 +41,7 @@ return (
                 </div>
                 <div className="pt-0.5">
                   <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-400 via-orange-300 to-amber-400 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(251,191,36,0.3)]">
-                    SAI NIVAS
+                    SRI SATHYA SAI NIVAS
                   </h1>
                 </div>
               </div>
