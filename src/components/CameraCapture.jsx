@@ -248,11 +248,11 @@ export default function CameraCapture({ label, onCapture, existingPhotoUrl, auto
               <div className="animate-pulse text-gray-400 text-sm">Loading photo...</div>
             </div>
           ) : null}
-          <div className="relative border-2 border-green-500 rounded overflow-hidden" style={{ display: imageLoading && photoDataUrl.startsWith('http') ? 'none' : 'block' }}>
+          <div className="relative border-2 border-green-500 rounded overflow-hidden max-h-[60vh] md:max-h-[400px]" style={{ display: imageLoading && photoDataUrl.startsWith('http') ? 'none' : 'block' }}>
             <img 
               src={photoDataUrl} 
               alt={label} 
-              className="w-full"
+              className="w-full h-full object-cover"
               onLoad={() => setImageLoading(false)}
               onError={() => setImageLoading(false)}
             />

@@ -439,7 +439,7 @@ export default function SearchPage() {
                         <h3 className="text-lg font-semibold text-white">{allocation.name}</h3>
                         <p className="text-sm text-gray-300">
                           {allocation.location_name} • Bed {allocation.bed_number}
-                          {allocation.tent_index && ` • ${allocation.tent_name || `Tent ${allocation.tent_index}`} ${allocation.block_name || `Block ${allocation.block_index}`}`}
+                          {allocation.tent_index && ` • ${allocation.tent_name || `Tent ${String.fromCharCode(64 + allocation.tent_index)}`} ${allocation.block_name || `Block ${allocation.block_index}`}`}
                         </p>
                       </div>
                       <button
