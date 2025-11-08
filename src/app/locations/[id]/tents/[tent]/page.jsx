@@ -63,11 +63,12 @@ export default function TentBlocksPage({ params }) {
 
   const { location, blocks } = data;
   const tentInfo = data.tentInfo || data.tent || {}; // Handle both tentInfo and tent properties
+  const tentName = tentInfo.name || `Tent ${tentInfo.index || tent}`;
 
   const breadcrumbItems = [
     { label: 'Home', href: '/' },
     { label: location.name, href: `/locations/${id}` },
-    { label: `Tent ${tent}`, href: `/locations/${id}/tents/${tent}` }
+    { label: tentName, href: `/locations/${id}/tents/${tent}` }
   ];
 
   return (
@@ -86,7 +87,7 @@ export default function TentBlocksPage({ params }) {
             </Link>
           </nav>
           <h2 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
-            {location.name} | Tent {tentInfo.index || tent}
+            {location.name} | {tentName}
           </h2>
           <div className="flex items-center gap-4">
             <p className="text-xs sm:text-sm text-purple-200/80">Managing {blocks.length} block{blocks.length !== 1 ? 's' : ''} • {stats.totalCapacity} total beds</p>
