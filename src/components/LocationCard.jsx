@@ -4,9 +4,9 @@ import StatPill from './StatPill';
 
 // Landmark mapping for locations
 const LANDMARKS = {
-  'Anand Vilas Enclave': 'Chaitanya Jothi',
+  'Anand Vilas Enclave': 'Chaitanya Jyoti',
   'Brindavan Enclave': 'Electricity Board',
-  'Sai Sruthi Enclave': 'APSRTC Bus Depo',
+  'Sai Sruthi Enclave': 'APSRTC Bus Depot',
   'Dharmakshetra Enclave': 'Sai Hira Hall',
   'Shivam Enclave': 'West South',
   'Sundaram Enclave': 'West North',

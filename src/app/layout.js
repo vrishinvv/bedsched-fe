@@ -4,7 +4,7 @@ import AuthGate from '@/components/AuthGate';
 import Image from 'next/image';
 
 export const metadata = { 
-  title: 'Sri Sathya Sai ENCLAVE BOOKING',
+  title: 'Sri Sathya Sai Enclave Booking',
   icons: {
     icon: '/logo-left.png',
   }
