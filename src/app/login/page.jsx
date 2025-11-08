@@ -50,7 +50,7 @@ export default function LoginPage() {
       {/* Login Form */}
       <div className="w-full max-w-sm lg:w-96 rounded-xl border border-gray-200 bg-white p-6 shadow-lg text-gray-900">
         <div className="mb-5 text-center">
-          <h1 className="text-xl font-semibold tracking-tight">Sign in to SSS Nivas</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Sign in to SSS Enclave Booking</h1>
           <p className="mt-1 text-sm text-gray-500">Enter your credentials to continue</p>
         </div>
         {error && (
