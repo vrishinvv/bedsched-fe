@@ -34,6 +34,7 @@ export default function AllocateModal({
   locationId,
   tentIndex,
   blockIndex,
+  onSaveAndNext, // New prop for save & next functionality
 }) {
   const [form, setForm] = useState({
     name: '',
@@ -244,7 +245,7 @@ export default function AllocateModal({
     return `location-${locationId}/tent-${tentIndex}/block-${blockIndex}/${bedNumber}-${dd}${mm}${yyyy}-${hh}${min}-${sanitizedName}-${typeSuffix}.jpg`;
   }
 
-  async function handleSave() {
+  async function handleSave(saveAndNext = false) {
     if (!form.name || !form.startDate || !form.endDate || !form.phone) {
       return alert('Name, phone, start & end dates are required');
     }
@@ -362,6 +363,11 @@ export default function AllocateModal({
       await Promise.all(parallelPromises);
       console.log('All operations complete!');
       setUploadProgress(100);
+      
+      // If save & next, trigger the next bed opening
+      if (saveAndNext && onSaveAndNext) {
+        onSaveAndNext();
+      }
     } catch (error) {
       console.error('Operation failed:', error);
       setUploading(false);
@@ -688,8 +694,19 @@ export default function AllocateModal({
             >
               Cancel
             </button>
+            {!isEdit && onSaveAndNext && (
+              <button 
+                onClick={() => handleSave(true)} 
+                disabled={!canSave}
+                title={!canSave ? validationErrors[0] : 'Save and open next free bed'}
+                className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isProcessing && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                Save & Next
+              </button>
+            )}
             <button 
-              onClick={handleSave} 
+              onClick={() => handleSave(false)} 
               disabled={!canSave}
               title={!canSave ? validationErrors[0] : undefined}
               className="rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"

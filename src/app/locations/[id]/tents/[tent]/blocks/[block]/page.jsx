@@ -103,6 +103,34 @@ export default function BlockBedsPage({ params }) {
   function openAllocate(n, data) {
     setModal({ open: true, bedNumber: n, data });
   }
+  
+  function handleSaveAndNext() {
+    // Find next free bed after current bed
+    const currentBed = modal.bedNumber;
+    const capacity = bedsState?.capacity || 0;
+    
+    // First, search from current bed to end
+    for (let nextBed = currentBed + 1; nextBed <= capacity; nextBed++) {
+      if (!bedsState?.beds?.[nextBed]) {
+        // Found next free bed, open it
+        setModal({ open: true, bedNumber: nextBed, data: null });
+        return;
+      }
+    }
+    
+    // If not found, wrap around and search from start to current bed
+    for (let nextBed = 1; nextBed < currentBed; nextBed++) {
+      if (!bedsState?.beds?.[nextBed]) {
+        // Found next free bed, open it
+        setModal({ open: true, bedNumber: nextBed, data: null });
+        return;
+      }
+    }
+    
+    // No more free beds found, close modal and show notification
+    setModal({ open: false, bedNumber: null, data: null });
+    showNotification('info', 'No more free beds available in this block');
+  }
 
   function openBatchEdit() {
     if (!Array.isArray(selectedBeds) || selectedBeds.length === 0) {
@@ -642,6 +670,7 @@ export default function BlockBedsPage({ params }) {
         initialData={modal.data}
         onSave={handleSave}
         onDelete={handleDelete}
+        onSaveAndNext={handleSaveAndNext}
         pending={pending}
         genderRestriction={genderRestriction}
         locationId={id}
