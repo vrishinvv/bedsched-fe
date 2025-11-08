@@ -252,7 +252,7 @@ export default function SearchPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 p-4">
+    <>
       {notification && (
         <Notification
           type={notification.type}
@@ -261,14 +261,22 @@ export default function SearchPage() {
         />
       )}
 
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold text-white mb-6">🔍 Search Bookings</h1>
+      <div>
+        {/* Page Header */}
+        <section className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-blue-900/20 via-indigo-900/20 to-purple-900/20 border border-blue-500/20 p-4 sm:p-6 mb-6">
+          <div className="relative">
+            <h2 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">
+              Search Bookings
+            </h2>
+            <p className="text-sm sm:text-base text-blue-200/80">Find and manage allocations by phone number</p>
+          </div>
+        </section>
 
         {/* Search Form */}
-        <form onSubmit={searchByPhone} className="mb-8 bg-white rounded-lg shadow-md p-6">
+        <form onSubmit={searchByPhone} className="mb-8 bg-gray-900/50 backdrop-blur border border-white/10 rounded-lg shadow-md p-6">
           <div className="flex gap-4">
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-200 mb-2">
                 Phone Number
               </label>
               <input
@@ -278,14 +286,14 @@ export default function SearchPage() {
                 placeholder="Enter 10-digit phone number"
                 inputMode="numeric"
                 maxLength={10}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
+                className="w-full p-3 border border-gray-600 bg-gray-800 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400"
               />
             </div>
             <div className="flex items-end">
               <button
                 type="submit"
                 disabled={loading}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
               >
                 {loading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
                 Search
@@ -297,12 +305,12 @@ export default function SearchPage() {
         {/* Results */}
         {results.length > 0 && (
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-white">
+            <h2 className="text-xl font-semibold text-white mb-4">
               Found {results.length} booking{results.length !== 1 ? 's' : ''}
             </h2>
 
             {results.map((allocation) => (
-              <div key={allocation.id} className="bg-white rounded-lg shadow-md p-6">
+              <div key={allocation.id} className="bg-gray-900/50 backdrop-blur border border-white/10 rounded-lg shadow-md p-6">
                 {editingId === allocation.id ? (
                   /* Edit Mode */
                   <div className="space-y-4">
@@ -505,6 +513,6 @@ export default function SearchPage() {
           </div>
         )}
       </div>
-    </div>
+    </>
   );
 }

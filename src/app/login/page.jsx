@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { login } from '@/lib/api';
+import Image from 'next/image';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -27,10 +28,29 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-[70vh] items-center justify-center">
-      <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-6 shadow-lg text-gray-900">
+    <div className="flex flex-col lg:flex-row min-h-[70vh] items-center justify-center gap-6 lg:gap-8 xl:gap-12">
+      {/* Swami Image - Top on mobile, Left on desktop */}
+      <div className="relative w-full max-w-sm lg:max-w-none lg:w-96 h-64 sm:h-80 lg:h-[500px]">
+        {/* Top gradient fade - lighter on mobile, darker on desktop */}
+        <div className="absolute top-0 left-0 right-0 h-16 lg:h-24 bg-gradient-to-b from-black/60 via-black/30 to-transparent lg:from-black lg:via-black/70 z-10" />
+        {/* Bottom gradient fade - lighter on mobile, darker on desktop */}
+        <div className="absolute bottom-0 left-0 right-0 h-24 lg:h-40 bg-gradient-to-t from-black/60 via-black/30 to-transparent lg:from-black lg:via-black/70 z-10" />
+        {/* Right gradient fade (desktop only) */}
+        <div className="absolute top-0 bottom-0 right-0 w-32 bg-gradient-to-l from-black via-black/60 to-transparent z-10 hidden lg:block" />
+        <Image
+          src="/swami-hd-2.png"
+          alt="Bhagawan Sri Sathya Sai Baba"
+          fill
+          className="object-cover rounded-2xl shadow-2xl lg:object-[center_30%]"
+          style={{ objectPosition: 'center center' }}
+          priority
+        />
+      </div>
+
+      {/* Login Form */}
+      <div className="w-full max-w-sm lg:w-96 rounded-xl border border-gray-200 bg-white p-6 shadow-lg text-gray-900">
         <div className="mb-5 text-center">
-          <h1 className="text-xl font-semibold tracking-tight">Sign in to BedSched</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Sign in to Sai Nivas</h1>
           <p className="mt-1 text-sm text-gray-500">Enter your credentials to continue</p>
         </div>
         {error && (
