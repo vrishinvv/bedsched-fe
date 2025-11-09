@@ -32,6 +32,7 @@ export default function SearchPage() {
   const [editForm, setEditForm] = useState({});
   const [editPhotos, setEditPhotos] = useState({ person: {}, aadhaar: {} });
   const [notification, setNotification] = useState(null);
+  const [hasSearched, setHasSearched] = useState(false);
 
   // Phone number validation
   const isValidPhone = phoneNumber.length === 10 && /^\d{10}$/.test(phoneNumber);
@@ -93,6 +94,7 @@ export default function SearchPage() {
     
     // Clear previous notification
     setNotification(null);
+    setHasSearched(true);
 
     setLoading(true);
     setResults([]);
@@ -320,7 +322,7 @@ export default function SearchPage() {
         </form>
 
         {/* No Results Message */}
-        {!loading && results.length === 0 && phoneNumber.length === 10 && (
+        {!loading && hasSearched && results.length === 0 && (
           <div className="text-center py-8 text-gray-400">
             <svg className="w-16 h-16 mx-auto mb-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
