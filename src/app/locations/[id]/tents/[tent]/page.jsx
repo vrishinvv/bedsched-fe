@@ -43,7 +43,7 @@ export default function TentBlocksPage({ params }) {
         <HeaderSkeleton />
 
         {/* Stats skeleton */}
-        <section className="grid grid-cols-2 gap-4 md:grid-cols-3">
+        <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <StatCardSkeleton key={i} />
           ))}

@@ -253,30 +253,30 @@ function AnalyticsContent() {
       {/* Filters */}
       <section className="rounded-xl sm:rounded-2xl border border-gray-200 bg-white/70 backdrop-blur p-3 sm:p-4 mb-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-3">
-          <div>
+          <div className="min-w-0">
             <label className="block text-xs font-medium text-gray-700 mb-1">Start Date</label>
             <input
               type="date"
               value={filters.startDate}
               onChange={(e) => handleFilterChange('startDate', e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 text-sm"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 text-sm min-w-0"
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="block text-xs font-medium text-gray-700 mb-1">End Date</label>
             <input
               type="date"
               value={filters.endDate}
               onChange={(e) => handleFilterChange('endDate', e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 text-sm"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 text-sm min-w-0"
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="block text-xs font-medium text-gray-700 mb-1">Location</label>
             <select
               value={filters.locationId}
               onChange={(e) => handleFilterChange('locationId', e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 text-sm"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 text-sm min-w-0"
             >
               <option value="">All Locations</option>
               {locations.map(loc => (
@@ -284,13 +284,13 @@ function AnalyticsContent() {
               ))}
             </select>
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="block text-xs font-medium text-gray-700 mb-1">Tent</label>
             <select
               value={filters.tentIndex}
               onChange={(e) => handleFilterChange('tentIndex', e.target.value)}
               disabled={!filters.locationId}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 text-sm disabled:opacity-50"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 text-sm disabled:opacity-50 min-w-0"
             >
               <option value="">All Tents</option>
               {tents.map(tent => (
@@ -298,13 +298,13 @@ function AnalyticsContent() {
               ))}
             </select>
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="block text-xs font-medium text-gray-700 mb-1">Block</label>
             <select
               value={filters.blockIndex}
               onChange={(e) => handleFilterChange('blockIndex', e.target.value)}
               disabled={!filters.tentIndex}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 text-sm disabled:opacity-50"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 text-sm disabled:opacity-50 min-w-0"
             >
               <option value="">All Blocks</option>
               {blocks.map(block => (
@@ -313,7 +313,7 @@ function AnalyticsContent() {
             </select>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={applyFilters}
             disabled={loading}
@@ -422,7 +422,7 @@ function AnalyticsContent() {
                   <XAxis dataKey="dateLabel" stroke="#9ca3af" height={60} label={{ value: 'Day of November', position: 'insideBottom', offset: -5, fill: '#9ca3af' }} />
                   <YAxis stroke="#9ca3af" domain={[0, (dataMax) => Math.ceil(dataMax * 1.15)]} />
                   <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }} />
-                  <Legend />
+                  <Legend wrapperStyle={{ paddingTop: '30px' }} />
                   <Line type="monotone" dataKey="count" name="Allocations" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 4 }} animationDuration={1000} />
                 </LineChart>
               </ResponsiveContainer>
@@ -441,7 +441,7 @@ function AnalyticsContent() {
                   <XAxis dataKey="dateLabel" stroke="#9ca3af" height={60} label={{ value: 'Day of November', position: 'insideBottom', offset: -5, fill: '#9ca3af' }} />
                   <YAxis stroke="#9ca3af" domain={[0, (dataMax) => Math.ceil(dataMax * 1.15)]} />
                   <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }} />
-                  <Legend />
+                  <Legend wrapperStyle={{ paddingTop: '30px' }} />
                   <Line type="monotone" dataKey="count" name="Departures" stroke="#ef4444" strokeWidth={2} dot={{ fill: '#ef4444', r: 4 }} animationDuration={1000} />
                 </LineChart>
               </ResponsiveContainer>
@@ -460,7 +460,7 @@ function AnalyticsContent() {
                   <XAxis dataKey="dateLabel" stroke="#9ca3af" height={60} label={{ value: 'Day of November', position: 'insideBottom', offset: -5, fill: '#9ca3af' }} />
                   <YAxis stroke="#9ca3af" domain={[0, (dataMax) => Math.ceil(dataMax * 1.15)]} />
                   <Tooltip content={<CustomUserTooltip />} />
-                  <Legend />
+                  <Legend wrapperStyle={{ paddingTop: '30px' }} />
                   {uniqueUsers.map((user, index) => (
                     <Line
                       key={user.username}

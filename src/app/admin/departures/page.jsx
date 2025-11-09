@@ -160,11 +160,20 @@ function DeparturesContent() {
             <input 
               type="date" 
               value={date} 
-              onChange={(e)=>{ setDate(e.target.value); setSelectedFilter('custom'); load(e.target.value); }} 
+              onChange={(e)=>{ setDate(e.target.value); setSelectedFilter('custom'); }} 
               min={MIN_DATE}
               max={MAX_DATE}
               className="px-2 py-1.5 rounded border border-white/10 bg-black/40 text-white text-xs sm:text-sm min-w-[120px] touch-manipulation" 
             />
+            <button
+              onClick={() => load(date)}
+              className="inline-flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium text-xs sm:text-sm transition-all touch-manipulation"
+            >
+              <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <span>Search</span>
+            </button>
             <button
               onClick={downloadCSV}
               disabled={!items.length}

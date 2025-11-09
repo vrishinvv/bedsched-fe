@@ -10,7 +10,7 @@ function CurrentlyOccupiedContent() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [filter, setFilter] = useState({ locationId: '', tentIndex: '', blockIndex: '' });
+  const [filter, setFilter] = useState({ locationId: '', tentName: '', blockIndex: '' });
   const [userLocationId, setUserLocationId] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const router = useRouter();
@@ -50,7 +50,10 @@ function CurrentlyOccupiedContent() {
   const filteredItems = useMemo(() => {
     let result = items.filter(item => {
       if (filter.locationId && String(item.location_id) !== String(filter.locationId)) return false;
-      if (filter.tentIndex && String(item.tent_index) !== String(filter.tentIndex)) return false;
+      if (filter.tentName) {
+        const itemTentName = item.tent_name || `Tent ${String.fromCharCode(64 + item.tent_index)}`;
+        if (itemTentName !== filter.tentName) return false;
+      }
       if (filter.blockIndex && String(item.block_index) !== String(filter.blockIndex)) return false;
       return true;
     });
@@ -172,20 +175,54 @@ function CurrentlyOccupiedContent() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Tent</label>
-              <select value={filter.tentIndex} onChange={e=>setFilter(f=>({...f, tentIndex: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 text-sm">
+              <select value={filter.tentName} onChange={e=>setFilter(f=>({...f, tentName: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 text-sm">
                 <option value="">All Tents</option>
-                {Array.from(new Set(items.filter(i => !filter.locationId || String(i.location_id) === String(filter.locationId)).map(i=>i.tent_index))).map(idx => {
-                  const item = items.find(i => i.tent_index === idx);
-                  return <option key={idx} value={idx}>{item?.tent_name || `Tent ${idx}`}</option>;
-                })}
+                {(() => {
+                  // Get all items matching the location filter
+                  const filteredItems = items.filter(i => !filter.locationId || String(i.location_id) === String(filter.locationId));
+                  // Create options for each unique tent name
+                  const uniqueTentNames = new Set();
+                  const options = [];
+                  filteredItems.forEach(item => {
+                    const tentName = item.tent_name || `Tent ${String.fromCharCode(64 + item.tent_index)}`;
+                    if (!uniqueTentNames.has(tentName)) {
+                      uniqueTentNames.add(tentName);
+                      options.push({
+                        value: tentName,
+                        label: tentName,
+                        index: item.tent_index
+                      });
+                    }
+                  });
+                  // Sort by tent index
+                  options.sort((a, b) => a.index - b.index);
+                  return options.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ));
+                })()}
               </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Block</label>
               <select value={filter.blockIndex} onChange={e=>setFilter(f=>({...f, blockIndex: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 text-sm">
                 <option value="">All Blocks</option>
-                {Array.from(new Set(items.filter(i => (!filter.locationId || String(i.location_id) === String(filter.locationId)) && (!filter.tentIndex || String(i.tent_index) === String(filter.tentIndex))).map(i=>i.block_index))).map(idx => {
-                  const item = items.find(i => i.block_index === idx);
+                {Array.from(new Set(items.filter(i => {
+                  if (filter.locationId && String(i.location_id) !== String(filter.locationId)) return false;
+                  if (filter.tentName) {
+                    const tentName = i.tent_name || `Tent ${String.fromCharCode(64 + i.tent_index)}`;
+                    if (tentName !== filter.tentName) return false;
+                  }
+                  return true;
+                }).map(i=>i.block_index))).map(idx => {
+                  const item = items.find(i => {
+                    if (i.block_index !== idx) return false;
+                    if (filter.locationId && String(i.location_id) !== String(filter.locationId)) return false;
+                    if (filter.tentName) {
+                      const tentName = i.tent_name || `Tent ${String.fromCharCode(64 + i.tent_index)}`;
+                      if (tentName !== filter.tentName) return false;
+                    }
+                    return true;
+                  });
                   return <option key={idx} value={idx}>{item?.block_name || `Block ${idx}`}</option>;
                 })}
               </select>
@@ -197,7 +234,7 @@ function CurrentlyOccupiedContent() {
       <div className="space-y-2">
         {!loading && !filteredItems.length && items.length > 0 && <div className="text-sm text-gray-300">No occupied beds match the selected filters</div>}
         {!loading && !items.length && <div className="text-sm text-gray-300">No beds currently occupied</div>}
-        {filteredItems.length > 0 && (
+        {!loading && filteredItems.length > 0 && (
           <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg overflow-hidden shadow-2xl">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

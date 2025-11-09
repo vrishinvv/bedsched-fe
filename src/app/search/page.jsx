@@ -33,6 +33,10 @@ export default function SearchPage() {
   const [editPhotos, setEditPhotos] = useState({ person: {}, aadhaar: {} });
   const [notification, setNotification] = useState(null);
 
+  // Phone number validation
+  const isValidPhone = phoneNumber.length === 10 && /^\d{10}$/.test(phoneNumber);
+  const showPhoneError = phoneNumber.length > 0 && !isValidPhone;
+
   const MIN_DATE = '2025-11-03';
   const MAX_DATE = '2025-11-24';
 
@@ -85,34 +89,42 @@ export default function SearchPage() {
   const searchByPhone = useCallback(async (e) => {
     e.preventDefault();
     
-    if (!/^\d{10}$/.test(phoneNumber)) {
-      setNotification({ type: 'error', message: 'Please enter a valid 10-digit phone number' });
-      return;
-    }
+    if (!isValidPhone) return;
+    
+    // Clear previous notification
+    setNotification(null);
 
     setLoading(true);
+    setResults([]);
     try {
       const response = await fetch(`${API_BASE_URL}/api/allocations/by-phone/${phoneNumber}`, {
         headers: authHeaders(),
       });
 
       if (!response.ok) {
+        if (response.status === 404) {
+          setNotification({ type: 'error', message: 'No bookings found for this phone number' });
+          return;
+        }
         throw new Error('Search failed');
       }
 
       const data = await response.json();
-      setResults(data);
       
       if (data.length === 0) {
         setNotification({ type: 'info', message: 'No bookings found for this phone number' });
+        setResults([]);
+      } else {
+        setResults(data);
       }
     } catch (error) {
       console.error('Search error:', error);
-      setNotification({ type: 'error', message: 'Failed to search. Please try again.' });
+      setNotification({ type: 'error', message: error.message || 'Failed to search. Please try again.' });
+      setResults([]);
     } finally {
       setLoading(false);
     }
-  }, [phoneNumber]);
+  }, [phoneNumber, isValidPhone]);
 
   const startEdit = useCallback((allocation) => {
     setEditingId(allocation.id);
@@ -279,20 +291,25 @@ export default function SearchPage() {
               <label className="block text-sm font-medium text-gray-200 mb-2">
                 Phone Number
               </label>
-              <input
-                type="tel"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                placeholder="Enter 10-digit phone number"
-                inputMode="numeric"
-                maxLength={10}
-                className="w-full p-3 border border-gray-600 bg-gray-800 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400"
-              />
+              <div className="min-h-[52px]">
+                <input
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  placeholder="Enter 10-digit phone number"
+                  inputMode="numeric"
+                  maxLength={10}
+                  className="w-full p-3 border border-gray-600 bg-gray-800 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400"
+                />
+                {showPhoneError && (
+                  <p className="text-red-400 text-xs mt-1">Please enter a valid 10-digit phone number</p>
+                )}
+              </div>
             </div>
-            <div className="flex items-end">
+            <div className="flex items-start pt-7">
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !isValidPhone}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
               >
                 {loading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
@@ -301,6 +318,17 @@ export default function SearchPage() {
             </div>
           </div>
         </form>
+
+        {/* No Results Message */}
+        {!loading && results.length === 0 && phoneNumber.length === 10 && (
+          <div className="text-center py-8 text-gray-400">
+            <svg className="w-16 h-16 mx-auto mb-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-lg font-medium text-gray-300">No bookings found</p>
+            <p className="text-sm text-gray-500 mt-2">No results found for this phone number</p>
+          </div>
+        )}
 
         {/* Results */}
         {results.length > 0 && (
