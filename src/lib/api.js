@@ -203,10 +203,12 @@ export async function editAllocation(locationId, tentIndex, blockIndex, bedNumbe
 /**
  * Deallocate a bed
  */
-export async function deallocateBed(locationId, tentIndex, blockIndex, bedNumber) {
+export async function deallocateBed(locationId, tentIndex, blockIndex, bedNumber, options = {}) {
+  const { wasOccupied, reason } = options;
   const res = await fetch(`${API_BASE_URL}/api/locations/${locationId}/tents/${tentIndex}/blocks/${blockIndex}/beds/${bedNumber}`, {
     method: 'DELETE',
-    headers: authHeaders(),
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ wasOccupied, reason }),
   });
   return handle(res, 'Failed to deallocate bed');
 }
@@ -360,15 +362,30 @@ export async function deallocateByPhone({ phone, batchId, allocationIds }) {
   return handle(res, 'Failed to deallocate');
 }
 
-export async function fetchDepartures(date) {
+export async function fetchDepartures(date, { page = 1, limit = 50, sortField = 'bed_number', sortOrder = 'asc', location_id = '', tent_index = '', block_index = '' } = {}) {
   const url = new URL(`${API_BASE_URL}/api/allocations/departures`);
   url.searchParams.set('date', date);
+  url.searchParams.set('page', page.toString());
+  url.searchParams.set('limit', limit.toString());
+  url.searchParams.set('sortField', sortField);
+  url.searchParams.set('sortOrder', sortOrder);
+  if (location_id) url.searchParams.set('location_id', location_id);
+  if (tent_index) url.searchParams.set('tent_index', tent_index);
+  if (block_index) url.searchParams.set('block_index', block_index);
   const res = await fetch(url.toString(), { headers: authHeaders() });
   return handle(res, 'Failed to fetch departures');
 }
 
-export async function fetchCurrentlyOccupied() {
-  const res = await fetch(`${API_BASE_URL}/api/allocations/currently-occupied`, { headers: authHeaders() });
+export async function fetchCurrentlyOccupied({ page = 1, limit = 50, sortField = 'bed_number', sortOrder = 'asc', location_id = '', tent_index = '', block_index = '' } = {}) {
+  const url = new URL(`${API_BASE_URL}/api/allocations/currently-occupied`);
+  url.searchParams.set('page', page.toString());
+  url.searchParams.set('limit', limit.toString());
+  url.searchParams.set('sortField', sortField);
+  url.searchParams.set('sortOrder', sortOrder);
+  if (location_id) url.searchParams.set('location_id', location_id);
+  if (tent_index) url.searchParams.set('tent_index', tent_index);
+  if (block_index) url.searchParams.set('block_index', block_index);
+  const res = await fetch(url.toString(), { headers: authHeaders() });
   return handle(res, 'Failed to fetch currently occupied');
 }
 

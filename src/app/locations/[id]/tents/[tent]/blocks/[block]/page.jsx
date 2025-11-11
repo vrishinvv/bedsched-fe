@@ -5,6 +5,7 @@ import Breadcrumb from '@/components/Breadcrumb';
 import BedGrid from '@/components/BedGrid';
 import AllocateModal from '@/components/AllocateModal';
 import BulkAllocateModal from '@/components/BulkAllocateModal';
+import DeallocateModal from '@/components/DeallocateModal';
 import Notification from '@/components/Notification';
 import { BedGridSkeleton, StatCardSkeleton, HeaderSkeleton } from '@/components/Skeleton';
 import {
@@ -33,6 +34,8 @@ export default function BlockBedsPage({ params }) {
   const [updatingRestriction, setUpdatingRestriction] = useState(false);
   const [deallocating, setDeallocating] = useState(false);
   const [confirmDeallocate, setConfirmDeallocate] = useState(null);
+  const [showDeallocateModal, setShowDeallocateModal] = useState(false);
+  const [deallocatePersonName, setDeallocatePersonName] = useState('');
   // Enhancements: phone filter + selection
   const [phoneFilter, setPhoneFilter] = useState('');
   const [selectedBeds, setSelectedBeds] = useState([]);
@@ -311,13 +314,21 @@ export default function BlockBedsPage({ params }) {
   }
 
   async function handleDelete() {
+    // Show deallocate modal instead of immediately deallocating
+    setDeallocatePersonName(modal.data?.name || 'guest');
+    setShowDeallocateModal(true);
+  }
+
+  async function handleDeallocateConfirm(wasOccupied, reason) {
     const n = modal.bedNumber;
     const guestName = modal.data?.name || 'guest';
     
+    // Store original data for potential revert
+    const originalData = modal.data;
+    
     try {
       setPending(true);
-      // Store original data for potential revert
-      const originalData = modal.data;
+      setShowDeallocateModal(false);
       
       setBedsState((s) => {
         const next = { ...s.beds };
@@ -325,8 +336,10 @@ export default function BlockBedsPage({ params }) {
         return { ...s, beds: next };
       });
       
-      await deallocateBed(id, Number(tent), Number(block), n);
-      showNotification('success', `Bed ${n} deallocated successfully (${guestName})`);
+      await deallocateBed(id, Number(tent), Number(block), n, { wasOccupied, reason });
+      
+      const reasonText = reason === 'left_early' ? 'left early' : reason === 'no_show' ? 'no-show' : 'booking error';
+      showNotification('success', `Bed ${n} deallocated successfully (${guestName} - ${reasonText})`);
       setModal({ open: false, bedNumber: null, data: null });
     } catch (e) {
       // Revert optimistic update on error
@@ -634,6 +647,7 @@ export default function BlockBedsPage({ params }) {
             <span className="text-xs text-amber-300">Enter exactly 10 digits</span>
           )}
         </div>
+        {/* Batch Edit and Batch Deallocate buttons hidden per user request
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -653,8 +667,8 @@ export default function BlockBedsPage({ params }) {
           >
             {deallocating ? 'Deallocating...' : 'Batch Deallocate'}
           </button>
-          {/* Reallocate button removed per request */}
         </div>
+        */}
       </section>
 
       <BedGrid
@@ -691,6 +705,13 @@ export default function BlockBedsPage({ params }) {
       <Notification 
         notification={notification}
         onClose={closeNotification}
+      />
+
+      <DeallocateModal
+        open={showDeallocateModal}
+        onClose={() => setShowDeallocateModal(false)}
+        onConfirm={handleDeallocateConfirm}
+        personName={deallocatePersonName}
       />
 
       {/* Confirmation Modal for Batch Deallocate */}

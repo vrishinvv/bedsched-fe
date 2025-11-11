@@ -147,3 +147,43 @@ export function TreeSkeleton({ count = 3 }) {
     </div>
   );
 }
+
+// Skeleton for table view
+export function TableSkeleton({ rows = 10, columns = 9 }) {
+  return (
+    <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg overflow-hidden shadow-2xl">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-800/95 backdrop-blur-sm border-b border-white/10">
+            <tr>
+              {Array.from({ length: columns }).map((_, idx) => (
+                <th key={idx} className="px-4 py-3 text-left">
+                  <Skeleton className="h-4 w-20 bg-gradient-to-r from-gray-600 via-gray-500 to-gray-600" />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {Array.from({ length: rows }).map((_, rowIdx) => (
+              <tr key={rowIdx} className="animate-pulse">
+                {Array.from({ length: columns }).map((_, colIdx) => (
+                  <td key={colIdx} className="px-4 py-3">
+                    <Skeleton className={`h-4 bg-gradient-to-r from-gray-700 via-gray-600 to-gray-700 ${
+                      colIdx === 0 ? 'w-8' : 
+                      colIdx === 1 ? 'w-32' : 
+                      colIdx === 2 || colIdx === 3 ? 'w-20' : 
+                      colIdx === 4 ? 'w-12' : 
+                      colIdx === 5 ? 'w-40' : 
+                      colIdx === 6 ? 'w-28' : 
+                      'w-24'
+                    }`} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

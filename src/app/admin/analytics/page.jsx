@@ -3,7 +3,7 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { fetchAnalytics, triggerBackup, getLocations } from "@/lib/api";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 function AnalyticsContent() {
   const [data, setData] = useState(null);
@@ -146,6 +146,24 @@ function AnalyticsContent() {
     const date = new Date(dateStr);
     return date.getDate().toString(); // Just the day number (11, 12, 13)
   };
+
+  // Process deallocations data for stacked bar chart
+  const deallocationChartData = useMemo(() => {
+    if (!data?.dailyDeallocations) return [];
+    
+    // Group by date
+    const grouped = {};
+    data.dailyDeallocations.forEach(row => {
+      const dateLabel = formatDateLabel(row.date);
+      if (!grouped[dateLabel]) {
+        grouped[dateLabel] = { dateLabel, date: row.date, left_early: 0, no_show: 0, booking_error: 0, not_specified: 0 };
+      }
+      const reason = row.reason || 'not_specified';
+      grouped[dateLabel][reason] = parseInt(row.count);
+    });
+    
+    return Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date));
+  }, [data?.dailyDeallocations]);
 
   // Process user allocations data for multi-line chart
   const userChartData = useMemo(() => {
@@ -447,6 +465,50 @@ function AnalyticsContent() {
               </ResponsiveContainer>
             ) : (
               <p className="text-gray-400 text-sm">No data available</p>
+            )}
+          </div>
+
+          {/* Daily Deallocations Timeline */}
+          <div className="md:col-span-2 lg:col-span-3 bg-gradient-to-br from-gray-900/90 to-gray-800/90 border border-gray-700/50 rounded-xl p-6 backdrop-blur-sm">
+            <h3 className="text-lg font-semibold text-white mb-3">Daily Deallocations by Reason</h3>
+            {deallocationChartData?.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={deallocationChartData} margin={{ bottom: 25 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="dateLabel" stroke="#9ca3af" height={60} label={{ value: 'Day of November', position: 'insideBottom', offset: -5, fill: '#9ca3af' }} />
+                  <YAxis stroke="#9ca3af" domain={[0, (dataMax) => Math.ceil(dataMax * 1.15)]} allowDecimals={false} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                    formatter={(value, name) => {
+                      const labels = {
+                        left_early: 'Left Early',
+                        no_show: 'No-show',
+                        booking_error: 'Booking Error',
+                        not_specified: 'Not Specified'
+                      };
+                      return [value, labels[name] || name];
+                    }}
+                  />
+                  <Legend 
+                    wrapperStyle={{ paddingTop: '30px' }}
+                    formatter={(value) => {
+                      const labels = {
+                        left_early: 'Left Early',
+                        no_show: 'No-show',
+                        booking_error: 'Booking Error',
+                        not_specified: 'Not Specified'
+                      };
+                      return labels[value] || value;
+                    }}
+                  />
+                  <Bar dataKey="left_early" stackId="a" fill="#10b981" animationDuration={1000} />
+                  <Bar dataKey="no_show" stackId="a" fill="#f97316" animationDuration={1000} animationBegin={200} />
+                  <Bar dataKey="booking_error" stackId="a" fill="#ef4444" animationDuration={1000} animationBegin={400} />
+                  <Bar dataKey="not_specified" stackId="a" fill="#6b7280" animationDuration={1000} animationBegin={600} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-gray-400 text-sm">No deallocations yet</p>
             )}
           </div>
 

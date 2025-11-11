@@ -121,6 +121,16 @@ export default function TopNav() {
                     Currently Occupied
                   </Link>
                 </li>
+                <li>
+                  <Link onClick={() => setOpen(false)} href="/admin/table-view" className="block px-3 py-2 rounded-md text-gray-200 hover:bg-white/10 hover:text-white transition-colors">
+                    All Allocations
+                  </Link>
+                </li>
+                <li>
+                  <Link onClick={() => setOpen(false)} href="/admin/historical-deallocations" className="block px-3 py-2 rounded-md text-gray-200 hover:bg-white/10 hover:text-white transition-colors">
+                    Historical Deallocations
+                  </Link>
+                </li>
                 {isAdmin && (
                   <li>
                     <Link onClick={() => setOpen(false)} href="/admin/analytics" className="block px-3 py-2 rounded-md text-gray-200 hover:bg-white/10 hover:text-white transition-colors">

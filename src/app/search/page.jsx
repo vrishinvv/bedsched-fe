@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Notification from '@/components/Notification';
 import CameraCapture from '@/components/CameraCapture';
+import DeallocateModal from '@/components/DeallocateModal';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -33,6 +34,10 @@ export default function SearchPage() {
   const [editPhotos, setEditPhotos] = useState({ person: {}, aadhaar: {} });
   const [notification, setNotification] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [showDeallocateModal, setShowDeallocateModal] = useState(false);
+  const [deallocatingAllocation, setDeallocatingAllocation] = useState(null);
+  const [deallocating, setDeallocating] = useState(false);
+  const [activeTab, setActiveTab] = useState('active'); // 'active' or 'deallocated'
 
   // Phone number validation
   const isValidPhone = phoneNumber.length === 10 && /^\d{10}$/.test(phoneNumber);
@@ -265,6 +270,49 @@ export default function SearchPage() {
     setEditPhotos(prev => ({ ...prev, aadhaar: { blob, dataUrl } }));
   }, []);
 
+  // Filter results based on active tab
+  const filteredResults = useMemo(() => {
+    if (activeTab === 'active') {
+      return results.filter(r => !r.deleted_at);
+    } else {
+      return results.filter(r => r.deleted_at);
+    }
+  }, [results, activeTab]);
+
+  const startDeallocate = useCallback((allocation) => {
+    setDeallocatingAllocation(allocation);
+    setShowDeallocateModal(true);
+  }, []);
+
+  const handleDeallocateConfirm = useCallback(async (wasOccupied, reason) => {
+    if (!deallocatingAllocation) return;
+
+    setDeallocating(true);
+    setShowDeallocateModal(false);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/locations/${deallocatingAllocation.location_id}/tents/${deallocatingAllocation.tent_index}/blocks/${deallocatingAllocation.block_index}/beds/${deallocatingAllocation.bed_number}`, {
+        method: 'DELETE',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ wasOccupied, reason }),
+      });
+
+      if (!response.ok) throw new Error('Failed to deallocate');
+
+      const reasonText = reason === 'left_early' ? 'left early' : reason === 'no_show' ? 'no-show' : 'booking error';
+      setNotification({ type: 'success', message: `Bed ${deallocatingAllocation.bed_number} deallocated successfully (${deallocatingAllocation.name} - ${reasonText})` });
+
+      // Refresh search results
+      searchByPhone({ preventDefault: () => {} });
+    } catch (error) {
+      console.error('Deallocate error:', error);
+      setNotification({ type: 'error', message: error.message || 'Failed to deallocate bed' });
+    } finally {
+      setDeallocating(false);
+      setDeallocatingAllocation(null);
+    }
+  }, [deallocatingAllocation, searchByPhone]);
+
   return (
     <>
       {notification && (
@@ -321,6 +369,38 @@ export default function SearchPage() {
           </div>
         </form>
 
+        {/* Tabs */}
+        {results.length > 0 && (
+          <div className="flex gap-2 mb-6 border-b border-gray-700">
+            <button
+              onClick={() => setActiveTab('active')}
+              className={`px-4 py-2 font-medium transition-colors relative ${
+                activeTab === 'active'
+                  ? 'text-blue-400'
+                  : 'text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              Active Bookings
+              {activeTab === 'active' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-400"></div>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('deallocated')}
+              className={`px-4 py-2 font-medium transition-colors relative ${
+                activeTab === 'deallocated'
+                  ? 'text-blue-400'
+                  : 'text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              Deallocated
+              {activeTab === 'deallocated' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-400"></div>
+              )}
+            </button>
+          </div>
+        )}
+
         {/* No Results Message */}
         {!loading && hasSearched && results.length === 0 && (
           <div className="text-center py-8 text-gray-400">
@@ -336,10 +416,15 @@ export default function SearchPage() {
         {results.length > 0 && (
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-white mb-4">
-              Found {results.length} booking{results.length !== 1 ? 's' : ''}
+              {activeTab === 'active' ? 'Active' : 'Deallocated'} Bookings ({filteredResults.length})
             </h2>
 
-            {results.map((allocation) => (
+            {filteredResults.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                <p>No {activeTab === 'active' ? 'active' : 'deallocated'} bookings found</p>
+              </div>
+            ) : (
+              filteredResults.map((allocation) => (
               <div key={allocation.id} className="bg-gray-900/50 backdrop-blur border border-white/10 rounded-lg shadow-md p-6">
                 {editingId === allocation.id ? (
                   /* Edit Mode */
@@ -471,13 +556,28 @@ export default function SearchPage() {
                           {allocation.location_name} • Bed {allocation.bed_number}
                           {allocation.tent_index && ` • ${allocation.tent_name || `Tent ${String.fromCharCode(64 + allocation.tent_index)}`} ${allocation.block_name || `Block ${allocation.block_index}`}`}
                         </p>
+                        {allocation.deleted_at && (
+                          <p className="text-xs text-red-400 mt-1">
+                            ⚠️ This booking has been deallocated
+                          </p>
+                        )}
                       </div>
-                      <button
-                        onClick={() => startEdit(allocation)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                      >
-                        ✏️ Edit
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => startEdit(allocation)}
+                          disabled={allocation.deleted_at}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button
+                          onClick={() => startDeallocate(allocation)}
+                          disabled={deallocating || allocation.deleted_at}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          🗑️ Deallocate
+                        </button>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
@@ -506,9 +606,10 @@ export default function SearchPage() {
                       <div className="col-span-2">
                         <p className="text-xs text-gray-400">Status</p>
                         <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                          allocation.deleted_at ? 'bg-red-100 text-red-800' :
                           allocation.status === 'confirmed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {allocation.status}
+                          {allocation.deleted_at ? 'Deallocated' : allocation.status}
                         </span>
                       </div>
                     </div>
@@ -539,10 +640,21 @@ export default function SearchPage() {
                   </div>
                 )}
               </div>
-            ))}
+            ))
+            )}
           </div>
         )}
       </div>
+
+      <DeallocateModal
+        open={showDeallocateModal}
+        onClose={() => {
+          setShowDeallocateModal(false);
+          setDeallocatingAllocation(null);
+        }}
+        onConfirm={handleDeallocateConfirm}
+        personName={deallocatingAllocation?.name || 'guest'}
+      />
     </>
   );
 }
