@@ -157,6 +157,17 @@ export default function BlockBedsPage({ params }) {
     setNotification(null);
   }
 
+  async function refreshBlockData() {
+    try {
+      const blockRes = await fetchBlockDetail(id, Number(tent), Number(block));
+      setMeta(blockRes.meta);
+      setBedsState({ capacity: blockRes.blockSize, beds: blockRes.beds });
+      setGenderRestriction(blockRes.meta?.block?.genderRestriction || 'both');
+    } catch (e) {
+      console.error('Failed to refresh block data:', e);
+    }
+  }
+
   async function handleSave(payload, skipClose = false) {
     const isBatchEdit = modal.bedNumber === 'Multiple' && Array.isArray(batchSelection) && batchSelection.length > 0;
     const n = isBatchEdit ? null : modal.bedNumber;
@@ -293,7 +304,35 @@ export default function BlockBedsPage({ params }) {
       }
       setBatchSelection([]);
     } catch (e) {
-      // Revert optimistic update on error
+      // Check for 409 conflict error (bed already allocated by someone else)
+      const is409Conflict = 
+        e.response?.status === 409 || 
+        e.message?.toLowerCase().includes('already allocated') || 
+        e.message?.toLowerCase().includes('already booked') ||
+        e.message?.toLowerCase().includes('bed_already_allocated') ||
+        e.message?.toLowerCase().includes('overlapping_allocation');
+      
+      if (is409Conflict && !isEdit && n != null) {
+        // Only handle 409 for new allocations (not edits)
+        // Close modal immediately
+        setModal({ open: false, bedNumber: null, data: null });
+        setBatchSelection([]);
+        setPending(false);
+        
+        // Show conflict notification
+        showNotification('error', `Bed ${n} was just booked by someone else. Refreshing...`);
+        
+        // Auto-refresh the bed grid after a short delay
+        setTimeout(async () => {
+          await refreshBlockData();
+          // Show success notification after refresh
+          showNotification('info', 'Updated! Please select another available bed.');
+        }, 500);
+        
+        return; // Exit early, don't revert
+      }
+      
+      // Revert optimistic update on non-409 error
       if (n != null) {
         setBedsState((s) => {
           const reverted = { ...s.beds };
