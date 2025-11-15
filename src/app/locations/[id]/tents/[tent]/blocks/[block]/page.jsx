@@ -6,6 +6,7 @@ import BedGrid from '@/components/BedGrid';
 import AllocateModal from '@/components/AllocateModal';
 import BulkAllocateModal from '@/components/BulkAllocateModal';
 import DeallocateModal from '@/components/DeallocateModal';
+import ReallocationModal from '@/components/ReallocationModal';
 import Notification from '@/components/Notification';
 import { BedGridSkeleton, StatCardSkeleton, HeaderSkeleton } from '@/components/Skeleton';
 import {
@@ -40,8 +41,12 @@ export default function BlockBedsPage({ params }) {
   const [phoneFilter, setPhoneFilter] = useState('');
   const [selectedBeds, setSelectedBeds] = useState([]);
   const [batchSelection, setBatchSelection] = useState([]);
-  // Reallocate modal state
-  // Reallocate flow removed per request
+  // Reallocation modal state
+  const [reallocationModal, setReallocationModal] = useState({
+    open: false,
+    allocationId: null,
+    currentAllocation: null
+  });
 
   useEffect(() => {
     (async () => {
@@ -391,6 +396,86 @@ export default function BlockBedsPage({ params }) {
     }
   }
 
+  function handleReallocateClick() {
+    // Open reallocation modal with current allocation details
+    const allocationData = modal.data;
+    
+    console.log('=== REALLOCATION DEBUG ===');
+    console.log('Modal object:', modal);
+    console.log('Allocation data:', allocationData);
+    console.log('Allocation ID:', allocationData?.id);
+    console.log('All keys in allocation data:', allocationData ? Object.keys(allocationData) : 'null');
+    console.log('=========================');
+    
+    if (!allocationData) {
+      console.error('No allocation data available');
+      alert('Error: No allocation data available. Please try clicking the bed again.');
+      return;
+    }
+
+    if (!allocationData.id) {
+      alert('Error: Allocation ID is missing. This means the backend server needs to be restarted to include the ID field. Please ask the developer to restart the backend server.');
+      return;
+    }
+
+    setReallocationModal({
+      open: true,
+      allocationId: allocationData.id,
+      currentAllocation: {
+        name: allocationData.name,
+        location: meta?.location?.name || 'Unknown',
+        tent: meta?.tent?.name || `Tent ${tent}`,
+        block: meta?.block?.name || `Block ${block}`,
+        bed: modal.bedNumber,
+        startDate: allocationData.startDate,
+        endDate: allocationData.endDate,
+        createdAt: allocationData.createdAt
+      }
+    });
+  }
+
+  async function handleReallocate(payload) {
+    try {
+      setPending(true);
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/allocations/${reallocationModal.allocationId}/reallocate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(typeof window !== 'undefined' && window.localStorage.getItem('bs_token')
+            ? { Authorization: `Bearer ${window.localStorage.getItem('bs_token')}` }
+            : {}),
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Reallocation failed');
+      }
+
+      const result = await response.json();
+      
+      showNotification('success', `Successfully reallocated ${reallocationModal.currentAllocation.name} to new bed ${result.to.bed}`);
+      
+      // Close both modals
+      setReallocationModal({ open: false, allocationId: null, currentAllocation: null });
+      setModal({ open: false, bedNumber: null, data: null });
+      
+      // Refresh block data to show updated state
+      const blockRes = await fetchBlockDetail(id, Number(tent), Number(block));
+      setMeta(blockRes.meta);
+      setBedsState({ capacity: blockRes.blockSize, beds: blockRes.beds });
+      
+    } catch (e) {
+      console.error('Reallocation error:', e);
+      showNotification('error', e.message || 'Failed to reallocate bed');
+      throw e; // Re-throw to let modal handle it
+    } finally {
+      setPending(false);
+    }
+  }
+
   async function handleBatchDeallocate() {
     if (!Array.isArray(selectedBeds) || selectedBeds.length === 0) {
       showNotification('info', 'Select one or more allocated beds to deallocate.');
@@ -726,6 +811,7 @@ export default function BlockBedsPage({ params }) {
         initialData={modal.data}
         onSave={handleSave}
         onDelete={handleDelete}
+        onReallocate={handleReallocateClick}
         onSaveAndNext={handleSaveAndNext}
         pending={pending}
         genderRestriction={genderRestriction}
@@ -787,7 +873,14 @@ export default function BlockBedsPage({ params }) {
         </div>
       )}
 
-      {/* Reallocate modal removed per request */}
+      <ReallocationModal
+        open={reallocationModal.open}
+        onClose={() => setReallocationModal({ open: false, allocationId: null, currentAllocation: null })}
+        allocationId={reallocationModal.allocationId}
+        currentAllocation={reallocationModal.currentAllocation}
+        onReallocate={handleReallocate}
+        pending={pending}
+      />
     </main>
   );
 }

@@ -701,8 +701,11 @@ function TableViewContent() {
               ) : (
                 allocations.map((allocation, index) => {
                   const isMale = allocation.gender?.toLowerCase() === 'male';
+                  // Compare dates only (not times) - normalize to midnight
                   const today = new Date();
+                  today.setHours(0, 0, 0, 0);
                   const endDate = new Date(allocation.end_date);
+                  endDate.setHours(0, 0, 0, 0);
                   const isActive = !allocation.deleted_at && endDate >= today;
                   const isDeallocated = allocation.deleted_at !== null;
                   const isExpired = !allocation.deleted_at && endDate < today;

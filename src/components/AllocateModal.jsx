@@ -29,6 +29,7 @@ export default function AllocateModal({
   initialData, // null for new; { name, phone, gender, startDate, endDate }
   onSave,
   onDelete,
+  onReallocate, // New prop for reallocate functionality
   pending = false, // Add pending prop
   genderRestriction = 'both', // Block-level gender restriction
   locationId,
@@ -685,13 +686,27 @@ export default function AllocateModal({
             </div>
           )}
           {isEdit ? (
-            <button 
-              onClick={onDelete} 
-              disabled={isProcessing}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Deallocate
-            </button>
+            <div className="flex gap-2">
+              <button 
+                onClick={onDelete} 
+                disabled={isProcessing}
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Deallocate
+              </button>
+              {onReallocate && (
+                <button 
+                  onClick={() => {
+                    onReallocate();
+                    onClose();
+                  }} 
+                  disabled={isProcessing}
+                  className="rounded-lg border border-blue-500 bg-blue-50 px-3 py-2 text-sm text-blue-700 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Reallocate
+                </button>
+              )}
+            </div>
           ) : <span />}
           <div className="flex gap-2">
             <button 
