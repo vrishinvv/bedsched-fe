@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import Notification from '@/components/Notification';
 import CameraCapture from '@/components/CameraCapture';
 import DeallocateModal from '@/components/DeallocateModal';
+import { BOOKING_MAX_DATE as MAX_DATE, BOOKING_MIN_DATE as MIN_DATE, BOOKING_WINDOW_LABEL, isWithinBookingWindow } from '@/lib/bookingWindow.mjs';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -43,9 +44,6 @@ export default function SearchPage() {
   const isValidPhone = phoneNumber.length === 10 && /^\d{10}$/.test(phoneNumber);
   const showPhoneError = phoneNumber.length > 0 && !isValidPhone;
 
-  const MIN_DATE = '2025-11-03';
-  const MAX_DATE = '2025-11-24';
-
   // Memoized validation function
   const errors = useMemo(() => {
     if (!editingId) return {};
@@ -71,10 +69,14 @@ export default function SearchPage() {
 
     if (!editForm.startDate) {
       newErrors.startDate = 'Start date is required';
+    } else if (!isWithinBookingWindow(editForm.startDate)) {
+      newErrors.startDate = `Start date must be ${BOOKING_WINDOW_LABEL}`;
     }
 
     if (!editForm.endDate) {
       newErrors.endDate = 'End date is required';
+    } else if (!isWithinBookingWindow(editForm.endDate)) {
+      newErrors.endDate = `End date must be ${BOOKING_WINDOW_LABEL}`;
     }
 
     if (editForm.startDate && editForm.endDate && new Date(editForm.startDate) > new Date(editForm.endDate)) {

@@ -6,6 +6,7 @@ import { searchAllocationsByPhone, updatePhoneByPhone, updateNameByPhone, update
 import Notification from "@/components/Notification";
 import { TreeSkeleton } from '@/components/Skeleton';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import { BOOKING_MAX_DATE as MAX_DATE, BOOKING_MIN_DATE as MIN_DATE, BOOKING_WINDOW_LABEL, isWithinBookingWindow } from '@/lib/bookingWindow.mjs';
 
 function EditByPhoneContent() {
   const sp = useSearchParams();
@@ -21,9 +22,6 @@ function EditByPhoneContent() {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [filterBatchId, setFilterBatchId] = useState(null);
   const [userLocationId, setUserLocationId] = useState(null);
-
-  const MIN_DATE = '2025-11-03';
-  const MAX_DATE = '2025-11-24';
 
   const load = async (ph) => {
     setLoading(true); setNotification(null); setSelectedIds(new Set());
@@ -158,7 +156,7 @@ function EditByPhoneContent() {
       setNotification({ type: 'error', message: 'End date cannot be empty' });
       return;
     }
-    if (date < MIN_DATE || date > MAX_DATE) {
+    if (!isWithinBookingWindow(date)) {
       setNotification({ type: 'error', message: `End date must be between ${MIN_DATE} and ${MAX_DATE}` });
       return;
     }
@@ -391,7 +389,7 @@ function EditByPhoneContent() {
                 min={MIN_DATE}
                 max={MAX_DATE}
               />
-              <p className="text-xs text-gray-400 mt-1">Nov 3-24, 2025</p>
+              <p className="text-xs text-gray-400 mt-1">{BOOKING_WINDOW_LABEL}</p>
             </div>
           </div>
         </section>

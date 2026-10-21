@@ -140,7 +140,7 @@ function AnalyticsContent() {
     return '#6b7280'; // gray for other
   };
 
-  // Format date to show just day number for November 2025
+  // Format date to show just the November day number
   const formatDateLabel = (dateStr) => {
     if (!dateStr) return '';
     const date = new Date(dateStr);

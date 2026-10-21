@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Skeleton from '@/components/Skeleton';
 import CameraCapture from '@/components/CameraCapture';
+import { BOOKING_MAX_DATE as MAX_DATE, BOOKING_MIN_DATE as MIN_DATE, BOOKING_WINDOW_LABEL, isWithinBookingWindow } from '@/lib/bookingWindow.mjs';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -54,9 +55,6 @@ export default function AllocateModal({
   const ref = useRef(null);
   const scrollRef = useRef(null); // Ref for scrollable content area
   const topRef = useRef(null); // Ref for top element to scroll to
-
-  const MIN_DATE = '2025-11-03';
-  const MAX_DATE = '2025-11-24';
 
   // Smooth animation for progress number
   useEffect(() => {
@@ -282,10 +280,10 @@ export default function AllocateModal({
     const today = getTodayDate();
     
     // Validate date range
-    if (form.startDate < MIN_DATE || form.startDate > MAX_DATE) {
+    if (!isWithinBookingWindow(form.startDate)) {
       return alert(`Start date must be between ${MIN_DATE} and ${MAX_DATE}.`);
     }
-    if (form.endDate < MIN_DATE || form.endDate > MAX_DATE) {
+    if (!isWithinBookingWindow(form.endDate)) {
       return alert(`End date must be between ${MIN_DATE} and ${MAX_DATE}.`);
     }
     
@@ -467,8 +465,8 @@ export default function AllocateModal({
     if (!isEdit && !aadhaarPhoto.blob && !aadhaarPhoto.dataUrl) errs.push('Aadhaar photo is required');
     if (!form.startDate) errs.push('Start date is required');
     if (!form.endDate) errs.push('End date is required');
-    if (form.startDate && (form.startDate < MIN_DATE || form.startDate > MAX_DATE)) errs.push('Start date must be Nov 3-24, 2025');
-    if (form.endDate && (form.endDate < MIN_DATE || form.endDate > MAX_DATE)) errs.push('End date must be Nov 3-24, 2025');
+    if (form.startDate && !isWithinBookingWindow(form.startDate)) errs.push(`Start date must be ${BOOKING_WINDOW_LABEL}`);
+    if (form.endDate && !isWithinBookingWindow(form.endDate)) errs.push(`End date must be ${BOOKING_WINDOW_LABEL}`);
     if (form.startDate && form.endDate && form.endDate < form.startDate) errs.push('End date cannot be before start date');
     const selectedGender = form.gender || 'Male';
     if (genderRestriction === 'male_only' && selectedGender.toLowerCase() !== 'male') errs.push('This tent is restricted to male guests only');
@@ -633,7 +631,7 @@ export default function AllocateModal({
               disabled={isProcessing}
               className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
             />
-            <p className="text-xs text-gray-500 mt-1">Nov 3-24, 2025</p>
+            <p className="text-xs text-gray-500 mt-1">{BOOKING_WINDOW_LABEL}</p>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">End date*</label>
@@ -647,7 +645,7 @@ export default function AllocateModal({
               disabled={isProcessing}
               className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
             />
-            <p className="text-xs text-gray-500 mt-1">Nov 3-24, 2025</p>
+            <p className="text-xs text-gray-500 mt-1">{BOOKING_WINDOW_LABEL}</p>
           </div>
 
           {/* Photo Capture Section */}

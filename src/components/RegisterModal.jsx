@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Notification from './Notification';
+import { BOOKING_MAX_DATE as MAX_DATE, BOOKING_MIN_DATE as MIN_DATE, BOOKING_WINDOW_LABEL, isWithinBookingWindow } from '@/lib/bookingWindow.mjs';
 
 export default function RegisterModal({ open, onClose, onSuccess, defaultValues = {} , smartReserveFn, locationNames = {} }) {
   const [form, setForm] = useState({
@@ -17,9 +18,6 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
   const [notification, setNotification] = useState(null);
   const [confirmCtx, setConfirmCtx] = useState(null); // { type: 'mixed-blocks'|'split', preview: [...] }
   const [result, setResult] = useState(null); // store reservation result for summary
-
-  const MIN_DATE = '2025-11-03';
-  const MAX_DATE = '2025-11-24';
 
   const getTodayIST = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
@@ -69,11 +67,11 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
         show('error', 'Start and End dates are required.');
         return;
       }
-      if (form.startDate < MIN_DATE || form.startDate > MAX_DATE) {
+      if (!isWithinBookingWindow(form.startDate)) {
         show('error', `Start date must be between ${MIN_DATE} and ${MAX_DATE}.`);
         return;
       }
-      if (form.endDate < MIN_DATE || form.endDate > MAX_DATE) {
+      if (!isWithinBookingWindow(form.endDate)) {
         show('error', `End date must be between ${MIN_DATE} and ${MAX_DATE}.`);
         return;
       }
@@ -118,8 +116,8 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
     if (form.aadharNumber && aadharDigits.length !== 12) errs.push('Aadhar must be exactly 12 digits');
     if (!form.startDate) errs.push('Start date is required');
     if (!form.endDate) errs.push('End date is required');
-    if (form.startDate && (form.startDate < MIN_DATE || form.startDate > MAX_DATE)) errs.push('Start date must be Nov 3-24, 2025');
-    if (form.endDate && (form.endDate < MIN_DATE || form.endDate > MAX_DATE)) errs.push('End date must be Nov 3-24, 2025');
+    if (form.startDate && !isWithinBookingWindow(form.startDate)) errs.push(`Start date must be ${BOOKING_WINDOW_LABEL}`);
+    if (form.endDate && !isWithinBookingWindow(form.endDate)) errs.push(`End date must be ${BOOKING_WINDOW_LABEL}`);
     if (form.startDate && form.endDate && form.endDate < form.startDate) errs.push('End date cannot be before start date');
     if (total <= 0) errs.push('Add at least 1 person (male or female)');
     return errs;
@@ -266,12 +264,12 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
             <div>
               <label className="block text-sm font-medium text-gray-700">Start Date</label>
               <input type="date" min={MIN_DATE} max={MAX_DATE} className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900" value={form.startDate} onChange={(e)=>setForm(f=>({...f, startDate: e.target.value }))} />
-              <p className="text-xs text-gray-500 mt-1">Nov 3-24, 2025</p>
+              <p className="text-xs text-gray-500 mt-1">{BOOKING_WINDOW_LABEL}</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">End Date</label>
               <input type="date" min={MIN_DATE} max={MAX_DATE} className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900" value={form.endDate} onChange={(e)=>setForm(f=>({...f, endDate: e.target.value }))} />
-              <p className="text-xs text-gray-500 mt-1">Nov 3-24, 2025</p>
+              <p className="text-xs text-gray-500 mt-1">{BOOKING_WINDOW_LABEL}</p>
             </div>
           </div>
 

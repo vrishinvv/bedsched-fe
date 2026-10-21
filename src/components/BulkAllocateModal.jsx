@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import Skeleton from '@/components/Skeleton';
+import { BOOKING_MAX_DATE as MAX_DATE, BOOKING_MIN_DATE as MIN_DATE, BOOKING_WINDOW_LABEL, isWithinBookingWindow } from '@/lib/bookingWindow.mjs';
 
 export default function BulkAllocateModal({
   open,
@@ -20,9 +21,6 @@ export default function BulkAllocateModal({
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState(null); // { success: [], errors: [] }
   const ref = useRef(null);
-
-  const MIN_DATE = '2025-11-03';
-  const MAX_DATE = '2025-11-24';
 
   // Helper function to get today's date in YYYY-MM-DD format (IST)
   const getTodayDate = () => {
@@ -155,8 +153,8 @@ export default function BulkAllocateModal({
     if (!/^\d{10}$/.test(form.phone)) errs.push('Enter a valid 10-digit phone number');
     if (!form.startDate) errs.push('Start date is required');
     if (!form.endDate) errs.push('End date is required');
-    if (form.startDate && (form.startDate < MIN_DATE || form.startDate > MAX_DATE)) errs.push('Start date must be Nov 3-24, 2025');
-    if (form.endDate && (form.endDate < MIN_DATE || form.endDate > MAX_DATE)) errs.push('End date must be Nov 3-24, 2025');
+    if (form.startDate && !isWithinBookingWindow(form.startDate)) errs.push(`Start date must be ${BOOKING_WINDOW_LABEL}`);
+    if (form.endDate && !isWithinBookingWindow(form.endDate)) errs.push(`End date must be ${BOOKING_WINDOW_LABEL}`);
     if (form.startDate && form.endDate && form.endDate < form.startDate) errs.push('End date cannot be before start date');
     const totalCount = (isMixed ? (form.maleCount + form.femaleCount) : (isMaleOnly ? form.maleCount : form.femaleCount));
     if (totalCount <= 0) errs.push('Specify at least 1 person to book');
@@ -382,7 +380,7 @@ export default function BulkAllocateModal({
                 disabled={pending}
                 className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
               />
-              <p className="text-xs text-gray-500 mt-1">Nov 3-24, 2025</p>
+              <p className="text-xs text-gray-500 mt-1">{BOOKING_WINDOW_LABEL}</p>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">End date*</label>
@@ -396,7 +394,7 @@ export default function BulkAllocateModal({
                 disabled={pending}
                 className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
               />
-              <p className="text-xs text-gray-500 mt-1">Nov 3-24, 2025</p>
+              <p className="text-xs text-gray-500 mt-1">{BOOKING_WINDOW_LABEL}</p>
             </div>
           </div>
         </div>

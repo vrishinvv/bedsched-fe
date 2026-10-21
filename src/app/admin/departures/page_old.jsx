@@ -5,11 +5,9 @@ import { fetchDepartures, getMe } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { TreeSkeleton } from "@/components/Skeleton";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { BOOKING_MAX_DATE as MAX_DATE, BOOKING_MIN_DATE as MIN_DATE } from '@/lib/bookingWindow.mjs';
 
 function DeparturesContent() {
-  const MIN_DATE = '2025-11-03';
-  const MAX_DATE = '2025-11-24';
-  
   const getTodayIST = () => {
     const now = new Date();
     const istOffset = 5.5 * 60 * 60 * 1000;

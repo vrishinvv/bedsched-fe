@@ -2,6 +2,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { BOOKING_MAX_DATE, BOOKING_MIN_DATE } from '@/lib/bookingWindow.mjs';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -414,8 +415,8 @@ function TableViewContent() {
               type="date"
               value={filters.startDate}
               onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
-              min="2025-11-01"
-              max="2025-11-30"
+              min={BOOKING_MIN_DATE}
+              max={BOOKING_MAX_DATE}
               className="w-full rounded-lg border border-gray-600 px-3 py-2 bg-gray-800 text-white text-sm [color-scheme:dark]"
             />
           </div>
@@ -425,8 +426,8 @@ function TableViewContent() {
               type="date"
               value={filters.endDate}
               onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
-              min="2025-11-01"
-              max="2025-11-30"
+              min={BOOKING_MIN_DATE}
+              max={BOOKING_MAX_DATE}
               className="w-full rounded-lg border border-gray-600 px-3 py-2 bg-gray-800 text-white text-sm [color-scheme:dark]"
             />
           </div>
