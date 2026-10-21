@@ -2,8 +2,13 @@
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { fetchAnalytics, triggerBackup, getLocations } from "@/lib/api";
+import { BOOKING_MIN_DATE } from '@/lib/bookingWindow.mjs';
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { LineChart, Line, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
+const EVENT_YEAR = BOOKING_MIN_DATE.slice(0, 4);
+const DEFAULT_ANALYTICS_START_DATE = `${EVENT_YEAR}-01-01`;
+const DEFAULT_ANALYTICS_END_DATE = `${EVENT_YEAR}-12-31`;
 
 function AnalyticsContent() {
   const [data, setData] = useState(null);
@@ -17,8 +22,8 @@ function AnalyticsContent() {
   
   // Filters
   const [filters, setFilters] = useState({
-    startDate: '',
-    endDate: '',
+    startDate: DEFAULT_ANALYTICS_START_DATE,
+    endDate: DEFAULT_ANALYTICS_END_DATE,
     locationId: '',
     tentIndex: '',
     blockIndex: ''
@@ -107,8 +112,8 @@ function AnalyticsContent() {
 
   const resetFilters = () => {
     setFilters({
-      startDate: '',
-      endDate: '',
+      startDate: DEFAULT_ANALYTICS_START_DATE,
+      endDate: DEFAULT_ANALYTICS_END_DATE,
       locationId: '',
       tentIndex: '',
       blockIndex: ''
@@ -140,11 +145,15 @@ function AnalyticsContent() {
     return '#6b7280'; // gray for other
   };
 
-  // Format date to show just the November day number
+  // Include the month so historical and pre-event activity is unambiguous.
   const formatDateLabel = (dateStr) => {
     if (!dateStr) return '';
     const date = new Date(dateStr);
-    return date.getDate().toString(); // Just the day number (11, 12, 13)
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    });
   };
 
   // Process deallocations data for stacked bar chart
@@ -437,7 +446,7 @@ function AnalyticsContent() {
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={data.dailyAllocations.map(d => ({ ...d, dateLabel: formatDateLabel(d.date) }))} margin={{ bottom: 25 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="dateLabel" stroke="#9ca3af" height={60} label={{ value: 'Day of November', position: 'insideBottom', offset: -5, fill: '#9ca3af' }} />
+                  <XAxis dataKey="dateLabel" stroke="#9ca3af" height={60} label={{ value: 'Date', position: 'insideBottom', offset: -5, fill: '#9ca3af' }} />
                   <YAxis stroke="#9ca3af" domain={[0, (dataMax) => Math.ceil(dataMax * 1.15)]} />
                   <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }} />
                   <Legend wrapperStyle={{ paddingTop: '30px' }} />
@@ -456,7 +465,7 @@ function AnalyticsContent() {
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={data.dailyDepartures.map(d => ({ ...d, dateLabel: formatDateLabel(d.date) }))} margin={{ bottom: 25 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="dateLabel" stroke="#9ca3af" height={60} label={{ value: 'Day of November', position: 'insideBottom', offset: -5, fill: '#9ca3af' }} />
+                  <XAxis dataKey="dateLabel" stroke="#9ca3af" height={60} label={{ value: 'Date', position: 'insideBottom', offset: -5, fill: '#9ca3af' }} />
                   <YAxis stroke="#9ca3af" domain={[0, (dataMax) => Math.ceil(dataMax * 1.15)]} />
                   <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }} />
                   <Legend wrapperStyle={{ paddingTop: '30px' }} />
@@ -475,7 +484,7 @@ function AnalyticsContent() {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={deallocationChartData} margin={{ bottom: 25 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="dateLabel" stroke="#9ca3af" height={60} label={{ value: 'Day of November', position: 'insideBottom', offset: -5, fill: '#9ca3af' }} />
+                  <XAxis dataKey="dateLabel" stroke="#9ca3af" height={60} label={{ value: 'Date', position: 'insideBottom', offset: -5, fill: '#9ca3af' }} />
                   <YAxis stroke="#9ca3af" domain={[0, (dataMax) => Math.ceil(dataMax * 1.15)]} allowDecimals={false} />
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
@@ -519,7 +528,7 @@ function AnalyticsContent() {
               <ResponsiveContainer width="100%" height={400}>
                 <LineChart data={userChartData} margin={{ bottom: 25 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="dateLabel" stroke="#9ca3af" height={60} label={{ value: 'Day of November', position: 'insideBottom', offset: -5, fill: '#9ca3af' }} />
+                  <XAxis dataKey="dateLabel" stroke="#9ca3af" height={60} label={{ value: 'Date', position: 'insideBottom', offset: -5, fill: '#9ca3af' }} />
                   <YAxis stroke="#9ca3af" domain={[0, (dataMax) => Math.ceil(dataMax * 1.15)]} />
                   <Tooltip content={<CustomUserTooltip />} />
                   <Legend wrapperStyle={{ paddingTop: '30px' }} />
