@@ -1,121 +1,169 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
-import { fetchLocation, updateCapacity, allocateBed, editAllocation, deallocateBed } from '@/lib/api';
-import BedGrid from '@/components/BedGrid';
-import AllocateModal from '@/components/AllocateModal';
+import { use, useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
+import Breadcrumb from '@/components/Breadcrumb';
+import TentCard from '@/components/TentCard';
+import { CardSkeleton, StatCardSkeleton, HeaderSkeleton } from '@/components/Skeleton';
+import { fetchLocationTents } from '@/lib/api';
 
-export default function LocationPage({ params }) {
-  const { id } = params;
-  const [location, setLocation] = useState(null);
+export default function LocationTentsPage({ params }) {
+  const { id } = use(params); // location id
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [modal, setModal] = useState({ open: false, bedNumber: null, data: null });
-  const [pending, setPending] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        const data = await fetchLocation(id);
-        // fallback if backend not ready
-        const fallback = data?.id ? data : {
-          id,
-          name: `Tent ${String.fromCharCode(64 + Number(id)) || id}`,
-          capacity: 100,
-          beds: {}, // { [n]: { name, phone, gender, startDate, endDate } }
-        };
-        setLocation(fallback);
+        const res = await fetchLocationTents(id);
+        setData(res);
       } catch (e) {
-        setError(e.message);
+        setErr(e.message);
       } finally {
         setLoading(false);
       }
     })();
   }, [id]);
 
-  const allocatedCount = useMemo(() => Object.values(location?.beds || {}).filter(Boolean).length, [location]);
+  const stats = useMemo(() => {
+    if (!data?.tents) return { totalCapacity: 0, totalAllocated: 0, totalNotAllocated: 0, totalFreeingTomorrow: 0, totalReserved: 0 };
+    
+    const totalCapacity = data.tents.reduce((s, t) => s + (t.size || 0), 0);
+    const totalAllocated = data.tents.reduce((s, t) => s + (t.allocated || 0), 0);
+    const totalNotAllocated = totalCapacity - totalAllocated;
+    const totalFreeingTomorrow = data.tents.reduce((s, t) => s + (t.freeingTomorrow || 0), 0);
+    const totalReserved = data.tents.reduce((s, t) => s + (t.reserved || 0), 0);
+    return { totalCapacity, totalAllocated, totalNotAllocated, totalFreeingTomorrow, totalReserved };
+  }, [data]);
 
-  function openAllocate(n, data) {
-    setModal({ open: true, bedNumber: n, data });
+  if (loading) {
+    return (
+      <main className="space-y-6">
+        {/* Header skeleton */}
+        <HeaderSkeleton />
+
+        {/* Stats skeleton */}
+        <section className="grid grid-cols-2 gap-4 md:grid-cols-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </section>
+
+        {/* Tent cards skeleton */}
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </section>
+      </main>
+    );
   }
 
-  async function handleCapacityIncrease() {
-    const next = Number(prompt('New capacity (only increase):', String(location.capacity)) || location.capacity);
-    if (!Number.isFinite(next) || next < location.capacity) return;
-    try {
-      setPending(true);
-      // optimistic update
-      setLocation((loc) => ({ ...loc, capacity: next }));
-      await updateCapacity(id, next);
-    } catch (e) {
-      alert('Failed to update capacity');
-    } finally { setPending(false); }
-  }
+  if (err) return <div className="text-red-400">{err}</div>;
 
-  async function handleSave(payload) {
-    const n = modal.bedNumber;
-    const isEdit = Boolean(modal.data);
-    try {
-      setPending(true);
-      // optimistic
-      setLocation((loc) => ({ ...loc, beds: { ...loc.beds, [n]: payload } }));
-      if (isEdit) await editAllocation(id, n, payload); else await allocateBed(id, n, payload);
-      setModal({ open: false, bedNumber: null, data: null });
-    } catch (e) {
-      alert('Failed to save');
-    } finally { setPending(false); }
-  }
+  const { location, tents } = data;
 
-  async function handleDelete() {
-    const n = modal.bedNumber;
-    try {
-      setPending(true);
-      // optimistic
-      setLocation((loc) => {
-        const nextBeds = { ...loc.beds }; delete nextBeds[n];
-        return { ...loc, beds: nextBeds };
-      });
-      await deallocateBed(id, n);
-      setModal({ open: false, bedNumber: null, data: null });
-    } catch (e) {
-      alert('Failed to deallocate');
-    } finally { setPending(false); }
-  }
-
-  if (loading) return <div>Loading…</div>;
-  if (error) return <div className="text-red-600">{error}</div>;
+  const breadcrumbItems = [
+    { label: 'Home', href: '/' },
+    { label: location.name, href: `/locations/${id}` }
+  ];
 
   return (
-    <main className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <Link href="/" className="text-sm text-gray-500 hover:underline">← Back</Link>
-          {/* <h2 className="text-xl font-semibold">{location.name}</h2> */}
-          {/* <p className="text-sm text-gray-600">Allocated: {allocatedCount} / {location.capacity}</p> */}
+    <main className="space-y-6 p-3 sm:p-4">
+      <Breadcrumb items={breadcrumbItems} />
+      
+      {/* Enhanced Header with Purple Breadcrumb */}
+      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-purple-900/20 via-purple-800/20 to-indigo-900/20 border border-purple-500/20 p-4 sm:p-6">
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+        <div className="relative">
+          <nav className="mb-3">
+            <Link href="/" className="inline-flex items-center text-xs sm:text-sm text-purple-300/80 hover:text-purple-200 transition-colors">
+              <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back to Locations
+            </Link>
+          </nav>
+          <h2 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
+            {location.name}
+          </h2>
+          <p className="text-xs sm:text-sm text-purple-200/80">Managing {tents.length} tent{tents.length !== 1 ? 's' : ''} • {stats.totalCapacity} total beds</p>
         </div>
-        {/* <div className="flex items-center gap-2">
-          <button onClick={handleCapacityIncrease} disabled={pending} className="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-100 disabled:opacity-50">Increase capacity</button>
-        </div> */}
-      </div>
+      </section>
 
-      {/* Legend */}
-      {/* <div className="flex items-center gap-4 text-sm">
-        <div className="flex items-center gap-2"><span className="inline-block h-4 w-4 rounded bg-red-500" /> Allocated</div>
-        <div className="flex items-center gap-2"><span className="inline-block h-4 w-4 rounded bg-gray-200" /> Available</div>
-      </div> */}
+      {/* Enhanced Dashboard */}
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
+        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/10 via-blue-500/10 to-cyan-500/10 border border-blue-500/20 p-5 backdrop-blur-sm transition-all duration-300 hover:scale-105">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-400/5 to-transparent pointer-events-none" />
+          <div className="relative">
+            <div className="p-2 bg-blue-500/20 rounded-xl w-fit mb-3">
+              <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H9m0 0H7m-2 0h2m0 0h6m-7-10h6m-6 4h6m6-7v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2z" />
+              </svg>
+            </div>
+            <div className="text-xs text-blue-300/70 font-medium">Total Capacity</div>
+            <div className="text-2xl font-bold text-white">{stats.totalCapacity.toLocaleString()}</div>
+          </div>
+        </div>
 
-      {/* Grid */}
-      <BedGrid capacity={location.capacity} beds={location.beds} onSelect={openAllocate} />
+        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-600/10 via-red-500/10 to-orange-500/10 border border-red-500/20 p-5 backdrop-blur-sm transition-all duration-300 hover:scale-105">
+          <div className="absolute inset-0 bg-gradient-to-br from-red-400/5 to-transparent pointer-events-none" />
+          <div className="relative">
+            <div className="p-2 bg-red-500/20 rounded-xl w-fit mb-3">
+              <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </div>
+            <div className="text-xs text-red-300/70 font-medium">Total Allocated</div>
+            <div className="text-2xl font-bold text-white">{stats.totalAllocated.toLocaleString()}</div>
+          </div>
+        </div>
 
-      {/* Modal */}
-      <AllocateModal
-        open={modal.open}
-        onClose={() => setModal({ open: false, bedNumber: null, data: null })}
-        bedNumber={modal.bedNumber}
-        initialData={modal.data}
-        onSave={handleSave}
-        onDelete={handleDelete}
-      />
+        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600/10 via-emerald-500/10 to-green-500/10 border border-emerald-500/20 p-5 backdrop-blur-sm transition-all duration-300 hover:scale-105">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 to-transparent pointer-events-none" />
+          <div className="relative">
+            <div className="p-2 bg-emerald-500/20 rounded-xl w-fit mb-3">
+              <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="text-xs text-emerald-300/70 font-medium">Available Beds</div>
+            <div className="text-2xl font-bold text-white">{stats.totalNotAllocated.toLocaleString()}</div>
+          </div>
+        </div>
+
+        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-600/10 via-yellow-500/10 to-orange-500/10 border border-amber-500/20 p-5 backdrop-blur-sm transition-all duration-300 hover:scale-105">
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-400/5 to-transparent pointer-events-none" />
+          <div className="relative">
+            <div className="p-2 bg-amber-500/20 rounded-xl w-fit mb-3">
+              <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="text-xs text-amber-300/70 font-medium">Frees Tomorrow</div>
+            <div className="text-2xl font-bold text-white">{stats.totalFreeingTomorrow.toLocaleString()}</div>
+          </div>
+        </div>
+
+        {/*<div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600/10 via-purple-500/10 to-indigo-500/10 border border-indigo-500/20 p-5 backdrop-blur-sm transition-all duration-300 hover:scale-105 col-span-2 md:col-span-1">
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-400/5 to-transparent pointer-events-none" />
+           <div className="relative">
+            <div className="p-2 bg-indigo-500/20 rounded-xl w-fit mb-3">
+              <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="text-xs text-indigo-300/70 font-medium">Active Reservations</div>
+            <div className="text-2xl font-bold text-white">{stats.totalReserved.toLocaleString()}</div>
+          </div> 
+        </div>*/}
+      </section>
+
+      <section className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {tents.map((t) => (
+          <TentCard key={t.index} locationId={location.id} tent={t} />
+        ))}
+      </section>
     </main>
   );
 }

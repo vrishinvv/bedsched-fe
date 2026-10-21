@@ -2,11 +2,26 @@
 import Link from 'next/link';
 import StatPill from './StatPill';
 
-export default function LocationCard({ location }) {
+// Landmark mapping for locations
+const LANDMARKS = {
+  'Anand Vilas Enclave': 'Chaitanya Jyoti',
+  'Brindavan Enclave': 'Electricity Board',
+  'Sai Sruthi Enclave': 'APSRTC Bus Depot',
+  'Dharmakshetra Enclave': 'Sai Hira Hall',
+  'Shivam Enclave': 'West South',
+  'Sundaram Enclave': 'West North',
+  'New Block B Basement': 'New Block B Basement',
+  'New Block A': 'New Block A',
+  'New Block B': 'New Block B'
+};
+
+export default function LocationCard({ location, isClickable = true }) {
   const allocated = location.allocatedCount ?? 0;
-  const total = location.capacity ?? 100;
+  const total = location.capacity ?? 0;
   const pct = total ? Math.round((allocated / total) * 100) : 0;
   const freeingTomorrow = location.freeingTomorrow ?? 0;
+  const reserved = location.reservedCount ?? 0;
+  const landmark = LANDMARKS[location.name];
 
   // Dynamic color based on occupancy
   const getOccupancyColor = () => {
@@ -37,72 +52,96 @@ export default function LocationCard({ location }) {
     return 'text-emerald-700 bg-emerald-100';
   };
 
-  return (
-    <Link href={`/locations/${location.id}`} className="block group">
-      <div className={`relative overflow-hidden rounded-2xl border-2 ${getOccupancyBgColor()} p-6 shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1`}>
-        {/* Decorative gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white/50 to-transparent pointer-events-none" />
-        
-        {/* Status badge */}
-        <div className="absolute top-4 right-4">
-          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${getStatusColor()}`}>
-            {getStatusText()}
-          </span>
+  const cardContent = (
+    <div className={`relative overflow-hidden rounded-2xl border-2 ${getOccupancyBgColor()} p-4 sm:p-6 shadow-lg transition-all duration-300 ${isClickable ? 'group hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1' : 'opacity-90 cursor-not-allowed'}`}>
+      {/* Decorative gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white/50 to-transparent pointer-events-none" />
+
+      {/* Status badge */}
+      <div className="absolute top-4 right-4">
+        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${getStatusColor()}`}>
+          {getStatusText()}
+        </span>
+      </div>
+
+      {/* Header */}
+      <div className="relative mb-4">
+        <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 pr-20">{location.name}</h3>
+        {landmark && (
+          <div className="flex items-center gap-1.5 text-xs text-gray-600">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span className="font-medium">{landmark}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Main stats */}
+      <div className="relative mb-6">
+        <div className="flex items-end gap-1 mb-2">
+          <span className="text-2xl sm:text-3xl font-bold text-gray-900">{allocated}</span>
+          <span className="text-sm sm:text-lg text-gray-500 mb-1">/ {total}</span>
+        </div>
+      </div>
+
+      {/* Progress bar with enhanced styling */}
+      <div className="relative mb-4">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-sm font-medium text-gray-700">Occupancy</span>
+          <span className="text-sm font-bold text-gray-900">{pct}%</span>
+        </div>
+        <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200/50 shadow-inner">
+          <div
+            className={`h-3 ${getOccupancyColor()} transition-all duration-700 ease-out rounded-full shadow-sm`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Bottom stats */}
+      <div className="relative flex items-center justify-between">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {freeingTomorrow > 0 && (
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-xs sm:text-sm font-medium text-gray-700">
+                {freeingTomorrow} freeing tomorrow
+              </span>
+            </div>
+          )}
+          {reserved > 0 && (
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 bg-blue-500 rounded-full" />
+              <span className="text-xs sm:text-sm font-medium text-gray-700">
+                {reserved} reserved
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Header */}
-        <div className="relative mb-4">
-          <h3 className="text-xl font-bold text-gray-900 mb-1 pr-20">{location.name}</h3>
-          <p className="text-sm text-gray-600">Tent Accommodation</p>
-        </div>
-
-        {/* Main stats */}
-        <div className="relative mb-6">
-          <div className="flex items-end gap-1 mb-2">
-            <span className="text-3xl font-bold text-gray-900">{allocated}</span>
-            <span className="text-lg text-gray-500 mb-1">/ {total}</span>
-          </div>
-          <p className="text-sm font-medium text-gray-700">beds occupied</p>
-        </div>
-
-        {/* Progress bar with enhanced styling */}
-        <div className="relative mb-4">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium text-gray-700">Occupancy</span>
-            <span className="text-sm font-bold text-gray-900">{pct}%</span>
-          </div>
-          <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200/50 shadow-inner">
-            <div
-              className={`h-3 ${getOccupancyColor()} transition-all duration-700 ease-out rounded-full shadow-sm`}
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Bottom stats */}
-        <div className="relative flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {freeingTomorrow > 0 && (
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-sm font-medium text-gray-700">
-                  {freeingTomorrow} freeing tomorrow
-                </span>
-              </div>
-            )}
-          </div>
-          
-          {/* Arrow indicator */}
+        {/* Arrow indicator - only show if clickable */}
+        {isClickable && (
           <div className="flex items-center text-gray-400 group-hover:text-gray-600 transition-colors">
             <svg className="w-5 h-5 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </div>
-        </div>
-
-        {/* Hover effect overlay */}
-        <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-transparent to-gray-900/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+        )}
       </div>
-    </Link>
+
+      {/* Hover effect overlay - only if clickable */}
+      {isClickable && (
+        <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-transparent to-gray-900/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+      )}
+    </div>
   );
+
+  // Wrap in Link only if clickable
+  if (isClickable) {
+    return <Link href={`/locations/${location.id}`} className="block">{cardContent}</Link>;
+  }
+
+  return cardContent;
 }

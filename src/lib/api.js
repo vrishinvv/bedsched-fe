@@ -2,7 +2,24 @@
 // Frontend API wrappers for Express backend (no proxy).
 // Set NEXT_PUBLIC_API_BASE (e.g., http://localhost:3001) in .env.local
 
-const API = process.env.NEXT_PUBLIC_API_BASE || '';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+function getToken() {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage.getItem('bs_token');
+  } catch {
+    return null;
+  }
+}
+
+function authHeaders(extra = {}) {
+  const token = getToken();
+  return {
+    ...(extra || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
 
 async function handle(res, fallbackMsg) {
   if (res.ok) {
@@ -14,54 +31,385 @@ async function handle(res, fallbackMsg) {
     }
   }
   // Try to surface server-provided error details
+  let errorData = null;
   let msg = fallbackMsg;
   try {
     const text = await res.text();
-    msg = text || fallbackMsg;
+    // Try to parse as JSON first
+    try {
+      errorData = JSON.parse(text);
+      msg = errorData.message || errorData.error || text || fallbackMsg;
+    } catch {
+      msg = text || fallbackMsg;
+    }
   } catch {}
-  throw new Error(msg);
+  
+  // Create error with response data attached
+  const error = new Error(msg);
+  if (errorData) {
+    error.response = {
+      status: res.status,
+      data: errorData
+    };
+  }
+  throw error;
 }
 
+/**
+ * Generate view URL for a photo key
+ */
+export async function generatePhotoViewUrl(photoKey) {
+  if (!photoKey) return null;
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/photo-view-url`, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ key: photoKey }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.viewUrl;
+  } catch (error) {
+    console.error('Failed to generate view URL:', error);
+    return null;
+  }
+}
+
+/**
+ * Fetch all locations with their capacity and allocation data
+ */
 export async function fetchLocations() {
-  const res = await fetch(`${API}/api/locations`, { cache: 'no-store' });
-  return handle(res, 'Failed to load locations');
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/locations`, {
+      method: 'GET',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Ensure the data has the expected structure for the frontend
+    return data.map((location) => ({
+      id: location.id,
+      name: location.name,
+      capacity: location.capacity || 0,
+      allocatedCount: location.allocatedCount || 0,
+      freeingTomorrow: location.freeingTomorrow || 0,
+      ...location, // Include any additional fields from backend
+    }));
+  } catch (error) {
+    console.error('Error fetching locations:', error);
+    throw new Error(`Failed to fetch locations: ${error.message}`);
+  }
 }
 
-export async function fetchLocation(id) {
-  const res = await fetch(`${API}/api/locations/${id}`, { cache: 'no-store' });
-  return handle(res, 'Failed to load location');
+/**
+ * Fetch a specific location by ID
+ */
+export async function fetchLocationById(id) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/locations/${id}`, {
+      method: 'GET',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(`Error fetching location ${id}:`, error);
+    throw new Error(`Failed to fetch location: ${error.message}`);
+  }
 }
 
+/**
+ * Fetch tents for a specific location
+ */
+export async function fetchLocationTents(locationId) {
+  const res = await fetch(`${API_BASE_URL}/api/locations/${locationId}/tents`, { headers: authHeaders() });
+  return handle(res, 'Failed to fetch location tents');
+}
+
+/**
+ * Fetch blocks for a specific tent
+ */
+export async function fetchTentBlocks(locationId, tentIndex) {
+  const res = await fetch(`${API_BASE_URL}/api/locations/${locationId}/tents/${tentIndex}/blocks`, { headers: authHeaders() });
+  return handle(res, 'Failed to fetch tent blocks');
+}
+
+/**
+ * Update tent settings (gender restriction)
+ */
+export async function updateTent(locationId, tentIndex, payload) {
+  // Deprecated: tent-level gender restriction removed. Kept for backward compatibility.
+  throw new Error('Tent update is deprecated. Use updateBlock for gender restriction.');
+}
+
+/**
+ * Fetch block detail with bed information
+ */
+export async function fetchBlockDetail(locationId, tentIndex, blockIndex) {
+  const res = await fetch(`${API_BASE_URL}/api/locations/${locationId}/tents/${tentIndex}/blocks/${blockIndex}`, { headers: authHeaders() });
+  return handle(res, 'Failed to fetch block detail');
+}
+
+// Reallocate-related helpers removed per request
+
+/**
+ * Update location capacity
+ */
 export async function updateCapacity(id, newCapacity) {
-  const res = await fetch(`${API}/api/locations/${id}`, {
+  const res = await fetch(`${API_BASE_URL}/api/locations/${id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ capacity: newCapacity }),
   });
   return handle(res, 'Failed to update capacity');
 }
 
-export async function allocateBed(id, bedNumber, payload) {
-  const res = await fetch(`${API}/api/locations/${id}/beds/${bedNumber}/allocate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+/**
+ * Allocate a bed in a specific block
+ */
+export async function allocateBed(locationId, tentIndex, blockIndex, bedNumber, payload) {
+  const res = await fetch(
+    `${API_BASE_URL}/api/locations/${locationId}/tents/${tentIndex}/blocks/${blockIndex}/beds/${bedNumber}/allocate`,
+    {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload),
+    }
+  );
   return handle(res, 'Failed to allocate bed');
 }
 
-export async function editAllocation(id, bedNumber, payload) {
-  const res = await fetch(`${API}/api/locations/${id}/beds/${bedNumber}`, {
+/**
+ * Edit an existing bed allocation
+ */
+export async function editAllocation(locationId, tentIndex, blockIndex, bedNumber, payload) {
+  const res = await fetch(`${API_BASE_URL}/api/locations/${locationId}/tents/${tentIndex}/blocks/${blockIndex}/beds/${bedNumber}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   });
   return handle(res, 'Failed to edit allocation');
 }
 
-export async function deallocateBed(id, bedNumber) {
-  const res = await fetch(`${API}/api/locations/${id}/beds/${bedNumber}`, {
+/**
+ * Deallocate a bed
+ */
+export async function deallocateBed(locationId, tentIndex, blockIndex, bedNumber, options = {}) {
+  const { wasOccupied, reason } = options;
+  const res = await fetch(`${API_BASE_URL}/api/locations/${locationId}/tents/${tentIndex}/blocks/${blockIndex}/beds/${bedNumber}`, {
     method: 'DELETE',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ wasOccupied, reason }),
   });
   return handle(res, 'Failed to deallocate bed');
 }
+
+/**
+ * Bulk allocate beds
+ */
+export async function bulkAllocateBeds(locationId, tentIndex, blockIndex, payload) {
+  const res = await fetch(`${API_BASE_URL}/api/locations/${locationId}/tents/${tentIndex}/blocks/${blockIndex}/beds/bulk-allocate`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  });
+  return handle(res, 'Failed to bulk allocate beds');
+}
+
+export async function updateBlock(locationId, tentIndex, blockIndex, payload) {
+  const res = await fetch(`${API_BASE_URL}/api/locations/${locationId}/tents/${tentIndex}/blocks/${blockIndex}`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  });
+  return handle(res, 'Failed to update block');
+}
+
+export async function deallocateBedsBatch(locationId, tentIndex, blockIndex, bedNumbers) {
+  const res = await fetch(`${API_BASE_URL}/api/locations/${locationId}/tents/${tentIndex}/blocks/${blockIndex}/beds/deallocate-batch`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ bedNumbers }),
+  });
+  return handle(res, 'Failed to batch deallocate beds');
+}
+
+export async function editAllocationsBatch(locationId, tentIndex, blockIndex, bedNumbers, updates) {
+  const res = await fetch(`${API_BASE_URL}/api/locations/${locationId}/tents/${tentIndex}/blocks/${blockIndex}/beds/batch-edit`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ bedNumbers, updates }),
+  });
+  return handle(res, 'Failed to batch edit allocations');
+}
+
+// Reallocate-related helpers removed per request
+
+// Auth helpers
+export async function login(username, password) {
+  const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ username, password }),
+  });
+  const data = await handle(res, 'Login failed');
+  try {
+    if (typeof window !== 'undefined' && data?.token) {
+      window.localStorage.setItem('bs_token', data.token);
+    }
+  } catch {}
+  return data;
+}
+
+export async function logout() {
+  try {
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('bs_token');
+    }
+  } catch {}
+  try { await fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' }); } catch {}
+  return { ok: true };
+}
+
+export async function getMe() {
+  const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
+    method: 'GET',
+    headers: authHeaders(),
+    credentials: 'include',
+  });
+  return handle(res, 'Failed to get session');
+}
+
+// Reservation APIs
+export async function smartReserve(payload) {
+  const res = await fetch(`${API_BASE_URL}/api/allocations/smart-reserve`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  });
+  return handle(res, 'Failed to smart-reserve');
+}
+
+export async function searchAllocationsByPhone(phone) {
+  const url = new URL(`${API_BASE_URL}/api/allocations/by-phone`);
+  url.searchParams.set('phone', phone);
+  const res = await fetch(url.toString(), { headers: authHeaders() });
+  return handle(res, 'Failed to search by phone');
+}
+
+export async function confirmAllocations({ batchId, allocationIds }) {
+  const res = await fetch(`${API_BASE_URL}/api/allocations/confirm`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ batchId, allocationIds }),
+  });
+  return handle(res, 'Failed to confirm allocations');
+}
+
+// Admin edits by phone
+export async function updatePhoneByPhone({ oldPhone, newPhone, batchId, allocationIds }) {
+  const res = await fetch(`${API_BASE_URL}/api/allocations/by-phone/update-phone`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ oldPhone, newPhone, batchId, allocationIds }),
+  });
+  return handle(res, 'Failed to update phone');
+}
+
+export async function updateNameByPhone({ phone, name, batchId, allocationIds }) {
+  const res = await fetch(`${API_BASE_URL}/api/allocations/by-phone/update-name`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ phone, name, batchId, allocationIds }),
+  });
+  return handle(res, 'Failed to update name');
+}
+
+export async function updateEmergencyPhoneByPhone({ phone, emergencyPhone, batchId, allocationIds }) {
+  const res = await fetch(`${API_BASE_URL}/api/allocations/by-phone/update-emergency-phone`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ phone, emergencyPhone, batchId, allocationIds }),
+  });
+  return handle(res, 'Failed to update emergency phone');
+}
+
+export async function updateEndDateByPhone({ phone, endDate, batchId, allocationIds }) {
+  const res = await fetch(`${API_BASE_URL}/api/allocations/by-phone/update-end-date`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ phone, endDate, batchId, allocationIds }),
+  });
+  return handle(res, 'Failed to update end date');
+}
+
+export async function deallocateByPhone({ phone, batchId, allocationIds }) {
+  const res = await fetch(`${API_BASE_URL}/api/allocations/by-phone/deallocate`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ phone, batchId, allocationIds }),
+  });
+  return handle(res, 'Failed to deallocate');
+}
+
+export async function fetchDepartures(date, { page = 1, limit = 50, sortField = 'bed_number', sortOrder = 'asc', location_id = '', tent_index = '', block_index = '' } = {}) {
+  const url = new URL(`${API_BASE_URL}/api/allocations/departures`);
+  url.searchParams.set('date', date);
+  url.searchParams.set('page', page.toString());
+  url.searchParams.set('limit', limit.toString());
+  url.searchParams.set('sortField', sortField);
+  url.searchParams.set('sortOrder', sortOrder);
+  if (location_id) url.searchParams.set('location_id', location_id);
+  if (tent_index) url.searchParams.set('tent_index', tent_index);
+  if (block_index) url.searchParams.set('block_index', block_index);
+  const res = await fetch(url.toString(), { headers: authHeaders() });
+  return handle(res, 'Failed to fetch departures');
+}
+
+export async function fetchCurrentlyOccupied({ page = 1, limit = 50, sortField = 'bed_number', sortOrder = 'asc', location_id = '', tent_index = '', block_index = '' } = {}) {
+  const url = new URL(`${API_BASE_URL}/api/allocations/currently-occupied`);
+  url.searchParams.set('page', page.toString());
+  url.searchParams.set('limit', limit.toString());
+  url.searchParams.set('sortField', sortField);
+  url.searchParams.set('sortOrder', sortOrder);
+  if (location_id) url.searchParams.set('location_id', location_id);
+  if (tent_index) url.searchParams.set('tent_index', tent_index);
+  if (block_index) url.searchParams.set('block_index', block_index);
+  const res = await fetch(url.toString(), { headers: authHeaders() });
+  return handle(res, 'Failed to fetch currently occupied');
+}
+
+export async function fetchReservedActive() {
+  const res = await fetch(`${API_BASE_URL}/api/allocations/reserved-active`, { headers: authHeaders() });
+  return handle(res, 'Failed to fetch active reserved');
+}
+
+export async function fetchAnalytics(filters = {}) {
+  const url = new URL(`${API_BASE_URL}/api/admin/analytics`);
+  if (filters.startDate) url.searchParams.set('startDate', filters.startDate);
+  if (filters.endDate) url.searchParams.set('endDate', filters.endDate);
+  if (filters.locationId) url.searchParams.set('locationId', filters.locationId);
+  if (filters.tentIndex) url.searchParams.set('tentIndex', filters.tentIndex);
+  if (filters.blockIndex) url.searchParams.set('blockIndex', filters.blockIndex);
+  const res = await fetch(url.toString(), { headers: authHeaders() });
+  return handle(res, 'Failed to fetch analytics');
+}
+
+export async function triggerBackup() {
+  const res = await fetch(`${API_BASE_URL}/api/admin/trigger-backup`, { headers: authHeaders() });
+  return handle(res, 'Failed to trigger backup');
+}
+
+// Alias for backward compatibility
+export const getLocations = fetchLocations;
+
