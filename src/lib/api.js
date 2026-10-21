@@ -410,6 +410,21 @@ export async function triggerBackup() {
   return handle(res, 'Failed to trigger backup');
 }
 
+export async function fetchAdminUsers() {
+  const res = await fetch(`${API_BASE_URL}/api/admin/users`, {
+    headers: authHeaders(),
+  });
+  return handle(res, 'Failed to fetch users');
+}
+
+export async function createAdminUser(payload) {
+  const res = await fetch(`${API_BASE_URL}/api/admin/users`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  });
+  return handle(res, 'Failed to create user');
+}
+
 // Alias for backward compatibility
 export const getLocations = fetchLocations;
-
