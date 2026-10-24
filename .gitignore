@@ -125,6 +125,10 @@ dist
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
 
+# Playwright artifacts
+test-results/
+playwright-report/
+
 # yarn v3
 .pnp.*
 .yarn/*
