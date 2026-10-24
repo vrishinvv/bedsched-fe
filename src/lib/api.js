@@ -426,5 +426,57 @@ export async function createAdminUser(payload) {
   return handle(res, 'Failed to create user');
 }
 
+export async function fetchAdminStructure() {
+  const res = await fetch(`${API_BASE_URL}/api/admin/structure`, {
+    headers: authHeaders(),
+  });
+  return handle(res, 'Failed to fetch accommodation structure');
+}
+
+export async function updateStructureLocation(locationId, payload) {
+  const res = await fetch(`${API_BASE_URL}/api/admin/structure/locations/${locationId}`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  });
+  return handle(res, 'Failed to update location');
+}
+
+export async function createStructureTent(locationId, payload) {
+  const res = await fetch(`${API_BASE_URL}/api/admin/structure/locations/${locationId}/tents`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  });
+  return handle(res, 'Failed to create tent');
+}
+
+export async function updateStructureTent(tentId, payload) {
+  const res = await fetch(`${API_BASE_URL}/api/admin/structure/tents/${tentId}`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  });
+  return handle(res, 'Failed to update tent');
+}
+
+export async function createStructureBlock(tentId, payload) {
+  const res = await fetch(`${API_BASE_URL}/api/admin/structure/tents/${tentId}/blocks`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  });
+  return handle(res, 'Failed to create block');
+}
+
+export async function updateStructureBlock(blockId, payload) {
+  const res = await fetch(`${API_BASE_URL}/api/admin/structure/blocks/${blockId}`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  });
+  return handle(res, 'Failed to update block');
+}
+
 // Alias for backward compatibility
 export const getLocations = fetchLocations;
