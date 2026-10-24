@@ -19,11 +19,14 @@ import {
   deallocateBedsBatch,
   editAllocationsBatch,
   generatePhotoViewUrl,
+  getMe,
 } from '@/lib/api';
+import { canManageAccommodationStructure } from '@/lib/permissions.mjs';
 
 export default function BlockBedsPage({ params }) {
   const { id, tent, block } = use(params);
   const [meta, setMeta] = useState(null); // { location, tent, block }
+  const [currentUser, setCurrentUser] = useState(null);
   const [genderRestriction, setGenderRestriction] = useState('both'); // block-level gender restriction
   const [bedsState, setBedsState] = useState(null); // { capacity, beds:{} }
   const [loading, setLoading] = useState(true);
@@ -52,8 +55,12 @@ export default function BlockBedsPage({ params }) {
     (async () => {
       try {
         // Fetch block detail
-        const blockRes = await fetchBlockDetail(id, Number(tent), Number(block));
+        const [blockRes, session] = await Promise.all([
+          fetchBlockDetail(id, Number(tent), Number(block)),
+          getMe(),
+        ]);
         setMeta(blockRes.meta);
+        setCurrentUser(session?.user || null);
         setBedsState({ capacity: blockRes.blockSize, beds: blockRes.beds });
         setGenderRestriction(blockRes.meta?.block?.genderRestriction || 'both');
       } catch (e) {
@@ -633,7 +640,7 @@ export default function BlockBedsPage({ params }) {
               </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="relative">
+              {canManageAccommodationStructure(currentUser) && <div className="relative">
                 <select
                   value={genderRestriction}
                   disabled={updatingRestriction}
@@ -660,7 +667,7 @@ export default function BlockBedsPage({ params }) {
                   <option value="male_only">♂️ Male Only</option>
                   <option value="female_only">♀️ Female Only</option>
                 </select>
-              </div>
+              </div>}
               {/* Bulk Book Beds button - commented out
               <button
                 onClick={() => setBulkModal(true)}
