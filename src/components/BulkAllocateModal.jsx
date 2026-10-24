@@ -277,7 +277,7 @@ export default function BulkAllocateModal({
         {/* Current date info */}
         <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
           <div className="text-sm text-blue-800">
-            <div className="font-medium">Today's date (IST): {formatDateForDisplay(todayDate)}</div>
+            <div className="font-medium">Today&apos;s date (IST): {formatDateForDisplay(todayDate)}</div>
             <div className="text-blue-600 mt-1">(End date must be today or later)</div>
           </div>
         </div>

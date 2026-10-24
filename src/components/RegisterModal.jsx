@@ -285,7 +285,7 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
             {/* Explain disabled state */}
             {!canReserve && !result && !pending && (
               <div className="text-xs text-red-600 space-y-1">
-                <div className="font-medium">Can't reserve yet:</div>
+                <div className="font-medium">Can&apos;t reserve yet:</div>
                 <ul className="list-disc pl-4">
                   {validationErrors.map((e, i) => (<li key={i}>{e}</li>))}
                 </ul>
