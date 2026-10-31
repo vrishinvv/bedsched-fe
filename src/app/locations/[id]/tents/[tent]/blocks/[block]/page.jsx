@@ -22,12 +22,14 @@ import {
   getMe,
 } from '@/lib/api';
 import { canManageAccommodationStructure } from '@/lib/permissions.mjs';
+import { eligibleDelegateAllocations } from '@/lib/accommodationEligibility.mjs';
 
 export default function BlockBedsPage({ params }) {
   const { id, tent, block } = use(params);
   const [meta, setMeta] = useState(null); // { location, tent, block }
   const [currentUser, setCurrentUser] = useState(null);
   const [genderRestriction, setGenderRestriction] = useState('both'); // block-level gender restriction
+  const [allowedCategories, setAllowedCategories] = useState(['delegate', 'sevadal', 'devotee']);
   const [bedsState, setBedsState] = useState(null); // { capacity, beds:{} }
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
@@ -63,6 +65,7 @@ export default function BlockBedsPage({ params }) {
         setCurrentUser(session?.user || null);
         setBedsState({ capacity: blockRes.blockSize, beds: blockRes.beds });
         setGenderRestriction(blockRes.meta?.block?.genderRestriction || 'both');
+        setAllowedCategories(blockRes.meta?.block?.allowedCategories || ['delegate', 'sevadal', 'devotee']);
       } catch (e) {
         setErr(e.message);
       } finally {
@@ -106,6 +109,11 @@ export default function BlockBedsPage({ params }) {
       .map((n) => ({ bedNumber: n, data: bedsState.beds[n] }))
       .filter((x) => x.data != null);
   }, [selectedBeds, bedsState]);
+
+  const eligibleDelegates = useMemo(
+    () => eligibleDelegateAllocations(bedsState?.beds || {}),
+    [bedsState]
+  );
 
   const selectionIdenticalDetails = useMemo(() => {
     if (selectedAllocations.length === 0) return null;
@@ -175,6 +183,7 @@ export default function BlockBedsPage({ params }) {
       setMeta(blockRes.meta);
       setBedsState({ capacity: blockRes.blockSize, beds: blockRes.beds });
       setGenderRestriction(blockRes.meta?.block?.genderRestriction || 'both');
+      setAllowedCategories(blockRes.meta?.block?.allowedCategories || ['delegate', 'sevadal', 'devotee']);
     } catch (e) {
       console.error('Failed to refresh block data:', e);
     }
@@ -638,6 +647,13 @@ export default function BlockBedsPage({ params }) {
               }`}>
                 {genderRestriction === 'male_only' ? '♂️ Male Only' : genderRestriction === 'female_only' ? '♀️ Female Only' : '👫 All Genders'}
               </div>
+              <div className="flex flex-wrap gap-1.5">
+                {allowedCategories.map((category) => (
+                  <span key={category} className="rounded-full border border-purple-400/30 bg-purple-500/10 px-2 py-1 text-xs font-medium capitalize text-purple-100">
+                    {category}
+                  </span>
+                ))}
+              </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
               {canManageAccommodationStructure(currentUser) && <div className="relative">
@@ -825,6 +841,9 @@ export default function BlockBedsPage({ params }) {
         locationId={id}
         tentIndex={Number(tent)}
         blockIndex={Number(block)}
+        allowedCategories={allowedCategories}
+        eligibleDelegates={eligibleDelegates}
+        isAdmin={canManageAccommodationStructure(currentUser)}
       />
 
       <BulkAllocateModal

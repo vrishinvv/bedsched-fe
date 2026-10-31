@@ -11,11 +11,41 @@ import {
   updateStructureTent,
 } from '@/lib/api';
 import {
+  ACCOMMODATION_CATEGORY_OPTIONS,
   BLOCK_TYPE_OPTIONS,
   StructureFormError,
   validateBlockForm,
   validateStructureName,
 } from '@/lib/structureManagement.mjs';
+
+const ALL_CATEGORIES = ACCOMMODATION_CATEGORY_OPTIONS.map(({ value }) => value);
+
+function CategoryCheckboxes({ value, onChange }) {
+  const selected = Array.isArray(value) ? value : [];
+  const toggle = (category) => {
+    onChange(selected.includes(category)
+      ? selected.filter((item) => item !== category)
+      : [...selected, category]);
+  };
+  return (
+    <fieldset>
+      <legend className="mb-1 block text-xs font-medium text-gray-400">Allowed guests</legend>
+      <div className="flex min-h-10 flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-white/15 bg-gray-950 px-3 py-2">
+        {ACCOMMODATION_CATEGORY_OPTIONS.map((option) => (
+          <label key={option.value} className="flex cursor-pointer items-center gap-2 text-xs text-gray-200">
+            <input
+              type="checkbox"
+              checked={selected.includes(option.value)}
+              onChange={() => toggle(option.value)}
+              className="h-4 w-4 rounded border-gray-500 accent-blue-500"
+            />
+            {option.label}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
 
 function NameEditor({ value, label, saving, onSave, onError }) {
   const [name, setName] = useState(value || '');
@@ -58,6 +88,7 @@ function BlockEditor({ block, saving, onSave, onError }) {
     name: block.name || '',
     size: String(block.size),
     genderRestriction: block.genderRestriction,
+    allowedCategories: block.allowedCategories || ALL_CATEGORIES,
   });
 
   useEffect(() => {
@@ -65,6 +96,7 @@ function BlockEditor({ block, saving, onSave, onError }) {
       name: block.name || '',
       size: String(block.size),
       genderRestriction: block.genderRestriction,
+      allowedCategories: block.allowedCategories || ALL_CATEGORIES,
     });
   }, [block]);
 
@@ -125,6 +157,12 @@ function BlockEditor({ block, saving, onSave, onError }) {
           ))}
         </select>
       </div>
+      <div className="md:col-span-3">
+        <CategoryCheckboxes
+          value={form.allowedCategories}
+          onChange={(allowedCategories) => setForm((current) => ({ ...current, allowedCategories }))}
+        />
+      </div>
       <button
         type="submit"
         disabled={saving}
@@ -142,7 +180,7 @@ function BlockEditor({ block, saving, onSave, onError }) {
 
 function AddBlockForm({ tentId, saving, onCreate, onError }) {
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', size: '', genderRestriction: 'both' });
+  const [form, setForm] = useState({ name: '', size: '', genderRestriction: 'both', allowedCategories: ALL_CATEGORIES });
 
   const submit = async (event) => {
     event.preventDefault();
@@ -150,7 +188,7 @@ function AddBlockForm({ tentId, saving, onCreate, onError }) {
       const payload = validateBlockForm(form);
       const created = await onCreate(tentId, payload);
       if (!created) return;
-      setForm({ name: '', size: '', genderRestriction: 'both' });
+      setForm({ name: '', size: '', genderRestriction: 'both', allowedCategories: ALL_CATEGORIES });
       setOpen(false);
     } catch (error) {
       onError(error);
@@ -206,6 +244,12 @@ function AddBlockForm({ tentId, saving, onCreate, onError }) {
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
+      </div>
+      <div className="sm:col-span-2 lg:col-span-3">
+        <CategoryCheckboxes
+          value={form.allowedCategories}
+          onChange={(allowedCategories) => setForm((current) => ({ ...current, allowedCategories }))}
+        />
       </div>
       <div className="flex gap-2">
         <button type="submit" disabled={saving} className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">

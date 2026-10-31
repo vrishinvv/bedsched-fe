@@ -3,6 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import Skeleton from '@/components/Skeleton';
 import CameraCapture from '@/components/CameraCapture';
 import { BOOKING_MAX_DATE as MAX_DATE, BOOKING_MIN_DATE as MIN_DATE, BOOKING_WINDOW_LABEL, isWithinBookingWindow } from '@/lib/bookingWindow.mjs';
+import { lookupSaiConnect } from '@/lib/api';
+import {
+  ACCOMMODATION_CATEGORY_OPTIONS,
+  resolveLookupCategoryChoice,
+} from '@/lib/accommodationEligibility.mjs';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -37,6 +42,9 @@ export default function AllocateModal({
   tentIndex,
   blockIndex,
   onSaveAndNext, // New prop for save & next functionality
+  allowedCategories = ['delegate', 'sevadal', 'devotee'],
+  eligibleDelegates = [],
+  isAdmin = false,
 }) {
   const [form, setForm] = useState({
     name: '',
@@ -52,6 +60,11 @@ export default function AllocateModal({
   const [uploadProgress, setUploadProgress] = useState(0); // Upload progress percentage
   const [displayProgress, setDisplayProgress] = useState(0); // Animated display progress
   const [preFetchedUrls, setPreFetchedUrls] = useState({ person: null, aadhaar: null }); // Pre-fetched upload URLs
+  const [saiIdentifier, setSaiIdentifier] = useState('');
+  const [saiLookup, setSaiLookup] = useState({ loading: false, result: null, error: '' });
+  const [accommodationCategory, setAccommodationCategory] = useState('devotee');
+  const [isCaretaker, setIsCaretaker] = useState(false);
+  const [caretakerForAllocationId, setCaretakerForAllocationId] = useState('');
   const ref = useRef(null);
   const scrollRef = useRef(null); // Ref for scrollable content area
   const topRef = useRef(null); // Ref for top element to scroll to
@@ -112,6 +125,11 @@ export default function AllocateModal({
       setUploading(false);
       setUploadProgress(0);
       setDisplayProgress(0);
+      setSaiIdentifier('');
+      setSaiLookup({ loading: false, result: null, error: '' });
+      setIsCaretaker(Boolean(initialData?.caretakerForAllocationId));
+      setCaretakerForAllocationId(initialData?.caretakerForAllocationId ? String(initialData.caretakerForAllocationId) : '');
+      setAccommodationCategory(initialData?.accommodationCategory || 'devotee');
       
       // Pre-fetch upload URLs in background (non-blocking)
       prefetchUploadUrls();
@@ -171,6 +189,44 @@ export default function AllocateModal({
   if (!open) return null;
 
   const isEdit = Boolean(initialData);
+  const selectedDelegate = eligibleDelegates.find((delegate) => String(delegate.id) === String(caretakerForAllocationId))
+    || (initialData?.caretakerForAllocationId ? {
+      id: Number(initialData.caretakerForAllocationId),
+      name: initialData.caretakerForName || 'Delegate',
+      startDate: initialData.startDate,
+      endDate: initialData.endDate,
+    } : null);
+
+  async function handleSaiLookup() {
+    if (!saiIdentifier.trim()) {
+      setSaiLookup({ loading: false, result: null, error: 'Enter a Sai Connect ID or phone number.' });
+      return;
+    }
+    setSaiLookup({ loading: true, result: null, error: '' });
+    try {
+      const result = await lookupSaiConnect(saiIdentifier.trim());
+      if (!result.matched) {
+        setAccommodationCategory('devotee');
+        setSaiLookup({ loading: false, result, error: result.message || 'No matching registration was found.' });
+        return;
+      }
+      const choice = resolveLookupCategoryChoice(result.verifiedCategories);
+      setAccommodationCategory(choice.category);
+      setForm((current) => ({
+        ...current,
+        name: result.fullName || current.name,
+        phone: /^\d{10}$/.test(String(result.mobileNo || '')) ? String(result.mobileNo) : current.phone,
+      }));
+      setSaiLookup({ loading: false, result, error: '' });
+    } catch (error) {
+      setAccommodationCategory('devotee');
+      setSaiLookup({
+        loading: false,
+        result: null,
+        error: `${error.message || 'Lookup unavailable'} You can continue as a Devotee.`,
+      });
+    }
+  }
 
   // Helper functions for gender restriction display
   const getGenderRestrictionInfo = () => {
@@ -252,12 +308,11 @@ export default function AllocateModal({
   }
 
   async function handleSave(saveAndNext = false) {
-    if (!form.name || !form.startDate || !form.endDate || !form.phone) {
-      return alert('Name, phone, start & end dates are required');
+    if (!form.name || (!isCaretaker && (!form.startDate || !form.endDate || !form.phone))) {
+      return alert(isCaretaker ? 'Name is required' : 'Name, phone, start & end dates are required');
     }
 
-    // Validate phone: exactly 10 digits
-    if (!/^\d{10}$/.test(form.phone)) {
+    if (!isCaretaker && !/^\d{10}$/.test(form.phone)) {
       return alert('Please enter a valid 10-digit phone number.');
     }
 
@@ -268,7 +323,7 @@ export default function AllocateModal({
     }
 
     // Validate photos are captured (mandatory for new allocations)
-    if (!isEdit) {
+    if (!isEdit && !isCaretaker) {
       if (!personPhoto.blob && !personPhoto.dataUrl) {
         return alert('Person photo is required. Please capture the photo.');
       }
@@ -280,24 +335,24 @@ export default function AllocateModal({
     const today = getTodayDate();
     
     // Validate date range
-    if (!isWithinBookingWindow(form.startDate)) {
+    if (!isCaretaker && !isWithinBookingWindow(form.startDate)) {
       return alert(`Start date must be between ${MIN_DATE} and ${MAX_DATE}.`);
     }
-    if (!isWithinBookingWindow(form.endDate)) {
+    if (!isCaretaker && !isWithinBookingWindow(form.endDate)) {
       return alert(`End date must be between ${MIN_DATE} and ${MAX_DATE}.`);
     }
     
     // End date cannot be before start date
-    if (form.endDate < form.startDate) {
+    if (!isCaretaker && form.endDate < form.startDate) {
       return alert('End date cannot be before start date.');
     }
 
     // Validate gender restriction
     const selectedGender = form.gender || 'Male';
-    if (genderRestriction === 'male_only' && selectedGender.toLowerCase() !== 'male') {
+    if (!isCaretaker && genderRestriction === 'male_only' && selectedGender.toLowerCase() !== 'male') {
       return alert('This tent is restricted to male guests only. Please select Male as the gender.');
     }
-    if (genderRestriction === 'female_only' && selectedGender.toLowerCase() !== 'female') {
+    if (!isCaretaker && genderRestriction === 'female_only' && selectedGender.toLowerCase() !== 'female') {
       return alert('This tent is restricted to female guests only. Please select Female as the gender.');
     }
 
@@ -322,10 +377,15 @@ export default function AllocateModal({
       // Prepare backend payload (we have keys already!)
       const payload = {
         ...form,
-        gender: selectedGender,
+        gender: isCaretaker ? undefined : selectedGender,
         emergencyPhone: emergencyDigits || undefined,
         personPhotoKey,
-        aadhaarPhotoKey
+        aadhaarPhotoKey,
+        ...(!isEdit ? {
+          accommodationCategory,
+          saiVerificationToken: saiLookup.result?.verificationToken,
+          caretakerForAllocationId: isCaretaker ? Number(caretakerForAllocationId) : undefined,
+        } : (isAdmin ? { accommodationCategory } : {})),
       };
       
       if (payload.status) {
@@ -335,7 +395,7 @@ export default function AllocateModal({
       // Upload photos to S3 and save to backend IN PARALLEL! 🚀
       const parallelPromises = [];
       
-      if (personPhoto.blob) {
+      if (!isCaretaker && personPhoto.blob) {
         console.log('Uploading person photo with key:', personPhotoKey);
         parallelPromises.push(
           uploadPhotoToS3(personPhoto.blob, 'person', personPhotoKey).then(() => {
@@ -345,7 +405,7 @@ export default function AllocateModal({
         );
       }
       
-      if (aadhaarPhoto.blob) {
+      if (!isCaretaker && aadhaarPhoto.blob) {
         console.log('Uploading aadhaar photo with key:', aadhaarPhotoKey);
         parallelPromises.push(
           uploadPhotoToS3(aadhaarPhoto.blob, 'aadhaar', aadhaarPhotoKey).then(() => {
@@ -460,17 +520,22 @@ export default function AllocateModal({
   const validationErrors = (() => {
     const errs = [];
     if (!form.name || !form.name.trim()) errs.push('Name is required');
-    if (!/^\d{10}$/.test(form.phone)) errs.push('Enter a valid 10-digit phone number');
-    if (!isEdit && !personPhoto.blob && !personPhoto.dataUrl) errs.push('Person photo is required');
-    if (!isEdit && !aadhaarPhoto.blob && !aadhaarPhoto.dataUrl) errs.push('Aadhaar photo is required');
-    if (!form.startDate) errs.push('Start date is required');
-    if (!form.endDate) errs.push('End date is required');
-    if (form.startDate && !isWithinBookingWindow(form.startDate)) errs.push(`Start date must be ${BOOKING_WINDOW_LABEL}`);
-    if (form.endDate && !isWithinBookingWindow(form.endDate)) errs.push(`End date must be ${BOOKING_WINDOW_LABEL}`);
-    if (form.startDate && form.endDate && form.endDate < form.startDate) errs.push('End date cannot be before start date');
+    if (!isCaretaker && !/^\d{10}$/.test(form.phone)) errs.push('Enter a valid 10-digit phone number');
+    if (!isEdit && !isCaretaker && !personPhoto.blob && !personPhoto.dataUrl) errs.push('Person photo is required');
+    if (!isEdit && !isCaretaker && !aadhaarPhoto.blob && !aadhaarPhoto.dataUrl) errs.push('Identity photo is required');
+    if (!isCaretaker && !form.startDate) errs.push('Start date is required');
+    if (!isCaretaker && !form.endDate) errs.push('End date is required');
+    if (!isCaretaker && form.startDate && !isWithinBookingWindow(form.startDate)) errs.push(`Start date must be ${BOOKING_WINDOW_LABEL}`);
+    if (!isCaretaker && form.endDate && !isWithinBookingWindow(form.endDate)) errs.push(`End date must be ${BOOKING_WINDOW_LABEL}`);
+    if (!isCaretaker && form.startDate && form.endDate && form.endDate < form.startDate) errs.push('End date cannot be before start date');
     const selectedGender = form.gender || 'Male';
-    if (genderRestriction === 'male_only' && selectedGender.toLowerCase() !== 'male') errs.push('This tent is restricted to male guests only');
-    if (genderRestriction === 'female_only' && selectedGender.toLowerCase() !== 'female') errs.push('This tent is restricted to female guests only');
+    if (!isCaretaker && genderRestriction === 'male_only' && selectedGender.toLowerCase() !== 'male') errs.push('This tent is restricted to male guests only');
+    if (!isCaretaker && genderRestriction === 'female_only' && selectedGender.toLowerCase() !== 'female') errs.push('This tent is restricted to female guests only');
+    if (!isEdit && !isCaretaker && saiLookup.result?.matched && !accommodationCategory) errs.push('Choose Delegate or Sevadal');
+    if (!isEdit && !isCaretaker && accommodationCategory && !allowedCategories.includes(accommodationCategory)) {
+      errs.push(`This block does not allow ${accommodationCategory} accommodation`);
+    }
+    if (!isEdit && isCaretaker && !caretakerForAllocationId) errs.push('Choose the Delegate this caretaker supports');
     return errs;
   })();
   const canSave = validationErrors.length === 0 && !pending && !uploading;
@@ -542,22 +607,135 @@ export default function AllocateModal({
         </h3>
         
         {/* Show current date for reference */}
-        <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+        {!isCaretaker && <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
           <div className="text-sm text-blue-800">
             <div className="font-medium">Today&apos;s date (IST): {formatDateForDisplay(todayDate)}</div>
             <div className="text-blue-600 mt-1">(End date must be today or later)</div>
           </div>
-        </div>
+        </div>}
 
         {/* Tent Gender Restriction Info */}
-        <div className={`mb-4 p-3 rounded-lg border ${genderInfo.bgColor} ${genderInfo.borderColor}`}>
+        {!isCaretaker && <div className={`mb-4 p-3 rounded-lg border ${genderInfo.bgColor} ${genderInfo.borderColor}`}>
           <div className={`text-sm ${genderInfo.textColor}`}>
             <div className="font-medium flex items-center gap-2">
               <span className="text-lg">{genderInfo.icon}</span>
               {genderInfo.text}
             </div>
           </div>
-        </div>
+        </div>}
+
+        {!isEdit && (
+          <section className="mb-4 space-y-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3">
+            <div>
+              <div className="text-sm font-semibold text-indigo-950">Sai Connect lookup <span className="font-normal text-indigo-700">(optional)</span></div>
+              <p className="mt-1 text-xs text-indigo-700">Use a Sai Connect ID or phone number to verify Delegate or Sevadal status. If skipped or not found, the person is saved as a Devotee.</p>
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={saiIdentifier}
+                onChange={(event) => setSaiIdentifier(event.target.value.replace(/\D/g, '').slice(0, 15))}
+                inputMode="numeric"
+                placeholder="Sai Connect ID or phone"
+                disabled={isProcessing || saiLookup.loading}
+                className="min-w-0 flex-1 rounded-lg border border-indigo-200 bg-white p-2 text-sm text-gray-900 outline-none focus:border-indigo-500"
+              />
+              <button
+                type="button"
+                onClick={handleSaiLookup}
+                disabled={isProcessing || saiLookup.loading || !saiIdentifier.trim()}
+                className="rounded-lg bg-indigo-700 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-800 disabled:opacity-50"
+              >
+                {saiLookup.loading ? 'Checking…' : 'Verify'}
+              </button>
+            </div>
+            {saiLookup.error && <p className="text-xs text-amber-800">{saiLookup.error}</p>}
+            {saiLookup.result?.matched && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                <div className="text-sm font-medium text-emerald-900">Verified: {saiLookup.result.fullName}</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {saiLookup.result.verifiedCategories.map((category) => (
+                    <span key={category} className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium capitalize text-emerald-800">{category}</span>
+                  ))}
+                </div>
+                {saiLookup.result.verifiedCategories.length > 1 && (
+                  <label className="mt-3 block text-xs font-medium text-emerald-900">
+                    Book this accommodation as
+                    <select
+                      value={accommodationCategory}
+                      onChange={(event) => setAccommodationCategory(event.target.value)}
+                      className="mt-1 w-full rounded-lg border border-emerald-200 bg-white p-2 text-sm text-gray-900"
+                    >
+                      <option value="">Choose category</option>
+                      {saiLookup.result.verifiedCategories.map((category) => (
+                        <option key={category} value={category}>{category === 'delegate' ? 'Delegate' : 'Sevadal'}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </div>
+            )}
+            {eligibleDelegates.length > 0 && (
+              <div className="border-t border-indigo-200 pt-3">
+                <label className="flex cursor-pointer items-start gap-2 text-sm text-indigo-950">
+                  <input
+                    type="checkbox"
+                    checked={isCaretaker}
+                    onChange={(event) => {
+                      setIsCaretaker(event.target.checked);
+                      if (!event.target.checked) setCaretakerForAllocationId('');
+                    }}
+                    className="mt-0.5 h-4 w-4 accent-indigo-700"
+                  />
+                  <span><span className="font-medium">Allocate as caretaker</span><span className="block text-xs text-indigo-700">Uses this bed and inherits the Delegate&apos;s stay dates.</span></span>
+                </label>
+                {isCaretaker && (
+                  <select
+                    aria-label="Caretaker for"
+                    value={caretakerForAllocationId}
+                    onChange={(event) => setCaretakerForAllocationId(event.target.value)}
+                    className="mt-2 w-full rounded-lg border border-indigo-200 bg-white p-2 text-sm text-gray-900"
+                  >
+                    <option value="">Choose Delegate</option>
+                    {eligibleDelegates.map((delegate) => (
+                      <option key={delegate.id} value={delegate.id}>{delegate.name} — Bed {delegate.bedNumber}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
+          </section>
+        )}
+
+        {isEdit && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-sm text-gray-700">
+            <span className="rounded-full bg-gray-100 px-3 py-1 font-medium capitalize">{initialData?.accommodationCategory || 'devotee'}</span>
+            {initialData?.caretakerForName && <span>Caretaker for <strong>{initialData.caretakerForName}</strong></span>}
+          </div>
+        )}
+
+        {isEdit && isAdmin && (
+          <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 p-3">
+            <label className="block text-sm font-medium text-gray-800">Accommodation category</label>
+            <select
+              value={accommodationCategory}
+              onChange={(event) => setAccommodationCategory(event.target.value)}
+              className="mt-2 w-full rounded-lg border border-gray-300 bg-white p-2 text-sm text-gray-900"
+            >
+              {initialData?.accommodationCategory === 'delegate' && <option value="delegate" disabled>Delegate (Sai verified)</option>}
+              <option value="sevadal">Sevadal</option>
+              <option value="devotee">Devotee</option>
+            </select>
+            <p className="mt-1 text-xs text-gray-500">Delegate status can only be assigned through Sai Connect verification.</p>
+          </div>
+        )}
+
+        {!isEdit && (
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+            <span className="font-medium">Block allows:</span>
+            {allowedCategories.map((category) => <span key={category} className="rounded-full bg-gray-100 px-2 py-1 capitalize">{category}</span>)}
+            <span className="ml-auto font-medium capitalize text-gray-900">Booking as: {isCaretaker ? `caretaker for ${selectedDelegate?.name || '…'}` : (accommodationCategory || 'choose category')}</span>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
@@ -571,8 +749,14 @@ export default function AllocateModal({
               placeholder="Full name" 
             />
           </div>
+          {isCaretaker && selectedDelegate && (
+            <div className="sm:col-span-2 rounded-lg border border-indigo-100 bg-indigo-50 p-3 text-sm text-indigo-900">
+              <span className="font-medium">Stay dates:</span> {formatDateForDisplay(selectedDelegate.startDate)} to {formatDateForDisplay(selectedDelegate.endDate)} — copied from {selectedDelegate.name}
+            </div>
+          )}
+          {!isCaretaker && <>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Phone*</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Phone{isCaretaker ? ' (Optional)' : '*'}</label>
             <input 
               name="phone" 
               value={form.phone} 
@@ -603,12 +787,12 @@ export default function AllocateModal({
             <p className="text-xs text-gray-500 mt-1">Alternative contact number</p>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Gender*</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Gender{isCaretaker ? ' (Optional)' : '*'}</label>
             <select 
               name="gender" 
               value={form.gender} 
               onChange={handleChange} 
-              disabled={isProcessing}
+              disabled={isProcessing || isCaretaker}
               className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
               {availableGenders.map(option => (
@@ -620,7 +804,7 @@ export default function AllocateModal({
             )}
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Start date*</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Start date{isCaretaker ? '' : '*'}</label>
             <input 
               type="date" 
               name="startDate" 
@@ -628,13 +812,13 @@ export default function AllocateModal({
               onChange={handleChange}
               min={MIN_DATE}
               max={MAX_DATE}
-              disabled={isProcessing}
+              disabled={isProcessing || isCaretaker}
               className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
             />
-            <p className="text-xs text-gray-500 mt-1">{BOOKING_WINDOW_LABEL}</p>
+            <p className="text-xs text-gray-500 mt-1">{isCaretaker ? 'Copied from the selected Delegate' : BOOKING_WINDOW_LABEL}</p>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">End date*</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">End date{isCaretaker ? '' : '*'}</label>
             <input 
               type="date" 
               name="endDate" 
@@ -642,14 +826,15 @@ export default function AllocateModal({
               onChange={handleChange}
               min={MIN_DATE}
               max={MAX_DATE}
-              disabled={isProcessing}
+              disabled={isProcessing || isCaretaker}
               className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
             />
-            <p className="text-xs text-gray-500 mt-1">{BOOKING_WINDOW_LABEL}</p>
+            <p className="text-xs text-gray-500 mt-1">{isCaretaker ? 'Copied from the selected Delegate' : BOOKING_WINDOW_LABEL}</p>
           </div>
+          </>}
 
           {/* Photo Capture Section */}
-          <div className="sm:col-span-2 space-y-4 mt-4">
+          {!isCaretaker && <div className="sm:col-span-2 space-y-4 mt-4">
             <div className="border-t pt-4">
               <h4 className="text-sm font-semibold text-gray-900 mb-3">📸 Photo Verification*</h4>
               
@@ -671,7 +856,7 @@ export default function AllocateModal({
                 />
               </div>
             </div>
-          </div>
+          </div>}
         </div>
         
         <div className="mt-5 sticky bottom-0 bg-white pt-3 pb-3 flex items-center justify-between border-t">
@@ -714,7 +899,7 @@ export default function AllocateModal({
             >
               Cancel
             </button>
-            {!isEdit && onSaveAndNext && (
+            {!isEdit && !isCaretaker && onSaveAndNext && (
               <button 
                 onClick={() => handleSave(true)} 
                 disabled={!canSave}

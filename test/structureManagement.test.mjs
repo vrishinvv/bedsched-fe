@@ -12,16 +12,17 @@ test('normalizes structure names', () => {
 
 test('normalizes a valid block form', () => {
   assert.deepEqual(
-    validateBlockForm({ name: ' Block 5 ', size: '80', genderRestriction: 'male_only' }),
-    { name: 'Block 5', size: 80, genderRestriction: 'male_only' }
+    validateBlockForm({ name: ' Block 5 ', size: '80', genderRestriction: 'male_only', allowedCategories: ['delegate', 'sevadal'] }),
+    { name: 'Block 5', size: 80, genderRestriction: 'male_only', allowedCategories: ['delegate', 'sevadal'] }
   );
 });
 
 test('rejects missing names, invalid sizes, and invalid block types', () => {
   const cases = [
     () => validateStructureName('   ', 'Location name'),
-    () => validateBlockForm({ name: 'Block', size: '2.5', genderRestriction: 'both' }),
-    () => validateBlockForm({ name: 'Block', size: '10', genderRestriction: 'vip' }),
+    () => validateBlockForm({ name: 'Block', size: '2.5', genderRestriction: 'both', allowedCategories: ['devotee'] }),
+    () => validateBlockForm({ name: 'Block', size: '10', genderRestriction: 'vip', allowedCategories: ['devotee'] }),
+    () => validateBlockForm({ name: 'Block', size: '10', genderRestriction: 'both', allowedCategories: [] }),
   ];
 
   for (const operation of cases) {

@@ -188,6 +188,15 @@ export async function allocateBed(locationId, tentIndex, blockIndex, bedNumber, 
   return handle(res, 'Failed to allocate bed');
 }
 
+export async function lookupSaiConnect(identifier) {
+  const res = await fetch(`${API_BASE_URL}/api/sai-connect/lookup`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ identifier }),
+  });
+  return handle(res, 'Sai Connect lookup failed');
+}
+
 /**
  * Edit an existing bed allocation
  */

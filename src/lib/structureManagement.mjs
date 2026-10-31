@@ -5,6 +5,12 @@ export const BLOCK_TYPE_OPTIONS = Object.freeze([
 ]);
 
 const VALID_BLOCK_TYPES = new Set(BLOCK_TYPE_OPTIONS.map(({ value }) => value));
+export const ACCOMMODATION_CATEGORY_OPTIONS = Object.freeze([
+  { value: 'delegate', label: 'Delegates' },
+  { value: 'sevadal', label: 'Sevadals' },
+  { value: 'devotee', label: 'Devotees' },
+]);
+const VALID_ACCOMMODATION_CATEGORIES = new Set(ACCOMMODATION_CATEGORY_OPTIONS.map(({ value }) => value));
 
 export class StructureFormError extends Error {
   constructor(message, field) {
@@ -30,5 +36,12 @@ export function validateBlockForm(form) {
   if (!VALID_BLOCK_TYPES.has(form.genderRestriction)) {
     throw new StructureFormError('Select a valid block type.', 'genderRestriction');
   }
-  return { name, size, genderRestriction: form.genderRestriction };
+  const requested = Array.isArray(form.allowedCategories) ? form.allowedCategories : [];
+  const allowedCategories = ACCOMMODATION_CATEGORY_OPTIONS
+    .map(({ value }) => value)
+    .filter((value) => requested.includes(value));
+  if (allowedCategories.length === 0 || requested.some((value) => !VALID_ACCOMMODATION_CATEGORIES.has(value))) {
+    throw new StructureFormError('Select at least one valid accommodation category.', 'allowedCategories');
+  }
+  return { name, size, genderRestriction: form.genderRestriction, allowedCategories };
 }
