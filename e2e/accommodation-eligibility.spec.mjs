@@ -942,7 +942,7 @@ test('lets an admin update block category tags directly from the bed view', asyn
     if (path === '/api/auth/me') {
       return route.fulfill({ status: 200, headers, json: { user: { id: 1, username: 'admin', role: 'admin', locationId: null } } });
     }
-    if (path === '/api/locations/61/tents/1/blocks/1' && request.method() === 'PATCH') {
+    if (path === '/api/admin/structure/blocks/101' && request.method() === 'PATCH') {
       patchPayload = request.postDataJSON();
       updatedCategories = patchPayload.allowedCategories;
       return route.fulfill({ status: 200, headers, json: { ok: true } });
@@ -955,7 +955,7 @@ test('lets an admin update block category tags directly from the bed view', asyn
           meta: {
             location: { id: '61', name: 'Test Location' },
             tent: { index: 1, name: 'Test Tent' },
-            block: { index: 1, name: 'Mixed', genderRestriction: 'both', allowedCategories: updatedCategories },
+            block: { id: 101, index: 1, name: 'Mixed', genderRestriction: 'both', allowedCategories: updatedCategories },
           },
           blockSize: 1,
           beds: {},

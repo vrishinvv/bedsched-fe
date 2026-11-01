@@ -16,6 +16,7 @@ import {
   deallocateBed,
   bulkAllocateBeds,
   updateBlock,
+  updateStructureBlock,
   deallocateBedsBatch,
   editAllocationsBatch,
   generatePhotoViewUrl,
@@ -757,7 +758,7 @@ export default function BlockBedsPage({ params }) {
                     if (!preset || preset.value === categoryPresetValue(allowedCategories)) return;
                     try {
                       setUpdatingCategories(true);
-                      await updateBlock(id, Number(tent), Number(block), { allowedCategories: preset.categories });
+                      await updateStructureBlock(meta.block.id, { allowedCategories: preset.categories });
                       setAllowedCategories(preset.categories);
                       showNotification('success', `Block categories updated to ${preset.label}.`);
                     } catch (error) {
