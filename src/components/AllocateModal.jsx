@@ -867,8 +867,21 @@ export default function AllocateModal({
         {isEdit && (
           <div className="mb-3 flex flex-wrap items-center gap-2 text-sm text-gray-700">
             <span className="rounded-full bg-gray-100 px-3 py-1 font-medium capitalize">{initialData?.accommodationCategory || 'devotee'}</span>
-            {initialData?.caretakerForName && <span>Caretaker for <strong>{initialData.caretakerForName}</strong></span>}
           </div>
+        )}
+
+        {isEdit && initialData?.caretakerForAllocationId && (
+          <section
+            role="region"
+            aria-label="Caretaker assignment"
+            className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50/80 p-3"
+          >
+            <div className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Caretaker assignment</div>
+            <div className="mt-1 text-sm text-indigo-950">
+              Caretaker for <strong>{initialData?.caretakerForName || `Delegate allocation #${initialData.caretakerForAllocationId}`}</strong>
+            </div>
+            <p className="mt-1 text-xs text-indigo-700">This caretaker must remain in the same block as the Delegate.</p>
+          </section>
         )}
 
         {isEdit && (

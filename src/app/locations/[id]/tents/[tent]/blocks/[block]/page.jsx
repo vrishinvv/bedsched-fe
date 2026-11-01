@@ -507,7 +507,8 @@ export default function BlockBedsPage({ params }) {
         bed: modal.bedNumber,
         startDate: allocationData.startDate,
         endDate: allocationData.endDate,
-        createdAt: allocationData.createdAt
+        createdAt: allocationData.createdAt,
+        caretakerForName: allocationData.caretakerForName,
       }
     });
   }

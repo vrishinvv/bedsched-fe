@@ -39,6 +39,7 @@ export default function ReallocationModal({
 }) {
   const [step, setStep] = useState(1); // 1=location, 2=tent, 3=block, 4=bed
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
   
   // Selection state
   const [selectedLocation, setSelectedLocation] = useState(null);
@@ -67,6 +68,7 @@ export default function ReallocationModal({
       setTents([]);
       setBlocks([]);
       setAvailableBeds([]);
+      setLoadError('');
       
       // Load locations
       loadOptions();
@@ -88,6 +90,7 @@ export default function ReallocationModal({
     }
     
     setLoading(true);
+    setLoadError('');
     try {
       const params = new URLSearchParams();
       if (locationId) params.append('location_id', locationId);
@@ -101,9 +104,8 @@ export default function ReallocationModal({
         }
       );
 
-      if (!response.ok) throw new Error('Failed to load options');
-
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || 'Failed to load reallocation options.');
       
       // Store allocation info
       if (data.allocation) {
@@ -122,7 +124,7 @@ export default function ReallocationModal({
       }
     } catch (error) {
       console.error('Failed to load options:', error);
-      alert('Failed to load options. Please try again.');
+      setLoadError(error.message || 'Failed to load reallocation options. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -195,7 +197,12 @@ export default function ReallocationModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
       <div className="absolute inset-0 bg-black/40" onClick={!pending ? onClose : undefined} />
-      <div className="relative w-full max-w-3xl max-h-[95vh] sm:max-h-[90vh] flex flex-col rounded-lg sm:rounded-2xl bg-white shadow-xl overflow-hidden">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reallocate-bed-title"
+        className="relative w-full max-w-3xl max-h-[95vh] sm:max-h-[90vh] flex flex-col rounded-lg sm:rounded-2xl bg-white shadow-xl overflow-hidden"
+      >
         
         {/* Loading overlay */}
         {pending && (
@@ -212,7 +219,7 @@ export default function ReallocationModal({
         )}
 
         <div className="overflow-y-auto flex-1 p-4 sm:p-6">
-          <h3 className="mb-4 text-lg font-semibold text-gray-900">
+          <h3 id="reallocate-bed-title" className="mb-4 text-lg font-semibold text-gray-900">
             Reallocate Bed
           </h3>
 
@@ -235,6 +242,12 @@ export default function ReallocationModal({
                     <span className="text-gray-600">Bed:</span>
                     <div className="font-semibold text-gray-900">#{currentAllocation?.bed}</div>
                   </div>
+                  {currentAllocation?.caretakerForName && (
+                    <div className="col-span-1 sm:col-span-2 rounded-lg border border-indigo-200 bg-white/70 p-2">
+                      <span className="text-indigo-700">Caretaker for:</span>
+                      <div className="font-semibold text-indigo-950">{currentAllocation.caretakerForName}</div>
+                    </div>
+                  )}
                   <div>
                     <span className="text-gray-600">Location:</span>
                     <div className="font-medium text-gray-800 truncate">{currentAllocation?.location}</div>
@@ -261,6 +274,12 @@ export default function ReallocationModal({
               </div>
             </div>
           </div>
+
+          {loadError && (
+            <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-800">
+              {loadError}
+            </div>
+          )}
 
           {/* Breadcrumb */}
           <div className="mb-4 sm:mb-6 flex items-center justify-between gap-1 sm:gap-2 text-xs sm:text-sm">
