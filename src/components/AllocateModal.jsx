@@ -721,8 +721,24 @@ export default function AllocateModal({
               </button>
             </div>
             {saiLookup.error && (
-              <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              <div
+                role="alert"
+                aria-label="Sai Connect lookup error"
+                className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900"
+              >
                 {saiLookup.error}
+              </div>
+            )}
+            {saiLookup.result && !saiLookup.result.matched && (
+              <div
+                role="status"
+                aria-label="Sai Connect lookup result"
+                className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"
+              >
+                No Delegate or Sevadal registration was found.{' '}
+                {saiLookupRequired
+                  ? 'This person cannot be allocated to this restricted block.'
+                  : 'You can continue with the normal allocation flow.'}
               </div>
             )}
             {saiLookup.result?.matched && (

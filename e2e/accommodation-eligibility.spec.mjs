@@ -85,6 +85,9 @@ test('allocates a name-only caretaker into a Delegate-only block', async ({ page
   await expect(page.getByText(/devotee/i)).toHaveCount(0);
   await page.getByPlaceholder('Sai Connect ID or phone').fill('800717');
   await page.getByRole('button', { name: 'Verify' }).click();
+  await expect(page.getByRole('status', { name: 'Sai Connect lookup result' })).toContainText(
+    'No Delegate or Sevadal registration was found. This person cannot be allocated to this restricted block.',
+  );
   await expect(page.getByText('No eligible Delegate or Sevadal registration was found for this block.')).toBeVisible();
   await expect(page.getByText(/devotee/i)).toHaveCount(0);
   await page.getByLabel('Allocate as caretaker').check();
@@ -237,6 +240,13 @@ test('shows verified Sai categories without exposing the backend Devotee default
           },
         });
       }
+      if (identifier === '777777') {
+        return route.fulfill({
+          status: 503,
+          headers,
+          json: { message: 'Sai Connect is temporarily unavailable.' },
+        });
+      }
       return route.fulfill({
         status: 200,
         headers,
@@ -280,8 +290,17 @@ test('shows verified Sai categories without exposing the backend Devotee default
   await verify.click();
 
   await expect(verifiedCategoryOutcome).toHaveCount(0);
+  await expect(page.getByRole('status', { name: 'Sai Connect lookup result' })).toContainText(
+    'No Delegate or Sevadal registration was found. You can continue with the normal allocation flow.',
+  );
   await expect(page.getByText('Continue as a Devotee')).toHaveCount(0);
   await expect(page.getByText(/Booking as: devotee/i)).toHaveCount(0);
   await expect(page.getByText('Participant not registered.')).toHaveCount(0);
   await expect(page.getByText('Complete Sai Connect lookup')).toHaveCount(0);
+
+  await identifier.fill('777777');
+  await verify.click();
+  await expect(page.getByRole('alert', { name: 'Sai Connect lookup error' })).toHaveText(
+    'Sai Connect could not be checked. Try again.',
+  );
 });
