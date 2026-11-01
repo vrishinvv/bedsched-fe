@@ -1,5 +1,5 @@
 'use client';
-import { use, useEffect, useMemo, useState } from 'react';
+import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Breadcrumb from '@/components/Breadcrumb';
 import BedGrid from '@/components/BedGrid';
@@ -37,6 +37,7 @@ export default function BlockBedsPage({ params }) {
   const [bulkModal, setBulkModal] = useState(false);
   const [pending, setPending] = useState(false);
   const [notification, setNotification] = useState(null);
+  const [liveUpdatesAvailable, setLiveUpdatesAvailable] = useState(true);
   const [updatingRestriction, setUpdatingRestriction] = useState(false);
   const [deallocating, setDeallocating] = useState(false);
   const [confirmDeallocate, setConfirmDeallocate] = useState(null);
@@ -177,17 +178,61 @@ export default function BlockBedsPage({ params }) {
     setNotification(null);
   }
 
-  async function refreshBlockData() {
+  const refreshBlockData = useCallback(async ({ notifyOnSelectedConflict = false } = {}) => {
     try {
       const blockRes = await fetchBlockDetail(id, Number(tent), Number(block));
       setMeta(blockRes.meta);
       setBedsState({ capacity: blockRes.blockSize, beds: blockRes.beds });
       setGenderRestriction(blockRes.meta?.block?.genderRestriction || 'both');
       setAllowedCategories(blockRes.meta?.block?.allowedCategories || ['delegate', 'sevadal', 'devotee']);
+      setLiveUpdatesAvailable(true);
+
+      if (
+        notifyOnSelectedConflict
+        && modal.open
+        && !modal.data
+        && blockRes.beds?.[modal.bedNumber]
+      ) {
+        const conflictedBed = modal.bedNumber;
+        setModal({ open: false, bedNumber: null, data: null });
+        setNotification({
+          type: 'error',
+          message: `Bed ${conflictedBed} was just booked by another operator. Please select another available bed.`,
+        });
+      }
     } catch (e) {
       console.error('Failed to refresh block data:', e);
+      setLiveUpdatesAvailable(false);
     }
-  }
+  }, [id, tent, block, modal.open, modal.data, modal.bedNumber]);
+
+  useEffect(() => {
+    let refreshing = false;
+
+    async function refreshSharedBlock() {
+      if (refreshing || pending || document.visibilityState !== 'visible') return;
+      refreshing = true;
+      try {
+        await refreshBlockData({ notifyOnSelectedConflict: true });
+      } finally {
+        refreshing = false;
+      }
+    }
+
+    function refreshWhenVisible() {
+      if (document.visibilityState === 'visible') refreshSharedBlock();
+    }
+
+    const intervalId = window.setInterval(refreshSharedBlock, 5000);
+    window.addEventListener('focus', refreshSharedBlock);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshSharedBlock);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [pending, refreshBlockData]);
 
   async function handleSave(payload, skipClose = false) {
     const isBatchEdit = modal.bedNumber === 'Multiple' && Array.isArray(batchSelection) && batchSelection.length > 0;
@@ -793,6 +838,13 @@ export default function BlockBedsPage({ params }) {
           {phoneFilter && phoneFilter.length !== 10 && (
             <span className="text-xs text-amber-300">Enter exactly 10 digits</span>
           )}
+        </div>
+        <div
+          className={`flex items-center gap-2 text-xs font-medium ${liveUpdatesAvailable ? 'text-emerald-300' : 'text-amber-300'}`}
+          role="status"
+        >
+          <span className={`h-2 w-2 rounded-full ${liveUpdatesAvailable ? 'bg-emerald-400' : 'bg-amber-400'}`} aria-hidden="true" />
+          {liveUpdatesAvailable ? 'Live updates every 5 seconds' : 'Live updates unavailable — retrying'}
         </div>
         {/* Batch Edit and Batch Deallocate buttons hidden per user request
         <div className="flex items-center gap-2">

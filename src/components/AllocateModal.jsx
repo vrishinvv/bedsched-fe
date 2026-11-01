@@ -650,7 +650,7 @@ export default function AllocateModal({
                   ? 'The caretaker is linked to the selected Delegate and only their name is required.'
                   : saiLookupRequired
                     ? 'Complete the lookup to verify eligibility for this restricted block. A person without an eligible registration cannot be allocated here.'
-                    : 'Use a Sai Connect ID or phone number to verify Delegate or Sevadal status. If skipped or not found, the person is saved as a Devotee.'}
+                    : 'Use a Sai Connect ID or phone number to verify Delegate or Sevadal status. If skipped or not found, continue with the normal allocation flow.'}
               </p>
             </div>
             <div className="flex gap-2">
@@ -678,12 +678,6 @@ export default function AllocateModal({
             {saiLookup.error && (
               <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
                 {saiLookup.error}
-              </div>
-            )}
-            {saiLookup.result && !saiLookup.result.matched && (
-              <div role="status" className="rounded-lg border border-gray-200 bg-white p-3">
-                <div className="text-sm font-semibold text-gray-900">Devotee</div>
-                <p className="mt-1 text-xs text-gray-600">No Delegate or Sevadal registration was found. Continue as a Devotee.</p>
               </div>
             )}
             {saiLookup.result?.matched && (
@@ -796,7 +790,9 @@ export default function AllocateModal({
           <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-gray-600">
             <span className="font-medium">Block allows:</span>
             {allowedCategories.map((category) => <span key={category} className="rounded-full bg-gray-100 px-2 py-1 capitalize">{category}</span>)}
-            <span className="ml-auto font-medium capitalize text-gray-900">Booking as: {isCaretaker ? `caretaker for ${selectedDelegate?.name || '…'}` : (accommodationCategory || 'choose category')}</span>
+            {(isCaretaker || accommodationCategory !== 'devotee') && (
+              <span className="ml-auto font-medium capitalize text-gray-900">Booking as: {isCaretaker ? `caretaker for ${selectedDelegate?.name || '…'}` : (accommodationCategory || 'choose category')}</span>
+            )}
           </div>
         )}
 

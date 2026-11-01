@@ -158,7 +158,7 @@ test('filters the caretaker Delegate picker by name or bed number', async ({ pag
   await expect(delegatePicker).not.toContainText('Lakshmi Delegate');
 });
 
-test('shows Sai lookups as Delegate, Sevadal, or Devotee category outcomes', async ({ page }) => {
+test('shows verified Sai categories without exposing the backend Devotee default', async ({ page }) => {
   await page.route('**/api/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
@@ -238,28 +238,28 @@ test('shows Sai lookups as Delegate, Sevadal, or Devotee category outcomes', asy
   await page.getByTitle('Bed 1: Available').click();
   const identifier = page.getByPlaceholder('Sai Connect ID or phone');
   const verify = page.getByRole('button', { name: 'Verify' });
+  const verifiedCategoryOutcome = page.locator('[role="status"].bg-emerald-50');
 
   await expect(page.getByText('Sai Connect lookup is optional')).toBeVisible();
   await expect(page.getByText('Complete Sai Connect lookup')).toHaveCount(0);
 
   await identifier.fill('239910');
   await verify.click();
-  await expect(page.getByRole('status')).toContainText('Delegate');
-  await expect(page.getByRole('status')).toContainText('Sai Connect verified');
-  await expect(page.getByRole('status')).toHaveClass(/bg-emerald-50/);
+  await expect(verifiedCategoryOutcome).toContainText('Delegate');
+  await expect(verifiedCategoryOutcome).toContainText('Sai Connect verified');
   await expect(page.getByText('Complete Sai Connect lookup')).toHaveCount(0);
 
   await identifier.fill('888888');
   await expect(page.getByText('Complete Sai Connect lookup')).toHaveCount(0);
   await verify.click();
-  await expect(page.getByRole('status')).toContainText('Sevadal');
+  await expect(verifiedCategoryOutcome).toContainText('Sevadal');
 
   await identifier.fill('999999');
   await verify.click();
 
-  const categoryOutcome = page.getByRole('status');
-  await expect(categoryOutcome).toContainText('Devotee');
-  await expect(categoryOutcome).toContainText('Continue as a Devotee');
+  await expect(verifiedCategoryOutcome).toHaveCount(0);
+  await expect(page.getByText('Continue as a Devotee')).toHaveCount(0);
+  await expect(page.getByText(/Booking as: devotee/i)).toHaveCount(0);
   await expect(page.getByText('Participant not registered.')).toHaveCount(0);
   await expect(page.getByText('Complete Sai Connect lookup')).toHaveCount(0);
 });
