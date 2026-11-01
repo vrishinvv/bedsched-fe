@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { hasMissingOptionalPhotos, uploadOptionalPhotos } from '../src/lib/optionalPhotoUploads.mjs';
+import {
+  getRequiredBookingPhotoErrors,
+  hasMissingOptionalPhotos,
+  resolveRequireBookingPhotos,
+  uploadOptionalPhotos,
+} from '../src/lib/optionalPhotoUploads.mjs';
 
 test('a failed optional photo upload does not fail the booking preparation', async () => {
   const result = await uploadOptionalPhotos({
@@ -41,4 +46,19 @@ test('a partial photo set warns for a normal booking but caretakers remain photo
 
   assert.equal(hasMissingOptionalPhotos(partialPhotos), true);
   assert.equal(hasMissingOptionalPhotos(partialPhotos, { isCaretaker: true }), false);
+});
+
+test('production requires both photos for new individual bookings while dev and caretakers stay exempt', () => {
+  assert.equal(resolveRequireBookingPhotos(undefined, 'sssenclave.vercel.app'), true);
+  assert.equal(resolveRequireBookingPhotos(undefined, 'sssenclave-dev.vercel.app'), false);
+  assert.deepEqual(getRequiredBookingPhotoErrors({
+    photosRequired: true,
+    personPhoto: { blob: { kind: 'person' } },
+    aadhaarPhoto: {},
+  }), ['Identity photo is required']);
+  assert.deepEqual(getRequiredBookingPhotoErrors({
+    photosRequired: true,
+    isCaretaker: true,
+  }), []);
+  assert.deepEqual(getRequiredBookingPhotoErrors({ photosRequired: false }), []);
 });

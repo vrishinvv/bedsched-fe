@@ -8,7 +8,12 @@ import {
   ACCOMMODATION_CATEGORY_OPTIONS,
   resolveLookupCategoryChoice,
 } from '@/lib/accommodationEligibility.mjs';
-import { hasMissingOptionalPhotos, uploadOptionalPhotos } from '@/lib/optionalPhotoUploads.mjs';
+import {
+  getRequiredBookingPhotoErrors,
+  hasMissingOptionalPhotos,
+  resolveRequireBookingPhotos,
+  uploadOptionalPhotos,
+} from '@/lib/optionalPhotoUploads.mjs';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -55,6 +60,16 @@ export default function AllocateModal({
   eligibleDelegates = [],
   isAdmin = false,
 }) {
+  const [photosRequired, setPhotosRequired] = useState(
+    () => resolveRequireBookingPhotos(process.env.NEXT_PUBLIC_REQUIRE_BOOKING_PHOTOS, ''),
+  );
+
+  useEffect(() => {
+    setPhotosRequired(resolveRequireBookingPhotos(
+      process.env.NEXT_PUBLIC_REQUIRE_BOOKING_PHOTOS,
+      window.location.hostname,
+    ));
+  }, []);
   const [form, setForm] = useState({
     name: '',
     phone: '',
@@ -418,6 +433,17 @@ export default function AllocateModal({
       return alert('Please enter a valid 10-digit phone number.');
     }
 
+    const requiredPhotoErrors = getRequiredBookingPhotoErrors({
+      photosRequired,
+      isCaretaker,
+      isEdit,
+      personPhoto,
+      aadhaarPhoto,
+    });
+    if (requiredPhotoErrors.length > 0) {
+      return alert(requiredPhotoErrors[0]);
+    }
+
     // Validate Emergency Phone: if provided, must be exactly 10 digits
     const emergencyDigits = form.emergencyPhone.replace(/\D/g, '');
     if (form.emergencyPhone && emergencyDigits.length !== 10) {
@@ -470,6 +496,13 @@ export default function AllocateModal({
             existingKey: initialData?.aadhaarPhotoKey || null,
           },
         }, uploadPhotoToS3);
+
+      if (photosRequired && !isCaretaker && !isEdit && hasMissingOptionalPhotos(photoResult)) {
+        alert('Both photos must upload successfully before the booking can be saved. Please try again.');
+        setUploading(false);
+        setUploadProgress(0);
+        return;
+      }
 
       setUploadProgress(60);
 
@@ -621,6 +654,13 @@ export default function AllocateModal({
       }
     }
     if (!isEdit && isCaretaker && !caretakerForAllocationId) errs.push('Choose the Delegate this caretaker supports');
+    errs.push(...getRequiredBookingPhotoErrors({
+      photosRequired,
+      isCaretaker,
+      isEdit,
+      personPhoto,
+      aadhaarPhoto,
+    }));
     return errs;
   })();
   const canSave = validationErrors.length === 0 && !pending && !uploading;
@@ -1092,14 +1132,20 @@ export default function AllocateModal({
           {/* Photo Capture Section */}
           {!isCaretaker && <div className="sm:col-span-2 space-y-4 mt-4">
             <div className="border-t pt-4">
-              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3" role="note">
-                <h4 className="text-sm font-semibold text-amber-950">Photos are optional</h4>
-                <p className="mt-1 text-xs text-amber-800">You can save the booking without photos. If photo storage is unavailable, the booking will continue and show a warning.</p>
+              <div className={`mb-3 rounded-lg border p-3 ${photosRequired ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'}`} role="note">
+                <h4 className={`text-sm font-semibold ${photosRequired ? 'text-red-950' : 'text-amber-950'}`}>
+                  {photosRequired ? 'Both photos are required' : 'Photos are optional'}
+                </h4>
+                <p className={`mt-1 text-xs ${photosRequired ? 'text-red-800' : 'text-amber-800'}`}>
+                  {photosRequired
+                    ? 'Capture the person photo and identity card photo before saving.'
+                    : 'You can save the booking without photos. If photo storage is unavailable, the booking will continue and show a warning.'}
+                </p>
               </div>
               
               <CameraCapture
                 key={`person-${bedNumber}-${open}-${initialData?.personPhotoUrl || 'new'}`}
-                label="Person Photo"
+                label={`Person Photo${photosRequired ? ' *' : ''}`}
                 onCapture={(blob, dataUrl) => setPersonPhoto({ blob, dataUrl })}
                 existingPhotoUrl={initialData?.personPhotoUrl || null}
                 autoOpen={false}
@@ -1108,7 +1154,7 @@ export default function AllocateModal({
               <div className="mt-4">
                 <CameraCapture
                   key={`aadhaar-${bedNumber}-${open}-${initialData?.aadhaarPhotoUrl || 'new'}`}
-                  label="Identity Card Photo"
+                  label={`Identity Card Photo${photosRequired ? ' *' : ''}`}
                   onCapture={(blob, dataUrl) => setAadhaarPhoto({ blob, dataUrl })}
                   existingPhotoUrl={initialData?.aadhaarPhotoUrl || null}
                   autoOpen={false}

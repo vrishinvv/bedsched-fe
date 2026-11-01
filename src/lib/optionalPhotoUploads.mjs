@@ -25,3 +25,28 @@ export async function uploadOptionalPhotos(photos, uploadPhoto) {
 export function hasMissingOptionalPhotos(photoResult, { isCaretaker = false } = {}) {
   return !isCaretaker && (!photoResult?.personPhotoKey || !photoResult?.aadhaarPhotoKey);
 }
+
+export function resolveRequireBookingPhotos(configuredValue, hostname) {
+  if (configuredValue !== undefined && configuredValue !== null && String(configuredValue).trim() !== '') {
+    return String(configuredValue).trim().toLowerCase() === 'true';
+  }
+  return String(hostname || '').trim().toLowerCase() === 'sssenclave.vercel.app';
+}
+
+export function getRequiredBookingPhotoErrors({
+  photosRequired = false,
+  isCaretaker = false,
+  isEdit = false,
+  personPhoto,
+  aadhaarPhoto,
+} = {}) {
+  if (!photosRequired || isCaretaker || isEdit) return [];
+  const errors = [];
+  if (!(personPhoto?.blob || personPhoto?.dataUrl || personPhoto?.existingKey)) {
+    errors.push('Person photo is required');
+  }
+  if (!(aadhaarPhoto?.blob || aadhaarPhoto?.dataUrl || aadhaarPhoto?.existingKey)) {
+    errors.push('Identity photo is required');
+  }
+  return errors;
+}
