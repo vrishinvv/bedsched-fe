@@ -67,6 +67,7 @@ test('allocates a name-only caretaker into a Delegate-only block', async ({ page
   await page.goto('/locations/61/tents/1/blocks/1');
   await page.getByTitle('Bed 2: Available').click();
   await expect(page.getByText('Sai Connect lookup is required')).toBeVisible();
+  await expect(page.getByText('Complete the lookup to verify eligibility for this restricted block. A person without an eligible registration cannot be allocated here.')).toBeVisible();
   await expect(page.getByText('Complete Sai Connect lookup')).toBeVisible();
   await page.getByLabel('Allocate as caretaker').check();
   await expect(page.getByText('Sai Connect lookup is not required for caretakers')).toBeVisible();

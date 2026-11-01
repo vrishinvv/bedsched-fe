@@ -649,7 +649,7 @@ export default function AllocateModal({
                 {isCaretaker
                   ? 'The caretaker is linked to the selected Delegate and only their name is required.'
                   : saiLookupRequired
-                    ? 'Enter a Sai Connect ID or phone number and complete the lookup. If no registration is found, the person is saved as a Devotee.'
+                    ? 'Complete the lookup to verify eligibility for this restricted block. A person without an eligible registration cannot be allocated here.'
                     : 'Use a Sai Connect ID or phone number to verify Delegate or Sevadal status. If skipped or not found, the person is saved as a Devotee.'}
               </p>
             </div>
