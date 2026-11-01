@@ -38,18 +38,22 @@ test('no selected photos produces an allocation payload without photo keys or fa
   });
 });
 
-test('missing photo detection expects both guest photos and only a caretaker person photo', () => {
+test('missing photo detection expects person and identity photos for guests and caretakers', () => {
   const partialPhotos = {
     personPhotoKey: 'person.jpg',
     aadhaarPhotoKey: null,
   };
 
   assert.equal(hasMissingOptionalPhotos(partialPhotos), true);
-  assert.equal(hasMissingOptionalPhotos(partialPhotos, { isCaretaker: true }), false);
-  assert.equal(hasMissingOptionalPhotos({ personPhotoKey: null }, { isCaretaker: true }), true);
+  assert.equal(hasMissingOptionalPhotos(partialPhotos), true);
+  assert.equal(hasMissingOptionalPhotos({ personPhotoKey: null }), true);
+  assert.equal(hasMissingOptionalPhotos({
+    personPhotoKey: 'caretaker.jpg',
+    aadhaarPhotoKey: 'caretaker-identity.jpg',
+  }), false);
 });
 
-test('production requires both guest photos and only a caretaker person photo while dev stays optional', () => {
+test('production requires both photos for guests and caretakers while dev stays optional', () => {
   assert.equal(resolveRequireBookingPhotos(undefined, 'sssenclave.vercel.app'), true);
   assert.equal(resolveRequireBookingPhotos(undefined, 'sssenclave-dev.vercel.app'), false);
   assert.deepEqual(getRequiredBookingPhotoErrors({
@@ -60,11 +64,17 @@ test('production requires both guest photos and only a caretaker person photo wh
   assert.deepEqual(getRequiredBookingPhotoErrors({
     photosRequired: true,
     isCaretaker: true,
-  }), ['Caretaker photo is required']);
+  }), ['Caretaker photo is required', 'Caretaker identity photo is required']);
   assert.deepEqual(getRequiredBookingPhotoErrors({
     photosRequired: true,
     isCaretaker: true,
     personPhoto: { blob: { kind: 'caretaker' } },
+  }), ['Caretaker identity photo is required']);
+  assert.deepEqual(getRequiredBookingPhotoErrors({
+    photosRequired: true,
+    isCaretaker: true,
+    personPhoto: { blob: { kind: 'caretaker' } },
+    aadhaarPhoto: { blob: { kind: 'caretaker-identity' } },
   }), []);
   assert.deepEqual(getRequiredBookingPhotoErrors({ photosRequired: false }), []);
 });

@@ -503,15 +503,15 @@ export default function AllocateModal({
             existingKey: initialData?.personPhotoKey || null,
           },
           aadhaar: {
-            blob: isCaretaker ? null : aadhaarPhoto.blob,
-            key: isCaretaker ? null : aadhaarCandidateKey,
-            existingKey: isCaretaker ? null : (initialData?.aadhaarPhotoKey || null),
+            blob: aadhaarPhoto.blob,
+            key: aadhaarCandidateKey,
+            existingKey: initialData?.aadhaarPhotoKey || null,
           },
         }, uploadPhotoToS3);
 
-      if (photosRequired && !isEdit && hasMissingOptionalPhotos(photoResult, { isCaretaker })) {
+      if (photosRequired && !isEdit && hasMissingOptionalPhotos(photoResult)) {
         alert(isCaretaker
-          ? 'The caretaker photo must upload successfully before the booking can be saved. Please try again.'
+          ? 'Both caretaker photos must upload successfully before the booking can be saved. Please try again.'
           : 'Both photos must upload successfully before the booking can be saved. Please try again.');
         setUploading(false);
         setUploadProgress(0);
@@ -540,7 +540,7 @@ export default function AllocateModal({
 
       const saveResult = await onSave(payload, saveAndNext, {
         failedPhotoTypes: photoResult.failedPhotoTypes,
-        bookedWithoutPhotos: hasMissingOptionalPhotos(photoResult, { isCaretaker }),
+        bookedWithoutPhotos: hasMissingOptionalPhotos(photoResult),
       });
       if (!saveResult?.ok) {
         setUploading(false);
@@ -1171,13 +1171,13 @@ export default function AllocateModal({
               <div className={`mb-3 rounded-lg border p-3 ${photosRequired ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'}`} role="note">
                 <h4 className={`text-sm font-semibold ${photosRequired ? 'text-red-950' : 'text-amber-950'}`}>
                   {photosRequired
-                    ? (isCaretaker ? 'Caretaker photo is required' : 'Both photos are required')
+                    ? (isCaretaker ? 'Both caretaker photos are required' : 'Both photos are required')
                     : 'Photos are optional'}
                 </h4>
                 <p className={`mt-1 text-xs ${photosRequired ? 'text-red-800' : 'text-amber-800'}`}>
                   {photosRequired
                     ? (isCaretaker
-                      ? 'Capture the caretaker’s photo before saving.'
+                      ? 'Capture the caretaker’s photo and Aadhaar/identity photo before saving.'
                       : 'Capture the person photo and identity card photo before saving.')
                     : 'You can save the booking without photos. If photo storage is unavailable, the booking will continue and show a warning.'}
                 </p>
@@ -1191,15 +1191,15 @@ export default function AllocateModal({
                 autoOpen={false}
               />
               
-              {!isCaretaker && <div className="mt-4">
+              <div className="mt-4">
                 <CameraCapture
                   key={`aadhaar-${bedNumber}-${open}-${initialData?.aadhaarPhotoUrl || 'new'}`}
-                  label={`Identity Card Photo${photosRequired ? ' *' : ''}`}
+                  label={`${isCaretaker ? 'Caretaker Aadhaar / Identity Photo' : 'Identity Card Photo'}${photosRequired ? ' *' : ''}`}
                   onCapture={(blob, dataUrl) => setAadhaarPhoto({ blob, dataUrl })}
                   existingPhotoUrl={initialData?.aadhaarPhotoUrl || null}
                   autoOpen={false}
                 />
-              </div>}
+              </div>
             </div>
           </div>
         </div>

@@ -22,8 +22,7 @@ export async function uploadOptionalPhotos(photos, uploadPhoto) {
   return result;
 }
 
-export function hasMissingOptionalPhotos(photoResult, { isCaretaker = false } = {}) {
-  if (isCaretaker) return !photoResult?.personPhotoKey;
+export function hasMissingOptionalPhotos(photoResult) {
   return !photoResult?.personPhotoKey || !photoResult?.aadhaarPhotoKey;
 }
 
@@ -46,8 +45,8 @@ export function getRequiredBookingPhotoErrors({
   if (!(personPhoto?.blob || personPhoto?.dataUrl || personPhoto?.existingKey)) {
     errors.push(isCaretaker ? 'Caretaker photo is required' : 'Person photo is required');
   }
-  if (!isCaretaker && !(aadhaarPhoto?.blob || aadhaarPhoto?.dataUrl || aadhaarPhoto?.existingKey)) {
-    errors.push('Identity photo is required');
+  if (!(aadhaarPhoto?.blob || aadhaarPhoto?.dataUrl || aadhaarPhoto?.existingKey)) {
+    errors.push(isCaretaker ? 'Caretaker identity photo is required' : 'Identity photo is required');
   }
   return errors;
 }

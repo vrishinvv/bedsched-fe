@@ -101,6 +101,7 @@ test('allocates a caretaker with gender and locked Delegate stay dates', async (
   await page.getByLabel('Allocate as caretaker').check();
   await expect(page.getByText('Sai Connect lookup is optional for caretakers')).toBeVisible();
   await expect(page.getByText('Caretaker Photo', { exact: true })).toBeVisible();
+  await expect(page.getByText('Caretaker Aadhaar / Identity Photo', { exact: true })).toBeVisible();
   await expect(page.getByText('Sai Connect lookup is required', { exact: true })).toHaveCount(0);
   const caretakerPicker = page.getByRole('combobox', { name: 'Caretaker for' });
   await caretakerPicker.fill('Verified');
