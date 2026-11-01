@@ -66,6 +66,8 @@ test('allocates a name-only caretaker into a Delegate-only block', async ({ page
   await page.evaluate(() => window.localStorage.setItem('bs_token', 'playwright-token'));
   await page.goto('/locations/61/tents/1/blocks/1');
   await page.getByTitle('Bed 2: Available').click();
+  await expect(page.getByText('Sai Connect lookup is required')).toBeVisible();
+  await expect(page.getByText('Complete Sai Connect lookup')).toBeVisible();
   await page.getByLabel('Allocate as caretaker').check();
   await expect(page.getByText('Sai Connect lookup is not required for caretakers')).toBeVisible();
   await expect(page.getByText('Sai Connect lookup is required', { exact: true })).toHaveCount(0);
@@ -236,8 +238,8 @@ test('shows Sai lookups as Delegate, Sevadal, or Devotee category outcomes', asy
   const identifier = page.getByPlaceholder('Sai Connect ID or phone');
   const verify = page.getByRole('button', { name: 'Verify' });
 
-  await expect(page.getByText('Sai Connect lookup is required')).toBeVisible();
-  await expect(page.getByText('Complete Sai Connect lookup')).toBeVisible();
+  await expect(page.getByText('Sai Connect lookup is optional')).toBeVisible();
+  await expect(page.getByText('Complete Sai Connect lookup')).toHaveCount(0);
 
   await identifier.fill('239910');
   await verify.click();
@@ -247,7 +249,7 @@ test('shows Sai lookups as Delegate, Sevadal, or Devotee category outcomes', asy
   await expect(page.getByText('Complete Sai Connect lookup')).toHaveCount(0);
 
   await identifier.fill('888888');
-  await expect(page.getByText('Complete Sai Connect lookup')).toBeVisible();
+  await expect(page.getByText('Complete Sai Connect lookup')).toHaveCount(0);
   await verify.click();
   await expect(page.getByRole('status')).toContainText('Sevadal');
 

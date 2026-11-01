@@ -191,6 +191,7 @@ export default function AllocateModal({
   if (!open) return null;
 
   const isEdit = Boolean(initialData);
+  const saiLookupRequired = !isCaretaker && !allowedCategories.includes('devotee');
   const selectedDelegate = eligibleDelegates.find((delegate) => String(delegate.id) === String(caretakerForAllocationId))
     || (initialData?.caretakerForAllocationId ? {
       id: Number(initialData.caretakerForAllocationId),
@@ -532,7 +533,7 @@ export default function AllocateModal({
     if (!isCaretaker && !/^\d{10}$/.test(form.phone)) errs.push('Enter a valid 10-digit phone number');
     if (!isEdit && !isCaretaker && !personPhoto.blob && !personPhoto.dataUrl) errs.push('Person photo is required');
     if (!isEdit && !isCaretaker && !aadhaarPhoto.blob && !aadhaarPhoto.dataUrl) errs.push('Identity photo is required');
-    if (!isEdit && !isCaretaker && !saiLookup.result) errs.push('Complete Sai Connect lookup');
+    if (!isEdit && saiLookupRequired && !saiLookup.result) errs.push('Complete Sai Connect lookup');
     if (!isCaretaker && !form.startDate) errs.push('Start date is required');
     if (!isCaretaker && !form.endDate) errs.push('End date is required');
     if (!isCaretaker && form.startDate && !isWithinBookingWindow(form.startDate)) errs.push(`Start date must be ${BOOKING_WINDOW_LABEL}`);
@@ -638,12 +639,18 @@ export default function AllocateModal({
           <section className="mb-4 space-y-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3">
             <div>
               <div className="text-sm font-semibold text-indigo-950">
-                {isCaretaker ? 'Sai Connect lookup is not required for caretakers' : 'Sai Connect lookup is required'}
+                {isCaretaker
+                  ? 'Sai Connect lookup is not required for caretakers'
+                  : saiLookupRequired
+                    ? 'Sai Connect lookup is required'
+                    : 'Sai Connect lookup is optional'}
               </div>
               <p className="mt-1 text-xs text-indigo-700">
                 {isCaretaker
                   ? 'The caretaker is linked to the selected Delegate and only their name is required.'
-                  : 'Enter a Sai Connect ID or phone number and complete the lookup. If no registration is found, the person is saved as a Devotee.'}
+                  : saiLookupRequired
+                    ? 'Enter a Sai Connect ID or phone number and complete the lookup. If no registration is found, the person is saved as a Devotee.'
+                    : 'Use a Sai Connect ID or phone number to verify Delegate or Sevadal status. If skipped or not found, the person is saved as a Devotee.'}
               </p>
             </div>
             <div className="flex gap-2">
