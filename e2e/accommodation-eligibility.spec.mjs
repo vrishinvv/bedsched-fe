@@ -40,6 +40,19 @@ test('allocates a name-only caretaker into a Delegate-only block', async ({ page
         },
       });
     }
+    if (path === '/api/sai-connect/lookup' && request.method() === 'POST') {
+      return route.fulfill({
+        status: 200,
+        headers,
+        json: {
+          matched: false,
+          outcome: 'not_registered',
+          message: 'Participant not registered.',
+          defaultCategory: 'devotee',
+          verificationToken: 'unregistered-token',
+        },
+      });
+    }
     if (path.endsWith('/beds/2/allocate') && request.method() === 'POST') {
       submittedPayload = request.postDataJSON();
       return route.fulfill({
@@ -69,6 +82,10 @@ test('allocates a name-only caretaker into a Delegate-only block', async ({ page
   await expect(page.getByText('Sai Connect lookup is required')).toBeVisible();
   await expect(page.getByText('Complete the lookup to verify eligibility for this restricted block. A person without an eligible registration cannot be allocated here.')).toBeVisible();
   await expect(page.getByText('Complete Sai Connect lookup')).toBeVisible();
+  await page.getByPlaceholder('Sai Connect ID or phone').fill('800717');
+  await page.getByRole('button', { name: 'Verify' }).click();
+  await expect(page.getByText('No eligible Delegate or Sevadal registration was found for this block.')).toBeVisible();
+  await expect(page.getByText(/devotee/i)).toHaveCount(0);
   await page.getByLabel('Allocate as caretaker').check();
   await expect(page.getByText('Sai Connect lookup is not required for caretakers')).toBeVisible();
   await expect(page.getByText('Sai Connect lookup is required', { exact: true })).toHaveCount(0);

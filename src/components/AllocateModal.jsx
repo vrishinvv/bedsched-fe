@@ -544,7 +544,11 @@ export default function AllocateModal({
     if (!isCaretaker && genderRestriction === 'female_only' && selectedGender.toLowerCase() !== 'female') errs.push('This tent is restricted to female guests only');
     if (!isEdit && !isCaretaker && saiLookup.result?.matched && !accommodationCategory) errs.push('Choose Delegate or Sevadal');
     if (!isEdit && !isCaretaker && accommodationCategory && !allowedCategories.includes(accommodationCategory)) {
-      errs.push(`This block does not allow ${accommodationCategory} accommodation`);
+      if (accommodationCategory === 'devotee' && saiLookup.result && !saiLookup.result.matched) {
+        errs.push('No eligible Delegate or Sevadal registration was found for this block.');
+      } else {
+        errs.push(`This block does not allow ${accommodationCategory} accommodation`);
+      }
     }
     if (!isEdit && isCaretaker && !caretakerForAllocationId) errs.push('Choose the Delegate this caretaker supports');
     return errs;
