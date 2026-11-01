@@ -43,5 +43,9 @@ export function validateBlockForm(form) {
   if (allowedCategories.length === 0 || requested.some((value) => !VALID_ACCOMMODATION_CATEGORIES.has(value))) {
     throw new StructureFormError('Select at least one valid accommodation category.', 'allowedCategories');
   }
-  return { name, size, genderRestriction: form.genderRestriction, allowedCategories };
+  const minimumAge = Number(form.minimumAge ?? 0);
+  if (!Number.isSafeInteger(minimumAge) || minimumAge < 0 || minimumAge > 130) {
+    throw new StructureFormError('Minimum age must be a whole number between 0 and 130.', 'minimumAge');
+  }
+  return { name, size, genderRestriction: form.genderRestriction, allowedCategories, minimumAge };
 }

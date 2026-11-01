@@ -47,6 +47,8 @@ export default function BlockBedsPage({ params }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [genderRestriction, setGenderRestriction] = useState('both'); // block-level gender restriction
   const [allowedCategories, setAllowedCategories] = useState(['delegate', 'sevadal', 'devotee']);
+  const [minimumAge, setMinimumAge] = useState(0);
+  const [minimumAgeDraft, setMinimumAgeDraft] = useState('0');
   const [bedsState, setBedsState] = useState(null); // { capacity, beds:{} }
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
@@ -57,6 +59,7 @@ export default function BlockBedsPage({ params }) {
   const [liveUpdatesAvailable, setLiveUpdatesAvailable] = useState(true);
   const [updatingRestriction, setUpdatingRestriction] = useState(false);
   const [updatingCategories, setUpdatingCategories] = useState(false);
+  const [updatingMinimumAge, setUpdatingMinimumAge] = useState(false);
   const [deallocating, setDeallocating] = useState(false);
   const [confirmDeallocate, setConfirmDeallocate] = useState(null);
   const [showDeallocateModal, setShowDeallocateModal] = useState(false);
@@ -85,6 +88,9 @@ export default function BlockBedsPage({ params }) {
         setBedsState({ capacity: blockRes.blockSize, beds: blockRes.beds });
         setGenderRestriction(blockRes.meta?.block?.genderRestriction || 'both');
         setAllowedCategories(blockRes.meta?.block?.allowedCategories || ['delegate', 'sevadal', 'devotee']);
+        const nextMinimumAge = Number(blockRes.meta?.block?.minimumAge || 0);
+        setMinimumAge(nextMinimumAge);
+        setMinimumAgeDraft(String(nextMinimumAge));
       } catch (e) {
         setErr(e.message);
       } finally {
@@ -213,6 +219,9 @@ export default function BlockBedsPage({ params }) {
       setBedsState({ capacity: blockRes.blockSize, beds: blockRes.beds });
       setGenderRestriction(blockRes.meta?.block?.genderRestriction || 'both');
       setAllowedCategories(blockRes.meta?.block?.allowedCategories || ['delegate', 'sevadal', 'devotee']);
+      const refreshedMinimumAge = Number(blockRes.meta?.block?.minimumAge || 0);
+      setMinimumAge(refreshedMinimumAge);
+      setMinimumAgeDraft(String(refreshedMinimumAge));
       setLiveUpdatesAvailable(true);
 
       if (
@@ -533,6 +542,8 @@ export default function BlockBedsPage({ params }) {
         createdAt: allocationData.createdAt,
         caretakerForName: allocationData.caretakerForName,
         caretakerForBedNumber: allocationData.caretakerForBedNumber,
+        saiConnectAge: allocationData.saiConnectAge,
+        isCaretaker: Boolean(allocationData.caretakerForAllocationId),
       }
     });
   }
@@ -746,6 +757,9 @@ export default function BlockBedsPage({ params }) {
                   </span>
                 ))}
               </div>
+              <div className="rounded-full border border-amber-400/40 bg-amber-500/15 px-3 py-1.5 text-sm font-semibold text-amber-100">
+                {minimumAge > 0 ? `Age ${minimumAge}+` : 'All ages'}
+              </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
               {canManageAccommodationStructure(currentUser) && (
@@ -773,6 +787,51 @@ export default function BlockBedsPage({ params }) {
                     <option key={preset.value} value={preset.value}>{preset.label}</option>
                   ))}
                 </select>
+              )}
+              {canManageAccommodationStructure(currentUser) && (
+                <form
+                  className="flex items-center gap-1"
+                  onSubmit={async (event) => {
+                    event.preventDefault();
+                    const nextMinimumAge = Number(minimumAgeDraft);
+                    if (!Number.isSafeInteger(nextMinimumAge) || nextMinimumAge < 0 || nextMinimumAge > 130) {
+                      showNotification('error', 'Minimum age must be a whole number between 0 and 130.');
+                      return;
+                    }
+                    if (nextMinimumAge === minimumAge) return;
+                    try {
+                      setUpdatingMinimumAge(true);
+                      await updateStructureBlock(meta.block.id, { minimumAge: nextMinimumAge });
+                      setMinimumAge(nextMinimumAge);
+                      showNotification('success', nextMinimumAge > 0
+                        ? `Block earmarked for guests aged ${nextMinimumAge} or older.`
+                        : 'Block age earmarking removed.');
+                    } catch (error) {
+                      showNotification('error', error.message || 'Failed to update minimum age.');
+                    } finally {
+                      setUpdatingMinimumAge(false);
+                    }
+                  }}
+                >
+                  <input
+                    aria-label="Minimum guest age"
+                    type="number"
+                    min={0}
+                    max={130}
+                    step={1}
+                    value={minimumAgeDraft}
+                    disabled={updatingMinimumAge}
+                    onChange={(event) => setMinimumAgeDraft(event.target.value)}
+                    className="w-20 rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm font-medium text-gray-800 disabled:opacity-60"
+                  />
+                  <button
+                    type="submit"
+                    disabled={updatingMinimumAge || Number(minimumAgeDraft) === minimumAge}
+                    className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-sm font-medium text-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {updatingMinimumAge ? 'Saving…' : 'Set age'}
+                  </button>
+                </form>
               )}
               {canManageAccommodationStructure(currentUser) && <div className="relative">
                 <select
@@ -967,6 +1026,7 @@ export default function BlockBedsPage({ params }) {
         tentIndex={Number(tent)}
         blockIndex={Number(block)}
         allowedCategories={allowedCategories}
+        minimumAge={minimumAge}
         eligibleDelegates={eligibleDelegates}
         isAdmin={canManageAccommodationStructure(currentUser)}
       />

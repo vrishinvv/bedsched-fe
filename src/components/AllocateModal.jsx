@@ -6,6 +6,7 @@ import { BOOKING_MAX_DATE as MAX_DATE, BOOKING_MIN_DATE as MIN_DATE, BOOKING_WIN
 import { lookupSaiConnect } from '@/lib/api';
 import {
   ACCOMMODATION_CATEGORY_OPTIONS,
+  getAgeEarmarkWarning,
   resolveLookupCategoryChoice,
 } from '@/lib/accommodationEligibility.mjs';
 import {
@@ -57,6 +58,7 @@ export default function AllocateModal({
   blockIndex,
   onSaveAndNext, // New prop for save & next functionality
   allowedCategories = ['delegate', 'sevadal', 'devotee'],
+  minimumAge = 0,
   eligibleDelegates = [],
   isAdmin = false,
 }) {
@@ -92,6 +94,7 @@ export default function AllocateModal({
   const [delegateSearch, setDelegateSearch] = useState('');
   const [delegatePickerOpen, setDelegatePickerOpen] = useState(false);
   const [activeDelegateIndex, setActiveDelegateIndex] = useState(-1);
+  const [ageWarningAcknowledged, setAgeWarningAcknowledged] = useState(false);
   const ref = useRef(null);
   const scrollRef = useRef(null); // Ref for scrollable content area
   const topRef = useRef(null); // Ref for top element to scroll to
@@ -159,6 +162,7 @@ export default function AllocateModal({
       setDelegateSearch('');
       setDelegatePickerOpen(false);
       setActiveDelegateIndex(-1);
+      setAgeWarningAcknowledged(false);
       setAccommodationCategory(initialData?.accommodationCategory || 'devotee');
       
       // Pre-fetch upload URLs in background (non-blocking)
@@ -392,6 +396,13 @@ export default function AllocateModal({
     : genderRestriction === 'female_only' && selectedGender.toLowerCase() !== 'female'
       ? 'Gender mismatch: this block is restricted to female guests only.'
       : '';
+  const ageEarmarkWarning = !isEdit
+    ? getAgeEarmarkWarning({
+      minimumAge,
+      age: saiLookup.result?.matched ? saiLookup.result.age : null,
+      isCaretaker,
+    })
+    : '';
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -443,6 +454,9 @@ export default function AllocateModal({
     if (requiredPhotoErrors.length > 0) {
       return alert(requiredPhotoErrors[0]);
     }
+    if (ageEarmarkWarning && !ageWarningAcknowledged) {
+      return alert('Please acknowledge the block age warning before booking.');
+    }
 
     // Validate Emergency Phone: if provided, must be exactly 10 digits
     const emergencyDigits = form.emergencyPhone.replace(/\D/g, '');
@@ -482,23 +496,23 @@ export default function AllocateModal({
       
       const personCandidateKey = personPhoto.blob ? generatePhotoKey('person') : null;
       const aadhaarCandidateKey = aadhaarPhoto.blob ? generatePhotoKey('aadhaar') : null;
-      const photoResult = isCaretaker
-        ? { personPhotoKey: null, aadhaarPhotoKey: null, failedPhotoTypes: [] }
-        : await uploadOptionalPhotos({
+      const photoResult = await uploadOptionalPhotos({
           person: {
             blob: personPhoto.blob,
             key: personCandidateKey,
             existingKey: initialData?.personPhotoKey || null,
           },
           aadhaar: {
-            blob: aadhaarPhoto.blob,
-            key: aadhaarCandidateKey,
-            existingKey: initialData?.aadhaarPhotoKey || null,
+            blob: isCaretaker ? null : aadhaarPhoto.blob,
+            key: isCaretaker ? null : aadhaarCandidateKey,
+            existingKey: isCaretaker ? null : (initialData?.aadhaarPhotoKey || null),
           },
         }, uploadPhotoToS3);
 
-      if (photosRequired && !isCaretaker && !isEdit && hasMissingOptionalPhotos(photoResult)) {
-        alert('Both photos must upload successfully before the booking can be saved. Please try again.');
+      if (photosRequired && !isEdit && hasMissingOptionalPhotos(photoResult, { isCaretaker })) {
+        alert(isCaretaker
+          ? 'The caretaker photo must upload successfully before the booking can be saved. Please try again.'
+          : 'Both photos must upload successfully before the booking can be saved. Please try again.');
         setUploading(false);
         setUploadProgress(0);
         return;
@@ -654,6 +668,7 @@ export default function AllocateModal({
       }
     }
     if (!isEdit && isCaretaker && !caretakerForAllocationId) errs.push('Choose the Delegate this caretaker supports');
+    if (ageEarmarkWarning && !ageWarningAcknowledged) errs.push('Acknowledge the block age warning');
     errs.push(...getRequiredBookingPhotoErrors({
       photosRequired,
       isCaretaker,
@@ -784,6 +799,7 @@ export default function AllocateModal({
                     setSaiIdentifier(event.target.value.replace(/\D/g, '').slice(0, 15));
                     setSaiLookup({ loading: false, result: null, error: '' });
                     setAccommodationCategory('devotee');
+                    setAgeWarningAcknowledged(false);
                     if (shouldResetVerifiedGender) {
                       setForm((current) => ({
                         ...current,
@@ -846,6 +862,9 @@ export default function AllocateModal({
                     : saiLookup.result.verifiedCategories[0]}
                 </div>
                 <div className="mt-1 text-xs text-emerald-800">Sai Connect verified: {saiLookup.result.fullName}</div>
+                {Number.isInteger(saiLookup.result.age) && (
+                  <div className="mt-1 text-sm font-semibold text-emerald-950">Age: {saiLookup.result.age} years</div>
+                )}
                 <div className="mt-2 flex flex-wrap gap-2">
                   {saiLookup.result.verifiedCategories.map((category) => (
                     <span key={category} className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium capitalize text-emerald-800">{category}</span>
@@ -876,6 +895,7 @@ export default function AllocateModal({
                     checked={isCaretaker}
                     onChange={(event) => {
                       setIsCaretaker(event.target.checked);
+                      setAgeWarningAcknowledged(false);
                       setDelegateSearch('');
                       setDelegatePickerOpen(false);
                       setActiveDelegateIndex(-1);
@@ -956,6 +976,22 @@ export default function AllocateModal({
                 )}
               </div>
             )}
+          </section>
+        )}
+
+        {ageEarmarkWarning && (
+          <section role="alert" aria-label="Block age warning" className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3">
+            <div className="text-sm font-semibold text-amber-950">Age earmarking warning</div>
+            <p className="mt-1 text-sm text-amber-900">{ageEarmarkWarning}</p>
+            <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm font-medium text-amber-950">
+              <input
+                type="checkbox"
+                checked={ageWarningAcknowledged}
+                onChange={(event) => setAgeWarningAcknowledged(event.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-amber-700"
+              />
+              Book anyway
+            </label>
           </section>
         )}
 
@@ -1130,28 +1166,32 @@ export default function AllocateModal({
             <p className="text-xs text-gray-500 mt-1">{isCaretaker ? 'Copied from the selected Delegate' : BOOKING_WINDOW_LABEL}</p>
           </div>
           {/* Photo Capture Section */}
-          {!isCaretaker && <div className="sm:col-span-2 space-y-4 mt-4">
+          <div className="sm:col-span-2 space-y-4 mt-4">
             <div className="border-t pt-4">
               <div className={`mb-3 rounded-lg border p-3 ${photosRequired ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'}`} role="note">
                 <h4 className={`text-sm font-semibold ${photosRequired ? 'text-red-950' : 'text-amber-950'}`}>
-                  {photosRequired ? 'Both photos are required' : 'Photos are optional'}
+                  {photosRequired
+                    ? (isCaretaker ? 'Caretaker photo is required' : 'Both photos are required')
+                    : 'Photos are optional'}
                 </h4>
                 <p className={`mt-1 text-xs ${photosRequired ? 'text-red-800' : 'text-amber-800'}`}>
                   {photosRequired
-                    ? 'Capture the person photo and identity card photo before saving.'
+                    ? (isCaretaker
+                      ? 'Capture the caretaker’s photo before saving.'
+                      : 'Capture the person photo and identity card photo before saving.')
                     : 'You can save the booking without photos. If photo storage is unavailable, the booking will continue and show a warning.'}
                 </p>
               </div>
               
               <CameraCapture
                 key={`person-${bedNumber}-${open}-${initialData?.personPhotoUrl || 'new'}`}
-                label={`Person Photo${photosRequired ? ' *' : ''}`}
+                label={`${isCaretaker ? 'Caretaker Photo' : 'Person Photo'}${photosRequired ? ' *' : ''}`}
                 onCapture={(blob, dataUrl) => setPersonPhoto({ blob, dataUrl })}
                 existingPhotoUrl={initialData?.personPhotoUrl || null}
                 autoOpen={false}
               />
               
-              <div className="mt-4">
+              {!isCaretaker && <div className="mt-4">
                 <CameraCapture
                   key={`aadhaar-${bedNumber}-${open}-${initialData?.aadhaarPhotoUrl || 'new'}`}
                   label={`Identity Card Photo${photosRequired ? ' *' : ''}`}
@@ -1159,9 +1199,9 @@ export default function AllocateModal({
                   existingPhotoUrl={initialData?.aadhaarPhotoUrl || null}
                   autoOpen={false}
                 />
-              </div>
+              </div>}
             </div>
-          </div>}
+          </div>
         </div>
         
         <div className="mt-5 sticky bottom-0 bg-white pt-3 pb-3 flex items-center justify-between border-t">

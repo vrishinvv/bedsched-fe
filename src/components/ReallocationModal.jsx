@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Skeleton from '@/components/Skeleton';
+import { getAgeEarmarkWarning } from '@/lib/accommodationEligibility.mjs';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -55,6 +56,7 @@ export default function ReallocationModal({
   
   // Allocation info for display
   const [allocationInfo, setAllocationInfo] = useState(null);
+  const [ageWarningAcknowledged, setAgeWarningAcknowledged] = useState(false);
 
   useEffect(() => {
     if (open && allocationId) {
@@ -69,6 +71,7 @@ export default function ReallocationModal({
       setBlocks([]);
       setAvailableBeds([]);
       setLoadError('');
+      setAgeWarningAcknowledged(false);
       
       // Load locations
       loadOptions();
@@ -150,6 +153,7 @@ export default function ReallocationModal({
   function handleBlockSelect(block) {
     setSelectedBlock(block);
     setSelectedBed(null);
+    setAgeWarningAcknowledged(false);
     setStep(4);
     loadOptions(selectedLocation.id, selectedTent.id, block.id);
   }
@@ -178,6 +182,9 @@ export default function ReallocationModal({
     if (!selectedLocation || !selectedTent || !selectedBlock || !selectedBed) {
       return alert('Please select all options before confirming');
     }
+    if (ageEarmarkWarning && !ageWarningAcknowledged) {
+      return alert('Please acknowledge the block age warning before reallocating.');
+    }
 
     try {
       await onReallocate({
@@ -192,7 +199,16 @@ export default function ReallocationModal({
     }
   }
 
-  const canConfirm = selectedLocation && selectedTent && selectedBlock && selectedBed;
+  const ageEarmarkWarning = getAgeEarmarkWarning({
+    minimumAge: selectedBlock?.minimumAge,
+    age: currentAllocation?.saiConnectAge,
+    isCaretaker: currentAllocation?.isCaretaker,
+  });
+  const canConfirm = selectedLocation
+    && selectedTent
+    && selectedBlock
+    && selectedBed
+    && (!ageEarmarkWarning || ageWarningAcknowledged);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
@@ -242,6 +258,12 @@ export default function ReallocationModal({
                     <span className="text-gray-600">Bed:</span>
                     <div className="font-semibold text-gray-900">#{currentAllocation?.bed}</div>
                   </div>
+                  {currentAllocation?.saiConnectAge !== null && currentAllocation?.saiConnectAge !== undefined && (
+                    <div>
+                      <span className="text-gray-600">Sai Connect age:</span>
+                      <div className="font-semibold text-gray-900">{currentAllocation.saiConnectAge} years</div>
+                    </div>
+                  )}
                   {currentAllocation?.caretakerForName && (
                     <div className="col-span-1 sm:col-span-2 rounded-lg border border-indigo-200 bg-white/70 p-2">
                       <span className="text-indigo-700">Caretaker for:</span>
@@ -445,6 +467,9 @@ export default function ReallocationModal({
                             {block.gender_restriction === 'male_only' ? '♂️ Male only' : '♀️ Female only'}
                           </span>
                         )}
+                        {Number(block.minimumAge) > 0 && (
+                          <span className="rounded bg-amber-100 px-2 py-1 text-amber-800">Age {block.minimumAge}+</span>
+                        )}
                       </div>
                     </button>
                   ))}
@@ -499,6 +524,21 @@ export default function ReallocationModal({
                     ))}
                   </div>
                 </>
+              )}
+              {ageEarmarkWarning && (
+                <div role="alert" className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3">
+                  <div className="text-sm font-semibold text-amber-950">Age earmarking warning</div>
+                  <p className="mt-1 text-sm text-amber-900">{ageEarmarkWarning}</p>
+                  <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm font-medium text-amber-950">
+                    <input
+                      type="checkbox"
+                      checked={ageWarningAcknowledged}
+                      onChange={(event) => setAgeWarningAcknowledged(event.target.checked)}
+                      className="mt-0.5 h-4 w-4 accent-amber-700"
+                    />
+                    Reallocate anyway
+                  </label>
+                </div>
               )}
             </div>
           )}

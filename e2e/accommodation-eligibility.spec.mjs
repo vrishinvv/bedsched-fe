@@ -100,6 +100,7 @@ test('allocates a caretaker with gender and locked Delegate stay dates', async (
   await expect(allocationDialog.getByText(/devotee/i)).toHaveCount(0);
   await page.getByLabel('Allocate as caretaker').check();
   await expect(page.getByText('Sai Connect lookup is optional for caretakers')).toBeVisible();
+  await expect(page.getByText('Caretaker Photo', { exact: true })).toBeVisible();
   await expect(page.getByText('Sai Connect lookup is required', { exact: true })).toHaveCount(0);
   const caretakerPicker = page.getByRole('combobox', { name: 'Caretaker for' });
   await caretakerPicker.fill('Verified');
@@ -928,7 +929,9 @@ test('locks Sai-sourced profile fields for location users but leaves admins in c
 
 test('lets an admin update block category tags directly from the bed view', async ({ page }) => {
   let updatedCategories = ['delegate', 'sevadal', 'devotee'];
+  let updatedMinimumAge = 0;
   let patchPayload;
+  const patchPayloads = [];
   await page.route('**/api/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
@@ -944,7 +947,9 @@ test('lets an admin update block category tags directly from the bed view', asyn
     }
     if (path === '/api/admin/structure/blocks/101' && request.method() === 'PATCH') {
       patchPayload = request.postDataJSON();
-      updatedCategories = patchPayload.allowedCategories;
+      patchPayloads.push(patchPayload);
+      if (patchPayload.allowedCategories) updatedCategories = patchPayload.allowedCategories;
+      if (patchPayload.minimumAge !== undefined) updatedMinimumAge = patchPayload.minimumAge;
       return route.fulfill({ status: 200, headers, json: { ok: true } });
     }
     if (path === '/api/locations/61/tents/1/blocks/1') {
@@ -955,7 +960,7 @@ test('lets an admin update block category tags directly from the bed view', asyn
           meta: {
             location: { id: '61', name: 'Test Location' },
             tent: { index: 1, name: 'Test Tent' },
-            block: { id: 101, index: 1, name: 'Mixed', genderRestriction: 'both', allowedCategories: updatedCategories },
+            block: { id: 101, index: 1, name: 'Mixed', genderRestriction: 'both', allowedCategories: updatedCategories, minimumAge: updatedMinimumAge },
           },
           blockSize: 1,
           beds: {},
@@ -975,4 +980,93 @@ test('lets an admin update block category tags directly from the bed view', asyn
   await expect(tags.getByText('Delegate', { exact: true })).toBeVisible();
   await expect(tags.getByText('Sevadal', { exact: true })).toBeVisible();
   await expect(tags.getByText('Devotee', { exact: true })).toHaveCount(0);
+
+  await page.getByLabel('Minimum guest age').fill('70');
+  await page.getByRole('button', { name: 'Set age' }).click();
+  await expect.poll(() => patchPayloads.find((payload) => payload.minimumAge === 70)).toEqual({ minimumAge: 70 });
+  await expect(page.getByText('Age 70+', { exact: true })).toBeVisible();
+});
+
+test('shows Sai Connect age immediately and requires UI acknowledgement for an under-age booking', async ({ page }) => {
+  let submittedPayload;
+  await page.route('**/api/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    const headers = {
+      'access-control-allow-credentials': 'true',
+      'access-control-allow-headers': 'authorization,content-type',
+      'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+      'access-control-allow-origin': 'http://127.0.0.1:3100',
+    };
+    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+    if (path === '/api/auth/me') {
+      return route.fulfill({ status: 200, headers, json: { user: { id: 1, username: 'admin', role: 'admin', locationId: null } } });
+    }
+    if (path === '/api/locations/61/tents/1/blocks/1') {
+      return route.fulfill({
+        status: 200,
+        headers,
+        json: {
+          meta: {
+            location: { id: '61', name: 'Test Location' },
+            tent: { index: 1, name: 'Test Tent' },
+            block: {
+              id: 101,
+              index: 1,
+              name: 'Senior Guests',
+              genderRestriction: 'both',
+              allowedCategories: ['delegate', 'sevadal', 'devotee'],
+              minimumAge: 70,
+            },
+          },
+          blockSize: 1,
+          beds: {},
+        },
+      });
+    }
+    if (path === '/api/sai-connect/lookup' && request.method() === 'POST') {
+      return route.fulfill({
+        status: 200,
+        headers,
+        json: {
+          matched: true,
+          outcome: 'matched',
+          fullName: 'Younger Delegate',
+          mobileNo: '9876543210',
+          gender: 'Male',
+          age: 65,
+          verifiedCategories: ['delegate'],
+          verificationToken: 'younger-delegate-token',
+        },
+      });
+    }
+    if (path.endsWith('/beds/1/allocate') && request.method() === 'POST') {
+      submittedPayload = request.postDataJSON();
+      return route.fulfill({ status: 200, headers, json: { id: 501, ...submittedPayload, status: 'confirmed' } });
+    }
+    return route.fulfill({ status: 404, headers, json: { error: `Unexpected request: ${path}` } });
+  });
+
+  await page.goto('/login');
+  await page.evaluate(() => window.localStorage.setItem('bs_token', 'playwright-token'));
+  await page.goto('/locations/61/tents/1/blocks/1');
+  await expect(page.getByText('Age 70+', { exact: true })).toBeVisible();
+  await page.getByTitle('Bed 1: Available').click();
+  await page.getByPlaceholder('Sai Connect ID or phone').fill('808675');
+  await page.getByRole('button', { name: 'Verify' }).click();
+
+  await expect(page.getByText('Age: 65 years')).toBeVisible();
+  const warning = page.getByRole('alert', { name: 'Block age warning' });
+  await expect(warning).toContainText('This block is earmarked for guests aged 70 or older. Sai Connect reports age 65.');
+  await page.locator('input[name="startDate"]').fill('2026-11-05');
+  await page.locator('input[name="endDate"]').fill('2026-11-24');
+  await expect(page.getByRole('button', { name: 'Allocate', exact: true })).toBeDisabled();
+  await warning.getByLabel('Book anyway').check();
+  await expect(page.getByRole('button', { name: 'Allocate', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Allocate', exact: true }).click();
+  await expect.poll(() => submittedPayload).toMatchObject({
+    name: 'Younger Delegate',
+    phone: '9876543210',
+    accommodationCategory: 'delegate',
+  });
 });

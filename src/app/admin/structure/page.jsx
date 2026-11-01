@@ -89,6 +89,7 @@ function BlockEditor({ block, saving, onSave, onError }) {
     size: String(block.size),
     genderRestriction: block.genderRestriction,
     allowedCategories: block.allowedCategories || ALL_CATEGORIES,
+    minimumAge: String(block.minimumAge ?? 0),
   });
 
   useEffect(() => {
@@ -97,6 +98,7 @@ function BlockEditor({ block, saving, onSave, onError }) {
       size: String(block.size),
       genderRestriction: block.genderRestriction,
       allowedCategories: block.allowedCategories || ALL_CATEGORIES,
+      minimumAge: String(block.minimumAge ?? 0),
     });
   }, [block]);
 
@@ -123,7 +125,7 @@ function BlockEditor({ block, saving, onSave, onError }) {
   };
 
   return (
-    <form onSubmit={submit} className="grid gap-3 rounded-lg border border-white/10 bg-black/20 p-3 md:grid-cols-[minmax(150px,1fr)_110px_150px_auto] md:items-end">
+    <form onSubmit={submit} className="grid gap-3 rounded-lg border border-white/10 bg-black/20 p-3 md:grid-cols-[minmax(150px,1fr)_110px_150px_110px_auto] md:items-end">
       <div>
         <label className="mb-1 block text-xs font-medium text-gray-400">Block {block.index} name</label>
         <input
@@ -157,7 +159,19 @@ function BlockEditor({ block, saving, onSave, onError }) {
           ))}
         </select>
       </div>
-      <div className="md:col-span-3">
+      <div>
+        <label className="mb-1 block text-xs font-medium text-gray-400">Minimum age</label>
+        <input
+          type="number"
+          min={0}
+          max={130}
+          step={1}
+          value={form.minimumAge}
+          onChange={(event) => setForm((current) => ({ ...current, minimumAge: event.target.value }))}
+          className="w-full rounded-md border border-white/15 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-blue-400"
+        />
+      </div>
+      <div className="md:col-span-4">
         <CategoryCheckboxes
           value={form.allowedCategories}
           onChange={(allowedCategories) => setForm((current) => ({ ...current, allowedCategories }))}
@@ -170,7 +184,7 @@ function BlockEditor({ block, saving, onSave, onError }) {
       >
         {saving ? 'Saving…' : 'Save'}
       </button>
-      <div className="text-xs text-gray-500 md:col-span-4">
+      <div className="text-xs text-gray-500 md:col-span-5">
         {block.activeAllocations} active booking{block.activeAllocations === 1 ? '' : 's'}
         {block.highestActiveBed > 0 ? ` · highest occupied/reserved bed ${block.highestActiveBed}` : ''}
       </div>
@@ -180,7 +194,7 @@ function BlockEditor({ block, saving, onSave, onError }) {
 
 function AddBlockForm({ tentId, saving, onCreate, onError }) {
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', size: '', genderRestriction: 'both', allowedCategories: ALL_CATEGORIES });
+  const [form, setForm] = useState({ name: '', size: '', genderRestriction: 'both', allowedCategories: ALL_CATEGORIES, minimumAge: '0' });
 
   const submit = async (event) => {
     event.preventDefault();
@@ -188,7 +202,7 @@ function AddBlockForm({ tentId, saving, onCreate, onError }) {
       const payload = validateBlockForm(form);
       const created = await onCreate(tentId, payload);
       if (!created) return;
-      setForm({ name: '', size: '', genderRestriction: 'both', allowedCategories: ALL_CATEGORIES });
+      setForm({ name: '', size: '', genderRestriction: 'both', allowedCategories: ALL_CATEGORIES, minimumAge: '0' });
       setOpen(false);
     } catch (error) {
       onError(error);
@@ -208,7 +222,7 @@ function AddBlockForm({ tentId, saving, onCreate, onError }) {
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-3 rounded-lg border border-blue-400/20 bg-blue-500/5 p-3 sm:grid-cols-2 lg:grid-cols-[minmax(150px,1fr)_110px_150px_auto] lg:items-end">
+    <form onSubmit={submit} className="grid gap-3 rounded-lg border border-blue-400/20 bg-blue-500/5 p-3 sm:grid-cols-2 lg:grid-cols-[minmax(150px,1fr)_110px_150px_110px_auto] lg:items-end">
       <div>
         <label className="mb-1 block text-xs font-medium text-gray-300">Block name</label>
         <input
@@ -245,7 +259,19 @@ function AddBlockForm({ tentId, saving, onCreate, onError }) {
           ))}
         </select>
       </div>
-      <div className="sm:col-span-2 lg:col-span-3">
+      <div>
+        <label className="mb-1 block text-xs font-medium text-gray-300">Minimum age</label>
+        <input
+          type="number"
+          min={0}
+          max={130}
+          step={1}
+          value={form.minimumAge}
+          onChange={(event) => setForm((current) => ({ ...current, minimumAge: event.target.value }))}
+          className="w-full rounded-md border border-white/15 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-blue-400"
+        />
+      </div>
+      <div className="sm:col-span-2 lg:col-span-4">
         <CategoryCheckboxes
           value={form.allowedCategories}
           onChange={(allowedCategories) => setForm((current) => ({ ...current, allowedCategories }))}
@@ -338,7 +364,7 @@ function StructureContent() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Accommodation Setup</h1>
-        <p className="mt-1 text-sm text-gray-400">Manage names, tents, blocks, bed counts, and block types.</p>
+        <p className="mt-1 text-sm text-gray-400">Manage names, tents, blocks, bed counts, guest categories, and age earmarking.</p>
       </div>
 
       {notice && (

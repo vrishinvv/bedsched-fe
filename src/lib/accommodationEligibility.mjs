@@ -32,3 +32,17 @@ export function eligibleDelegateAllocations(beds = {}) {
     }))
     .sort((left, right) => left.bedNumber - right.bedNumber);
 }
+
+export function getAgeEarmarkWarning({ minimumAge = 0, age = null, isCaretaker = false } = {}) {
+  const normalizedMinimumAge = Number(minimumAge);
+  if (isCaretaker || !Number.isSafeInteger(normalizedMinimumAge) || normalizedMinimumAge <= 0) return '';
+
+  const normalizedAge = age === null || age === undefined || age === '' ? null : Number(age);
+  if (!Number.isSafeInteger(normalizedAge)) {
+    return `This block is earmarked for guests aged ${normalizedMinimumAge} or older, but this person’s age could not be verified.`;
+  }
+  if (normalizedAge < normalizedMinimumAge) {
+    return `This block is earmarked for guests aged ${normalizedMinimumAge} or older. Sai Connect reports age ${normalizedAge}.`;
+  }
+  return '';
+}

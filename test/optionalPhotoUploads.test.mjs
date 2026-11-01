@@ -38,7 +38,7 @@ test('no selected photos produces an allocation payload without photo keys or fa
   });
 });
 
-test('a partial photo set warns for a normal booking but caretakers remain photo-exempt', () => {
+test('missing photo detection expects both guest photos and only a caretaker person photo', () => {
   const partialPhotos = {
     personPhotoKey: 'person.jpg',
     aadhaarPhotoKey: null,
@@ -46,9 +46,10 @@ test('a partial photo set warns for a normal booking but caretakers remain photo
 
   assert.equal(hasMissingOptionalPhotos(partialPhotos), true);
   assert.equal(hasMissingOptionalPhotos(partialPhotos, { isCaretaker: true }), false);
+  assert.equal(hasMissingOptionalPhotos({ personPhotoKey: null }, { isCaretaker: true }), true);
 });
 
-test('production requires both photos for new individual bookings while dev and caretakers stay exempt', () => {
+test('production requires both guest photos and only a caretaker person photo while dev stays optional', () => {
   assert.equal(resolveRequireBookingPhotos(undefined, 'sssenclave.vercel.app'), true);
   assert.equal(resolveRequireBookingPhotos(undefined, 'sssenclave-dev.vercel.app'), false);
   assert.deepEqual(getRequiredBookingPhotoErrors({
@@ -59,6 +60,11 @@ test('production requires both photos for new individual bookings while dev and 
   assert.deepEqual(getRequiredBookingPhotoErrors({
     photosRequired: true,
     isCaretaker: true,
+  }), ['Caretaker photo is required']);
+  assert.deepEqual(getRequiredBookingPhotoErrors({
+    photosRequired: true,
+    isCaretaker: true,
+    personPhoto: { blob: { kind: 'caretaker' } },
   }), []);
   assert.deepEqual(getRequiredBookingPhotoErrors({ photosRequired: false }), []);
 });
