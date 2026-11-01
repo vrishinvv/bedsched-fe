@@ -65,6 +65,7 @@ export default function AllocateModal({
   const [accommodationCategory, setAccommodationCategory] = useState('devotee');
   const [isCaretaker, setIsCaretaker] = useState(false);
   const [caretakerForAllocationId, setCaretakerForAllocationId] = useState('');
+  const [delegateSearch, setDelegateSearch] = useState('');
   const ref = useRef(null);
   const scrollRef = useRef(null); // Ref for scrollable content area
   const topRef = useRef(null); // Ref for top element to scroll to
@@ -129,6 +130,7 @@ export default function AllocateModal({
       setSaiLookup({ loading: false, result: null, error: '' });
       setIsCaretaker(Boolean(initialData?.caretakerForAllocationId));
       setCaretakerForAllocationId(initialData?.caretakerForAllocationId ? String(initialData.caretakerForAllocationId) : '');
+      setDelegateSearch('');
       setAccommodationCategory(initialData?.accommodationCategory || 'devotee');
       
       // Pre-fetch upload URLs in background (non-blocking)
@@ -196,6 +198,13 @@ export default function AllocateModal({
       startDate: initialData.startDate,
       endDate: initialData.endDate,
     } : null);
+  const normalizedDelegateSearch = delegateSearch.trim().toLowerCase();
+  const filteredDelegates = normalizedDelegateSearch
+    ? eligibleDelegates.filter((delegate) => (
+      delegate.name.toLowerCase().includes(normalizedDelegateSearch)
+      || String(delegate.bedNumber).includes(normalizedDelegateSearch)
+    ))
+    : eligibleDelegates;
 
   async function handleSaiLookup() {
     if (!saiIdentifier.trim()) {
@@ -207,7 +216,7 @@ export default function AllocateModal({
       const result = await lookupSaiConnect(saiIdentifier.trim());
       if (!result.matched) {
         setAccommodationCategory('devotee');
-        setSaiLookup({ loading: false, result, error: result.message || 'No matching registration was found.' });
+        setSaiLookup({ loading: false, result, error: '' });
         return;
       }
       const choice = resolveLookupCategoryChoice(result.verifiedCategories);
@@ -222,8 +231,12 @@ export default function AllocateModal({
       setAccommodationCategory('devotee');
       setSaiLookup({
         loading: false,
-        result: null,
-        error: `${error.message || 'Lookup unavailable'} You can continue as a Devotee.`,
+        result: {
+          matched: false,
+          outcome: 'unavailable',
+          defaultCategory: 'devotee',
+        },
+        error: '',
       });
     }
   }
@@ -648,10 +661,20 @@ export default function AllocateModal({
                 {saiLookup.loading ? 'Checking…' : 'Verify'}
               </button>
             </div>
-            {saiLookup.error && <p className="text-xs text-amber-800">{saiLookup.error}</p>}
+            {saiLookup.result && !saiLookup.result.matched && (
+              <div role="status" className="rounded-lg border border-gray-200 bg-white p-3">
+                <div className="text-sm font-semibold text-gray-900">Devotee</div>
+                <p className="mt-1 text-xs text-gray-600">No Delegate or Sevadal registration was found. Continue as a Devotee.</p>
+              </div>
+            )}
             {saiLookup.result?.matched && (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-                <div className="text-sm font-medium text-emerald-900">Verified: {saiLookup.result.fullName}</div>
+              <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                <div className="text-sm font-semibold capitalize text-emerald-950">
+                  {saiLookup.result.verifiedCategories.length > 1
+                    ? 'Delegate or Sevadal'
+                    : saiLookup.result.verifiedCategories[0]}
+                </div>
+                <div className="mt-1 text-xs text-emerald-800">Sai Connect verified: {saiLookup.result.fullName}</div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {saiLookup.result.verifiedCategories.map((category) => (
                     <span key={category} className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium capitalize text-emerald-800">{category}</span>
@@ -682,6 +705,7 @@ export default function AllocateModal({
                     checked={isCaretaker}
                     onChange={(event) => {
                       setIsCaretaker(event.target.checked);
+                      setDelegateSearch('');
                       if (!event.target.checked) setCaretakerForAllocationId('');
                     }}
                     className="mt-0.5 h-4 w-4 accent-indigo-700"
@@ -689,17 +713,37 @@ export default function AllocateModal({
                   <span><span className="font-medium">Allocate as caretaker</span><span className="block text-xs text-indigo-700">Uses this bed and inherits the Delegate&apos;s stay dates.</span></span>
                 </label>
                 {isCaretaker && (
-                  <select
-                    aria-label="Caretaker for"
-                    value={caretakerForAllocationId}
-                    onChange={(event) => setCaretakerForAllocationId(event.target.value)}
-                    className="mt-2 w-full rounded-lg border border-indigo-200 bg-white p-2 text-sm text-gray-900"
-                  >
-                    <option value="">Choose Delegate</option>
-                    {eligibleDelegates.map((delegate) => (
-                      <option key={delegate.id} value={delegate.id}>{delegate.name} — Bed {delegate.bedNumber}</option>
-                    ))}
-                  </select>
+                  <div className="mt-2 space-y-2">
+                    <label className="block text-xs font-medium text-indigo-900">
+                      Search Delegates
+                      <input
+                        type="search"
+                        aria-label="Search Delegates"
+                        value={delegateSearch}
+                        onChange={(event) => {
+                          setDelegateSearch(event.target.value);
+                          setCaretakerForAllocationId('');
+                        }}
+                        placeholder="Name or bed number"
+                        className="mt-1 w-full rounded-lg border border-indigo-200 bg-white p-2 text-sm text-gray-900 outline-none focus:border-indigo-500"
+                      />
+                    </label>
+                    <select
+                      aria-label="Caretaker for"
+                      value={caretakerForAllocationId}
+                      onChange={(event) => {
+                        setCaretakerForAllocationId(event.target.value);
+                        if (event.target.value) setDelegateSearch('');
+                      }}
+                      className="w-full rounded-lg border border-indigo-200 bg-white p-2 text-sm text-gray-900"
+                    >
+                      <option value="">Choose Delegate</option>
+                      {filteredDelegates.map((delegate) => (
+                        <option key={delegate.id} value={delegate.id}>{delegate.name} — Bed {delegate.bedNumber}</option>
+                      ))}
+                      {filteredDelegates.length === 0 && <option disabled>No matching Delegates</option>}
+                    </select>
+                  </div>
                 )}
               </div>
             )}
