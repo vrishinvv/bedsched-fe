@@ -60,7 +60,8 @@ test('shows a clear notice when a stale screen attempts a second caretaker', asy
   await page.goto('/locations/61/tents/1/blocks/1');
   await page.getByTitle('Bed 2: Available').click();
   await page.getByLabel('Allocate as caretaker').check();
-  await page.getByRole('combobox', { name: 'Caretaker for' }).selectOption('101');
+  await page.getByRole('combobox', { name: 'Caretaker for' }).fill('Delegate');
+  await page.getByRole('option', { name: 'Verified Delegate — Bed 1' }).click();
   await page.getByPlaceholder('Full name').fill('Second Caretaker');
   await page.getByRole('button', { name: 'Allocate', exact: true }).click();
 

@@ -90,7 +90,9 @@ test('allocates a name-only caretaker into a Delegate-only block', async ({ page
   await page.getByLabel('Allocate as caretaker').check();
   await expect(page.getByText('Sai Connect lookup is not required for caretakers')).toBeVisible();
   await expect(page.getByText('Sai Connect lookup is required', { exact: true })).toHaveCount(0);
-  await page.getByRole('combobox', { name: 'Caretaker for' }).selectOption('101');
+  const caretakerPicker = page.getByRole('combobox', { name: 'Caretaker for' });
+  await caretakerPicker.fill('Verified');
+  await page.getByRole('option', { name: 'Verified Delegate — Bed 1' }).click();
   await page.getByPlaceholder('Full name').fill('Devotee Caretaker');
   await page.getByRole('button', { name: 'Allocate', exact: true }).click();
 
@@ -164,16 +166,18 @@ test('filters the caretaker Delegate picker by name or bed number', async ({ pag
   await page.getByTitle('Bed 3: Available').click();
   await page.getByLabel('Allocate as caretaker').check();
 
-  const search = page.getByRole('searchbox', { name: 'Search Delegates' });
   const delegatePicker = page.getByRole('combobox', { name: 'Caretaker for' });
-  await search.fill('Lakshmi');
+  await expect(page.getByRole('searchbox', { name: 'Search Delegates' })).toHaveCount(0);
+  await delegatePicker.fill('Lakshmi');
 
-  await expect(delegatePicker).toContainText('Lakshmi Delegate — Bed 2');
-  await expect(delegatePicker).not.toContainText('Arun Delegate');
+  await expect(page.getByRole('option', { name: 'Lakshmi Delegate — Bed 2' })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'Arun Delegate — Bed 1' })).toHaveCount(0);
+  await page.getByRole('option', { name: 'Lakshmi Delegate — Bed 2' }).click();
+  await expect(delegatePicker).toHaveValue('Lakshmi Delegate — Bed 2');
 
-  await search.fill('1');
-  await expect(delegatePicker).toContainText('Arun Delegate — Bed 1');
-  await expect(delegatePicker).not.toContainText('Lakshmi Delegate');
+  await delegatePicker.fill('1');
+  await expect(page.getByRole('option', { name: 'Arun Delegate — Bed 1' })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'Lakshmi Delegate — Bed 2' })).toHaveCount(0);
 });
 
 test('shows verified Sai categories without exposing the backend Devotee default', async ({ page }) => {

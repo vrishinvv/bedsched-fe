@@ -66,6 +66,8 @@ export default function AllocateModal({
   const [isCaretaker, setIsCaretaker] = useState(false);
   const [caretakerForAllocationId, setCaretakerForAllocationId] = useState('');
   const [delegateSearch, setDelegateSearch] = useState('');
+  const [delegatePickerOpen, setDelegatePickerOpen] = useState(false);
+  const [activeDelegateIndex, setActiveDelegateIndex] = useState(-1);
   const ref = useRef(null);
   const scrollRef = useRef(null); // Ref for scrollable content area
   const topRef = useRef(null); // Ref for top element to scroll to
@@ -131,6 +133,8 @@ export default function AllocateModal({
       setIsCaretaker(Boolean(initialData?.caretakerForAllocationId));
       setCaretakerForAllocationId(initialData?.caretakerForAllocationId ? String(initialData.caretakerForAllocationId) : '');
       setDelegateSearch('');
+      setDelegatePickerOpen(false);
+      setActiveDelegateIndex(-1);
       setAccommodationCategory(initialData?.accommodationCategory || 'devotee');
       
       // Pre-fetch upload URLs in background (non-blocking)
@@ -199,13 +203,48 @@ export default function AllocateModal({
       startDate: initialData.startDate,
       endDate: initialData.endDate,
     } : null);
-  const normalizedDelegateSearch = delegateSearch.trim().toLowerCase();
+  const selectedDelegateLabel = selectedDelegate
+    ? `${selectedDelegate.name} — Bed ${selectedDelegate.bedNumber}`
+    : '';
+  const normalizedDelegateSearch = delegateSearch === selectedDelegateLabel
+    ? ''
+    : delegateSearch.trim().toLowerCase();
   const filteredDelegates = normalizedDelegateSearch
     ? eligibleDelegates.filter((delegate) => (
       delegate.name.toLowerCase().includes(normalizedDelegateSearch)
       || String(delegate.bedNumber).includes(normalizedDelegateSearch)
     ))
     : eligibleDelegates;
+
+  function chooseDelegate(delegate) {
+    setCaretakerForAllocationId(String(delegate.id));
+    setDelegateSearch(`${delegate.name} — Bed ${delegate.bedNumber}`);
+    setDelegatePickerOpen(false);
+    setActiveDelegateIndex(-1);
+  }
+
+  function handleDelegatePickerKeyDown(event) {
+    if (event.key === 'Escape') {
+      setDelegatePickerOpen(false);
+      setActiveDelegateIndex(-1);
+      return;
+    }
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      setDelegatePickerOpen(true);
+      if (filteredDelegates.length === 0) return;
+      setActiveDelegateIndex((current) => {
+        if (event.key === 'ArrowDown') return current >= filteredDelegates.length - 1 ? 0 : current + 1;
+        return current <= 0 ? filteredDelegates.length - 1 : current - 1;
+      });
+      return;
+    }
+    if (event.key === 'Enter' && delegatePickerOpen && activeDelegateIndex >= 0) {
+      event.preventDefault();
+      const delegate = filteredDelegates[activeDelegateIndex];
+      if (delegate) chooseDelegate(delegate);
+    }
+  }
 
   async function handleSaiLookup() {
     if (!saiIdentifier.trim()) {
@@ -725,6 +764,8 @@ export default function AllocateModal({
                     onChange={(event) => {
                       setIsCaretaker(event.target.checked);
                       setDelegateSearch('');
+                      setDelegatePickerOpen(false);
+                      setActiveDelegateIndex(-1);
                       if (!event.target.checked) setCaretakerForAllocationId('');
                     }}
                     className="mt-0.5 h-4 w-4 accent-indigo-700"
@@ -732,36 +773,70 @@ export default function AllocateModal({
                   <span><span className="font-medium">Allocate as caretaker</span><span className="block text-xs text-indigo-700">Uses this bed and inherits the Delegate&apos;s stay dates.</span></span>
                 </label>
                 {isCaretaker && (
-                  <div className="mt-2 space-y-2">
-                    <label className="block text-xs font-medium text-indigo-900">
-                      Search Delegates
-                      <input
-                        type="search"
-                        aria-label="Search Delegates"
-                        value={delegateSearch}
-                        onChange={(event) => {
-                          setDelegateSearch(event.target.value);
-                          setCaretakerForAllocationId('');
-                        }}
-                        placeholder="Name or bed number"
-                        className="mt-1 w-full rounded-lg border border-indigo-200 bg-white p-2 text-sm text-gray-900 outline-none focus:border-indigo-500"
-                      />
+                  <div
+                    className="relative mt-2"
+                    onBlur={(event) => {
+                      if (!event.currentTarget.contains(event.relatedTarget)) {
+                        setDelegatePickerOpen(false);
+                        setActiveDelegateIndex(-1);
+                      }
+                    }}
+                  >
+                    <label htmlFor="caretaker-delegate-picker" className="block text-xs font-medium text-indigo-900">
+                      Caretaker for
                     </label>
-                    <select
+                    <input
+                      id="caretaker-delegate-picker"
+                      type="text"
+                      role="combobox"
                       aria-label="Caretaker for"
-                      value={caretakerForAllocationId}
-                      onChange={(event) => {
-                        setCaretakerForAllocationId(event.target.value);
-                        if (event.target.value) setDelegateSearch('');
+                      aria-autocomplete="list"
+                      aria-expanded={delegatePickerOpen}
+                      aria-controls="caretaker-delegate-options"
+                      aria-activedescendant={activeDelegateIndex >= 0 ? `caretaker-delegate-option-${filteredDelegates[activeDelegateIndex]?.id}` : undefined}
+                      value={delegateSearch}
+                      placeholder="Search by name or bed number"
+                      autoComplete="off"
+                      onFocus={() => {
+                        setDelegatePickerOpen(true);
+                        setActiveDelegateIndex(-1);
                       }}
-                      className="w-full rounded-lg border border-indigo-200 bg-white p-2 text-sm text-gray-900"
-                    >
-                      <option value="">Choose Delegate</option>
-                      {filteredDelegates.map((delegate) => (
-                        <option key={delegate.id} value={delegate.id}>{delegate.name} — Bed {delegate.bedNumber}</option>
-                      ))}
-                      {filteredDelegates.length === 0 && <option disabled>No matching Delegates</option>}
-                    </select>
+                      onChange={(event) => {
+                        setDelegateSearch(event.target.value);
+                        setCaretakerForAllocationId('');
+                        setDelegatePickerOpen(true);
+                        setActiveDelegateIndex(0);
+                      }}
+                      onKeyDown={handleDelegatePickerKeyDown}
+                      className="mt-1 w-full rounded-lg border border-indigo-200 bg-white p-2 pr-9 text-sm text-gray-900 outline-none focus:border-indigo-500"
+                    />
+                    <span aria-hidden="true" className="pointer-events-none absolute right-3 top-8 text-xs text-indigo-500">⌄</span>
+                    {delegatePickerOpen && (
+                      <div
+                        id="caretaker-delegate-options"
+                        role="listbox"
+                        aria-label="Eligible Delegates"
+                        className="absolute z-20 mt-1 max-h-44 w-full overflow-y-auto rounded-lg border border-indigo-200 bg-white p-1 shadow-lg"
+                      >
+                        {filteredDelegates.map((delegate, index) => (
+                          <button
+                            key={delegate.id}
+                            id={`caretaker-delegate-option-${delegate.id}`}
+                            type="button"
+                            role="option"
+                            aria-selected={String(delegate.id) === String(caretakerForAllocationId)}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => chooseDelegate(delegate)}
+                            className={`block w-full rounded-md px-3 py-2 text-left text-sm ${index === activeDelegateIndex ? 'bg-indigo-50 text-indigo-950' : 'text-gray-900 hover:bg-gray-50'}`}
+                          >
+                            {delegate.name} — Bed {delegate.bedNumber}
+                          </button>
+                        ))}
+                        {filteredDelegates.length === 0 && (
+                          <p className="px-3 py-2 text-sm text-gray-500">No matching Delegates</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
