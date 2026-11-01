@@ -78,6 +78,10 @@ test('allocates a caretaker with gender and locked Delegate stay dates', async (
   await page.goto('/login');
   await page.evaluate(() => window.localStorage.setItem('bs_token', 'playwright-token'));
   await page.goto('/locations/61/tents/1/blocks/1');
+  const categoryTags = page.getByRole('region', { name: 'Allowed accommodation categories' });
+  await expect(categoryTags.getByText('Delegate', { exact: true })).toBeVisible();
+  await expect(categoryTags.getByText('Sevadal', { exact: true })).toHaveCount(0);
+  await expect(categoryTags.getByText('Devotee', { exact: true })).toHaveCount(0);
   await page.getByTitle('Bed 2: Available').click();
   await expect(page.getByText('Sai Connect lookup is required')).toBeVisible();
   await expect(page.getByText('Complete the lookup to verify eligibility for this restricted block. A person without an eligible registration cannot be allocated here.')).toBeVisible();
@@ -91,7 +95,7 @@ test('allocates a caretaker with gender and locked Delegate stay dates', async (
   await expect(page.getByText('No eligible Delegate or Sevadal registration was found for this block.')).toBeVisible();
   await expect(page.getByText(/devotee/i)).toHaveCount(0);
   await page.getByLabel('Allocate as caretaker').check();
-  await expect(page.getByText('Sai Connect lookup is not required for caretakers')).toBeVisible();
+  await expect(page.getByText('Sai Connect lookup is optional for caretakers')).toBeVisible();
   await expect(page.getByText('Sai Connect lookup is required', { exact: true })).toHaveCount(0);
   const caretakerPicker = page.getByRole('combobox', { name: 'Caretaker for' });
   await caretakerPicker.fill('Verified');
@@ -115,6 +119,245 @@ test('allocates a caretaker with gender and locked Delegate stay dates', async (
   });
   expect(submittedPayload.personPhotoKey).toBeFalsy();
   expect(submittedPayload.aadhaarPhotoKey).toBeFalsy();
+});
+
+test('submits a verified caretaker with their Sai Connect profile and actual category', async ({ page }) => {
+  let submittedPayload;
+  await page.route('**/api/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    const headers = {
+      'access-control-allow-credentials': 'true',
+      'access-control-allow-headers': 'authorization,content-type',
+      'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+      'access-control-allow-origin': 'http://127.0.0.1:3100',
+    };
+    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+    if (path === '/api/auth/me') {
+      return route.fulfill({ status: 200, headers, json: { user: { id: 1, username: 'admin', role: 'admin', locationId: null } } });
+    }
+    if (path === '/api/locations/61/tents/1/blocks/1') {
+      return route.fulfill({
+        status: 200,
+        headers,
+        json: {
+          meta: {
+            location: { id: '61', name: 'Test Location' },
+            tent: { index: 1, name: 'Test Tent' },
+            block: { index: 1, name: 'Delegates', genderRestriction: 'both', allowedCategories: ['delegate'] },
+          },
+          blockSize: 2,
+          beds: {
+            1: {
+              id: 101,
+              name: 'Verified Delegate',
+              status: 'confirmed',
+              accommodationCategory: 'delegate',
+              startDate: '2026-11-05',
+              endDate: '2026-11-24',
+              gender: 'Male',
+            },
+          },
+        },
+      });
+    }
+    if (path === '/api/sai-connect/lookup' && request.method() === 'POST') {
+      return route.fulfill({
+        status: 200,
+        headers,
+        json: {
+          matched: true,
+          saiConnectId: '239910',
+          fullName: 'Verified Sevadal Caretaker',
+          age: 42,
+          mobileNo: '9876543210',
+          gender: 'Female',
+          verifiedCategories: ['sevadal'],
+          registrations: [],
+          verificationToken: 'verified-caretaker-token',
+          existingAllocation: null,
+        },
+      });
+    }
+    if (path.endsWith('/beds/2/allocate') && request.method() === 'POST') {
+      submittedPayload = request.postDataJSON();
+      return route.fulfill({ status: 200, headers, json: { id: 102, ...submittedPayload, status: 'confirmed' } });
+    }
+    return route.fulfill({ status: 404, headers, json: { error: `Unexpected request: ${path}` } });
+  });
+
+  await page.goto('/login');
+  await page.evaluate(() => window.localStorage.setItem('bs_token', 'playwright-token'));
+  await page.goto('/locations/61/tents/1/blocks/1');
+  await page.getByTitle('Bed 2: Available').click();
+  await page.getByPlaceholder('Sai Connect ID or phone').fill('239910');
+  await page.getByRole('button', { name: 'Verify' }).click();
+  await page.getByLabel('Allocate as caretaker').check();
+  await expect(page.getByText('Sai Connect lookup is optional for caretakers')).toBeVisible();
+  await expect(page.getByText('If verified, the caretaker’s Sai Connect ID, category, age, phone, and gender will be saved.', { exact: false })).toBeVisible();
+  await page.getByRole('combobox', { name: 'Caretaker for' }).fill('Verified Delegate');
+  await page.getByRole('option', { name: 'Verified Delegate — Bed 1' }).click();
+  await page.getByRole('button', { name: 'Allocate', exact: true }).click();
+
+  await expect.poll(() => submittedPayload).toBeTruthy();
+  expect(submittedPayload).toMatchObject({
+    name: 'Verified Sevadal Caretaker',
+    phone: '9876543210',
+    gender: 'Female',
+    accommodationCategory: 'sevadal',
+    saiVerificationToken: 'verified-caretaker-token',
+    caretakerForAllocationId: 101,
+  });
+});
+
+test('blocks a duplicate Sai Connect ID during verification and shows its existing bed', async ({ page }) => {
+  let allocationRequests = 0;
+  await page.route('**/api/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    const headers = {
+      'access-control-allow-credentials': 'true',
+      'access-control-allow-headers': 'authorization,content-type',
+      'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+      'access-control-allow-origin': 'http://127.0.0.1:3100',
+    };
+    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+    if (path === '/api/auth/me') {
+      return route.fulfill({ status: 200, headers, json: { user: { id: 1, username: 'admin', role: 'admin', locationId: null } } });
+    }
+    if (path === '/api/locations/61/tents/1/blocks/1') {
+      return route.fulfill({
+        status: 200,
+        headers,
+        json: {
+          meta: {
+            location: { id: '61', name: 'Test Location' },
+            tent: { index: 1, name: 'Test Tent' },
+            block: { index: 1, name: 'Delegates', genderRestriction: 'both', allowedCategories: ['delegate'] },
+          },
+          blockSize: 1,
+          beds: {},
+        },
+      });
+    }
+    if (path === '/api/sai-connect/lookup' && request.method() === 'POST') {
+      return route.fulfill({
+        status: 200,
+        headers,
+        json: {
+          matched: true,
+          saiConnectId: '808675',
+          fullName: 'Existing Delegate',
+          age: 35,
+          mobileNo: '9876543210',
+          gender: 'Male',
+          verifiedCategories: ['delegate'],
+          registrations: [],
+          verificationToken: 'verified-token',
+          existingAllocation: {
+            locationName: 'Anand Vilas Enclave',
+            tentName: 'Tent A',
+            blockName: 'Block 1',
+            bedNumber: 25,
+          },
+          allocationConflictMessage: 'This Sai Connect ID is already booked at Anand Vilas Enclave / Tent A / Block 1 / Bed 25.',
+        },
+      });
+    }
+    if (path.endsWith('/beds/1/allocate') && request.method() === 'POST') {
+      allocationRequests += 1;
+      return route.fulfill({ status: 500, headers, json: { error: 'should_not_allocate' } });
+    }
+    return route.fulfill({ status: 404, headers, json: { error: `Unexpected request: ${path}` } });
+  });
+
+  await page.goto('/login');
+  await page.evaluate(() => window.localStorage.setItem('bs_token', 'playwright-token'));
+  await page.goto('/locations/61/tents/1/blocks/1');
+  await page.getByTitle('Bed 1: Available').click();
+  await page.getByPlaceholder('Sai Connect ID or phone').fill('808675');
+  await page.getByRole('button', { name: 'Verify' }).click();
+
+  const conflict = page.getByRole('alert', { name: 'Sai Connect booking conflict' });
+  await expect(conflict).toHaveText('This Sai Connect ID is already booked at Anand Vilas Enclave / Tent A / Block 1 / Bed 25.');
+  await expect(page.getByRole('button', { name: 'Allocate', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Allocate', exact: true }).click({ force: true });
+  expect(allocationRequests).toBe(0);
+});
+
+test('keeps the precise Sai Connect conflict if another operator books after verification', async ({ page }) => {
+  await page.route('**/api/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    const headers = {
+      'access-control-allow-credentials': 'true',
+      'access-control-allow-headers': 'authorization,content-type',
+      'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+      'access-control-allow-origin': 'http://127.0.0.1:3100',
+    };
+    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+    if (path === '/api/auth/me') {
+      return route.fulfill({ status: 200, headers, json: { user: { id: 1, username: 'admin', role: 'admin', locationId: null } } });
+    }
+    if (path === '/api/locations/61/tents/1/blocks/1') {
+      return route.fulfill({
+        status: 200,
+        headers,
+        json: {
+          meta: {
+            location: { id: '61', name: 'Test Location' },
+            tent: { index: 1, name: 'Test Tent' },
+            block: { index: 1, name: 'Delegates', genderRestriction: 'both', allowedCategories: ['delegate'] },
+          },
+          blockSize: 1,
+          beds: {},
+        },
+      });
+    }
+    if (path === '/api/sai-connect/lookup' && request.method() === 'POST') {
+      return route.fulfill({
+        status: 200,
+        headers,
+        json: {
+          matched: true,
+          saiConnectId: '808675',
+          fullName: 'New Delegate',
+          age: 35,
+          mobileNo: '9876543210',
+          gender: 'Male',
+          verifiedCategories: ['delegate'],
+          registrations: [],
+          verificationToken: 'verified-token',
+          existingAllocation: null,
+        },
+      });
+    }
+    if (path.endsWith('/beds/1/allocate') && request.method() === 'POST') {
+      return route.fulfill({
+        status: 400,
+        headers,
+        json: {
+          error: 'sai_connect_already_allocated',
+          message: 'This Sai Connect ID is already booked at Anand Vilas Enclave / Tent A / Block 1 / Bed 25.',
+        },
+      });
+    }
+    return route.fulfill({ status: 404, headers, json: { error: `Unexpected request: ${path}` } });
+  });
+
+  await page.goto('/login');
+  await page.evaluate(() => window.localStorage.setItem('bs_token', 'playwright-token'));
+  await page.goto('/locations/61/tents/1/blocks/1');
+  await page.getByTitle('Bed 1: Available').click();
+  await page.getByPlaceholder('Sai Connect ID or phone').fill('808675');
+  await page.getByRole('button', { name: 'Verify' }).click();
+  await page.locator('input[name="startDate"]').fill('2026-11-05');
+  await page.locator('input[name="endDate"]').fill('2026-11-24');
+  await page.getByRole('button', { name: 'Allocate', exact: true }).click();
+
+  await expect(page.getByText('This Sai Connect ID is already booked at Anand Vilas Enclave / Tent A / Block 1 / Bed 25.')).toBeVisible();
+  await expect(page.getByText('Bed 1 is already booked. Please choose another available bed.')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Allocate bed — Bed 1' })).toBeVisible();
 });
 
 test('prefills and locks Sai gender while blocking a gender mismatch', async ({ page }) => {

@@ -576,7 +576,10 @@ export default function AllocateModal({
     if (form.endDate && !isWithinBookingWindow(form.endDate)) errs.push(`End date must be ${BOOKING_WINDOW_LABEL}`);
     if (form.startDate && form.endDate && form.endDate < form.startDate) errs.push('End date cannot be before start date');
     if (genderMismatchMessage) errs.push(genderMismatchMessage);
-    if (!isEdit && !isCaretaker && saiLookup.result?.matched && !accommodationCategory) errs.push('Choose Delegate or Sevadal');
+    if (!isEdit && saiLookup.result?.existingAllocation) {
+      errs.push(saiLookup.result.allocationConflictMessage || 'This Sai Connect ID already has an active booking.');
+    }
+    if (!isEdit && saiLookup.result?.matched && !accommodationCategory) errs.push('Choose Delegate or Sevadal');
     if (!isEdit && !isCaretaker && accommodationCategory && !allowedCategories.includes(accommodationCategory)) {
       if (accommodationCategory === 'devotee') {
         if (saiLookup.result && !saiLookup.result.matched) {
@@ -680,14 +683,14 @@ export default function AllocateModal({
             <div>
               <div className="text-sm font-semibold text-indigo-950">
                 {isCaretaker
-                  ? 'Sai Connect lookup is not required for caretakers'
+                  ? 'Sai Connect lookup is optional for caretakers'
                   : saiLookupRequired
                     ? 'Sai Connect lookup is required'
                     : 'Sai Connect lookup is optional'}
               </div>
               <p className="mt-1 text-xs text-indigo-700">
                 {isCaretaker
-                  ? 'The caretaker is linked to the selected Delegate and only their name is required.'
+                  ? 'You can continue without lookup. If verified, the caretaker’s Sai Connect ID, category, age, phone, and gender will be saved.'
                   : saiLookupRequired
                     ? 'Complete the lookup to verify eligibility for this restricted block. A person without an eligible registration cannot be allocated here.'
                     : 'Use a Sai Connect ID or phone number to verify Delegate or Sevadal status. If skipped or not found, continue with the normal allocation flow.'}
@@ -743,7 +746,16 @@ export default function AllocateModal({
                   : 'You can continue with the normal allocation flow.'}
               </div>
             )}
-            {saiLookup.result?.matched && (
+            {saiLookup.result?.existingAllocation && (
+              <div
+                role="alert"
+                aria-label="Sai Connect booking conflict"
+                className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-medium text-red-900"
+              >
+                {saiLookup.result.allocationConflictMessage || 'This Sai Connect ID already has an active booking.'}
+              </div>
+            )}
+            {saiLookup.result?.matched && !saiLookup.result.existingAllocation && (
               <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
                 <div className="text-sm font-semibold capitalize text-emerald-950">
                   {saiLookup.result.verifiedCategories.length > 1

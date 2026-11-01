@@ -399,15 +399,11 @@ export default function BlockBedsPage({ params }) {
         }
       }
 
-      // Check for 409 conflict error (bed already allocated by someone else)
-      const is409Conflict = 
-        e.response?.status === 409 || 
-        e.message?.toLowerCase().includes('already allocated') || 
-        e.message?.toLowerCase().includes('already booked') ||
-        e.message?.toLowerCase().includes('bed_already_allocated') ||
-        e.message?.toLowerCase().includes('overlapping_allocation');
+      // Only actual bed conflicts should replace the server's specific error message.
+      const errorCode = e.response?.data?.error;
+      const isBedConflict = ['bed_already_allocated', 'overlapping_allocation'].includes(errorCode);
       
-      if (is409Conflict && !isEdit && n != null) {
+      if (isBedConflict && !isEdit && n != null) {
         setModal({ open: false, bedNumber: null, data: null });
         setBatchSelection([]);
         showNotification('error', `Bed ${n} is already booked. Please choose another available bed.`);
@@ -702,7 +698,7 @@ export default function BlockBedsPage({ params }) {
             {meta.location.name} | {meta.tent.name || `Tent ${meta.tent.index}`} | {meta.block.name || `Block ${meta.block.index}`}
           </h2>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
               <p className="text-xs sm:text-sm text-purple-200/80">{stats.totalCapacity} beds • {stats.totalAllocated} occupied • {stats.totalNotAllocated} available • {stats.totalReserved} reserved</p>
               <div className={`px-3 py-1.5 rounded-full text-sm font-semibold border ${
                 genderRestriction === 'male_only' ? 'text-blue-200 bg-blue-600/40 border-blue-400/50' :
@@ -711,10 +707,15 @@ export default function BlockBedsPage({ params }) {
               }`}>
                 {genderRestriction === 'male_only' ? '♂️ Male Only' : genderRestriction === 'female_only' ? '♀️ Female Only' : '👫 All Genders'}
               </div>
-              <div className="flex flex-wrap gap-1.5">
+              <div
+                className="flex flex-wrap items-center gap-1.5"
+                role="region"
+                aria-label="Allowed accommodation categories"
+              >
+                <span className="text-xs font-medium text-gray-300">Allowed:</span>
                 {allowedCategories.map((category) => (
-                  <span key={category} className="rounded-full border border-purple-400/30 bg-purple-500/10 px-2 py-1 text-xs font-medium capitalize text-purple-100">
-                    {category}
+                  <span key={category} className="rounded-full border border-white/20 bg-white/10 px-2 py-1 text-xs font-medium text-white">
+                    {category === 'delegate' ? 'Delegate' : category === 'sevadal' ? 'Sevadal' : 'Devotee'}
                   </span>
                 ))}
               </div>
