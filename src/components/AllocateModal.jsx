@@ -11,6 +11,14 @@ import {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+function normalizeGender(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'male' || normalized === 'm') return 'Male';
+  if (normalized === 'female' || normalized === 'f') return 'Female';
+  if (normalized === 'other' || normalized === 'o') return 'Other';
+  return '';
+}
+
 function getToken() {
   if (typeof window === 'undefined') return null;
   try {
@@ -219,6 +227,11 @@ export default function AllocateModal({
   function chooseDelegate(delegate) {
     setCaretakerForAllocationId(String(delegate.id));
     setDelegateSearch(`${delegate.name} — Bed ${delegate.bedNumber}`);
+    setForm((current) => ({
+      ...current,
+      startDate: delegate.startDate || '',
+      endDate: delegate.endDate || '',
+    }));
     setDelegatePickerOpen(false);
     setActiveDelegateIndex(-1);
   }
@@ -265,6 +278,7 @@ export default function AllocateModal({
         ...current,
         name: result.fullName || current.name,
         phone: /^\d{10}$/.test(String(result.mobileNo || '')) ? String(result.mobileNo) : current.phone,
+        gender: normalizeGender(result.gender) || current.gender,
       }));
       setSaiLookup({ loading: false, result, error: '' });
     } catch (error) {
@@ -326,6 +340,18 @@ export default function AllocateModal({
   };
 
   const availableGenders = getAvailableGenderOptions();
+  const saiVerifiedGender = !isCaretaker && saiLookup.result?.matched
+    ? normalizeGender(saiLookup.result.gender)
+    : '';
+  const displayedGenderOptions = saiVerifiedGender && !availableGenders.some(({ value }) => value === saiVerifiedGender)
+    ? [...availableGenders, { value: saiVerifiedGender, label: saiVerifiedGender }]
+    : availableGenders;
+  const selectedGender = form.gender || 'Male';
+  const genderMismatchMessage = genderRestriction === 'male_only' && selectedGender.toLowerCase() !== 'male'
+    ? 'Gender mismatch: this block is restricted to male guests only.'
+    : genderRestriction === 'female_only' && selectedGender.toLowerCase() !== 'female'
+      ? 'Gender mismatch: this block is restricted to female guests only.'
+      : '';
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -357,8 +383,10 @@ export default function AllocateModal({
   }
 
   async function handleSave(saveAndNext = false) {
-    if (!form.name || (!isCaretaker && (!form.startDate || !form.endDate || !form.phone))) {
-      return alert(isCaretaker ? 'Name is required' : 'Name, phone, start & end dates are required');
+    if (!form.name || !form.startDate || !form.endDate || !form.gender || (!isCaretaker && !form.phone)) {
+      return alert(isCaretaker
+        ? 'Name, gender, start & end dates are required'
+        : 'Name, phone, gender, start & end dates are required');
     }
 
     if (!isCaretaker && !/^\d{10}$/.test(form.phone)) {
@@ -384,24 +412,23 @@ export default function AllocateModal({
     const today = getTodayDate();
     
     // Validate date range
-    if (!isCaretaker && !isWithinBookingWindow(form.startDate)) {
+    if (!isWithinBookingWindow(form.startDate)) {
       return alert(`Start date must be between ${MIN_DATE} and ${MAX_DATE}.`);
     }
-    if (!isCaretaker && !isWithinBookingWindow(form.endDate)) {
+    if (!isWithinBookingWindow(form.endDate)) {
       return alert(`End date must be between ${MIN_DATE} and ${MAX_DATE}.`);
     }
     
     // End date cannot be before start date
-    if (!isCaretaker && form.endDate < form.startDate) {
+    if (form.endDate < form.startDate) {
       return alert('End date cannot be before start date.');
     }
 
     // Validate gender restriction
-    const selectedGender = form.gender || 'Male';
-    if (!isCaretaker && genderRestriction === 'male_only' && selectedGender.toLowerCase() !== 'male') {
+    if (genderRestriction === 'male_only' && selectedGender.toLowerCase() !== 'male') {
       return alert('This tent is restricted to male guests only. Please select Male as the gender.');
     }
-    if (!isCaretaker && genderRestriction === 'female_only' && selectedGender.toLowerCase() !== 'female') {
+    if (genderRestriction === 'female_only' && selectedGender.toLowerCase() !== 'female') {
       return alert('This tent is restricted to female guests only. Please select Female as the gender.');
     }
 
@@ -426,7 +453,7 @@ export default function AllocateModal({
       // Prepare backend payload (we have keys already!)
       const payload = {
         ...form,
-        gender: isCaretaker ? undefined : selectedGender,
+        gender: selectedGender,
         emergencyPhone: emergencyDigits || undefined,
         personPhotoKey,
         aadhaarPhotoKey,
@@ -573,14 +600,13 @@ export default function AllocateModal({
     if (!isEdit && !isCaretaker && !personPhoto.blob && !personPhoto.dataUrl) errs.push('Person photo is required');
     if (!isEdit && !isCaretaker && !aadhaarPhoto.blob && !aadhaarPhoto.dataUrl) errs.push('Identity photo is required');
     if (!isEdit && saiLookupRequired && !saiLookup.result) errs.push('Complete Sai Connect lookup');
-    if (!isCaretaker && !form.startDate) errs.push('Start date is required');
-    if (!isCaretaker && !form.endDate) errs.push('End date is required');
-    if (!isCaretaker && form.startDate && !isWithinBookingWindow(form.startDate)) errs.push(`Start date must be ${BOOKING_WINDOW_LABEL}`);
-    if (!isCaretaker && form.endDate && !isWithinBookingWindow(form.endDate)) errs.push(`End date must be ${BOOKING_WINDOW_LABEL}`);
-    if (!isCaretaker && form.startDate && form.endDate && form.endDate < form.startDate) errs.push('End date cannot be before start date');
-    const selectedGender = form.gender || 'Male';
-    if (!isCaretaker && genderRestriction === 'male_only' && selectedGender.toLowerCase() !== 'male') errs.push('This tent is restricted to male guests only');
-    if (!isCaretaker && genderRestriction === 'female_only' && selectedGender.toLowerCase() !== 'female') errs.push('This tent is restricted to female guests only');
+    if (!form.gender) errs.push('Gender is required');
+    if (!form.startDate) errs.push(isCaretaker ? 'Choose a Delegate to copy the caretaker stay dates' : 'Start date is required');
+    if (!form.endDate) errs.push(isCaretaker ? 'Choose a Delegate to copy the caretaker stay dates' : 'End date is required');
+    if (form.startDate && !isWithinBookingWindow(form.startDate)) errs.push(`Start date must be ${BOOKING_WINDOW_LABEL}`);
+    if (form.endDate && !isWithinBookingWindow(form.endDate)) errs.push(`End date must be ${BOOKING_WINDOW_LABEL}`);
+    if (form.startDate && form.endDate && form.endDate < form.startDate) errs.push('End date cannot be before start date');
+    if (genderMismatchMessage) errs.push(genderMismatchMessage);
     if (!isEdit && !isCaretaker && saiLookup.result?.matched && !accommodationCategory) errs.push('Choose Delegate or Sevadal');
     if (!isEdit && !isCaretaker && accommodationCategory && !allowedCategories.includes(accommodationCategory)) {
       if (accommodationCategory === 'devotee') {
@@ -671,14 +697,14 @@ export default function AllocateModal({
         </div>}
 
         {/* Tent Gender Restriction Info */}
-        {!isCaretaker && <div className={`mb-4 p-3 rounded-lg border ${genderInfo.bgColor} ${genderInfo.borderColor}`}>
+        <div className={`mb-4 p-3 rounded-lg border ${genderInfo.bgColor} ${genderInfo.borderColor}`}>
           <div className={`text-sm ${genderInfo.textColor}`}>
             <div className="font-medium flex items-center gap-2">
               <span className="text-lg">{genderInfo.icon}</span>
               {genderInfo.text}
             </div>
           </div>
-        </div>}
+        </div>
 
         {!isEdit && (
           <section className="mb-4 space-y-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3">
@@ -702,9 +728,16 @@ export default function AllocateModal({
               <input
                 value={saiIdentifier}
                 onChange={(event) => {
+                  const shouldResetVerifiedGender = Boolean(saiLookup.result?.matched && normalizeGender(saiLookup.result.gender));
                   setSaiIdentifier(event.target.value.replace(/\D/g, '').slice(0, 15));
                   setSaiLookup({ loading: false, result: null, error: '' });
                   setAccommodationCategory('devotee');
+                  if (shouldResetVerifiedGender) {
+                    setForm((current) => ({
+                      ...current,
+                      gender: genderRestriction === 'female_only' ? 'Female' : 'Male',
+                    }));
+                  }
                 }}
                 inputMode="numeric"
                 placeholder="Sai Connect ID or phone"
@@ -782,7 +815,8 @@ export default function AllocateModal({
                       setDelegateSearch('');
                       setDelegatePickerOpen(false);
                       setActiveDelegateIndex(-1);
-                      if (!event.target.checked) setCaretakerForAllocationId('');
+                      setCaretakerForAllocationId('');
+                      setForm((current) => ({ ...current, startDate: '', endDate: '' }));
                     }}
                     className="mt-0.5 h-4 w-4 accent-indigo-700"
                   />
@@ -820,6 +854,7 @@ export default function AllocateModal({
                       onChange={(event) => {
                         setDelegateSearch(event.target.value);
                         setCaretakerForAllocationId('');
+                        setForm((current) => ({ ...current, startDate: '', endDate: '' }));
                         setDelegatePickerOpen(true);
                         setActiveDelegateIndex(0);
                       }}
@@ -905,11 +940,6 @@ export default function AllocateModal({
               placeholder="Full name" 
             />
           </div>
-          {isCaretaker && selectedDelegate && (
-            <div className="sm:col-span-2 rounded-lg border border-indigo-100 bg-indigo-50 p-3 text-sm text-indigo-900">
-              <span className="font-medium">Stay dates:</span> {formatDateForDisplay(selectedDelegate.startDate)} to {formatDateForDisplay(selectedDelegate.endDate)} — copied from {selectedDelegate.name}
-            </div>
-          )}
           {!isCaretaker && <>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Phone{isCaretaker ? ' (Optional)' : '*'}</label>
@@ -942,21 +972,25 @@ export default function AllocateModal({
             />
             <p className="text-xs text-gray-500 mt-1">Alternative contact number</p>
           </div>
+          </>}
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Gender{isCaretaker ? ' (Optional)' : '*'}</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Gender*</label>
             <select 
               name="gender" 
               value={form.gender} 
               onChange={handleChange} 
-              disabled={isProcessing || isCaretaker}
+              disabled={isProcessing || Boolean(saiVerifiedGender)}
               className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
-              {availableGenders.map(option => (
+              {displayedGenderOptions.map(option => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
-            {genderRestriction !== 'both' && (
-              <p className="text-xs text-gray-500 mt-1">Limited by tent restriction</p>
+            {saiVerifiedGender
+              ? <p className="mt-1 text-xs text-gray-500">Verified by Sai Connect and cannot be edited</p>
+              : genderRestriction !== 'both' && <p className="mt-1 text-xs text-gray-500">Limited by tent restriction</p>}
+            {genderMismatchMessage && (
+              <p role="alert" aria-label="Gender mismatch" className="mt-1 text-xs font-medium text-red-700">{genderMismatchMessage}</p>
             )}
           </div>
           <div>
@@ -987,8 +1021,6 @@ export default function AllocateModal({
             />
             <p className="text-xs text-gray-500 mt-1">{isCaretaker ? 'Copied from the selected Delegate' : BOOKING_WINDOW_LABEL}</p>
           </div>
-          </>}
-
           {/* Photo Capture Section */}
           {!isCaretaker && <div className="sm:col-span-2 space-y-4 mt-4">
             <div className="border-t pt-4">

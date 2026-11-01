@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('allocates a name-only caretaker into a Delegate-only block', async ({ page }) => {
+test('allocates a caretaker with gender and locked Delegate stay dates', async ({ page }) => {
   let submittedPayload;
   await page.route('**/api/**', async (route) => {
     const request = route.request();
@@ -97,16 +97,90 @@ test('allocates a name-only caretaker into a Delegate-only block', async ({ page
   await caretakerPicker.fill('Verified');
   await page.getByRole('option', { name: 'Verified Delegate — Bed 1' }).click();
   await page.getByPlaceholder('Full name').fill('Devotee Caretaker');
+  await expect(page.locator('input[name="startDate"]')).toHaveValue('2026-11-05');
+  await expect(page.locator('input[name="startDate"]')).toBeDisabled();
+  await expect(page.locator('input[name="endDate"]')).toHaveValue('2026-11-24');
+  await expect(page.locator('input[name="endDate"]')).toBeDisabled();
+  await page.locator('select[name="gender"]').selectOption('Female');
   await page.getByRole('button', { name: 'Allocate', exact: true }).click();
 
   await expect.poll(() => submittedPayload).toBeTruthy();
   expect(submittedPayload).toMatchObject({
     name: 'Devotee Caretaker',
+    gender: 'Female',
+    startDate: '2026-11-05',
+    endDate: '2026-11-24',
     accommodationCategory: 'devotee',
     caretakerForAllocationId: 101,
   });
   expect(submittedPayload.personPhotoKey).toBeFalsy();
   expect(submittedPayload.aadhaarPhotoKey).toBeFalsy();
+});
+
+test('prefills and locks Sai gender while blocking a gender mismatch', async ({ page }) => {
+  await page.route('**/api/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    const headers = {
+      'access-control-allow-credentials': 'true',
+      'access-control-allow-headers': 'authorization,content-type',
+      'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+      'access-control-allow-origin': 'http://127.0.0.1:3100',
+    };
+    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+    if (path === '/api/auth/me') {
+      return route.fulfill({ status: 200, headers, json: { user: { id: 1, username: 'admin', role: 'admin', locationId: null } } });
+    }
+    if (path === '/api/locations/61/tents/1/blocks/1') {
+      return route.fulfill({
+        status: 200,
+        headers,
+        json: {
+          meta: {
+            location: { id: '61', name: 'Test Location' },
+            tent: { index: 1, name: 'Test Tent' },
+            block: { index: 1, name: 'Male Delegates', genderRestriction: 'male_only', allowedCategories: ['delegate'] },
+          },
+          blockSize: 1,
+          beds: {},
+        },
+      });
+    }
+    if (path === '/api/sai-connect/lookup' && request.method() === 'POST') {
+      return route.fulfill({
+        status: 200,
+        headers,
+        json: {
+          matched: true,
+          fullName: 'Verified Female Delegate',
+          mobileNo: '9876543210',
+          gender: 'Female',
+          verifiedCategories: ['delegate'],
+          verificationToken: 'female-delegate-token',
+        },
+      });
+    }
+    if (path === '/api/upload-url') {
+      return route.fulfill({ status: 503, headers, json: { error: 'disabled_in_test' } });
+    }
+    return route.fulfill({ status: 404, headers, json: { error: `Unexpected request: ${path}` } });
+  });
+
+  await page.goto('/login');
+  await page.evaluate(() => window.localStorage.setItem('bs_token', 'playwright-token'));
+  await page.goto('/locations/61/tents/1/blocks/1');
+  await page.getByTitle('Bed 1: Available').click();
+  await page.getByPlaceholder('Sai Connect ID or phone').fill('808675');
+  await page.getByRole('button', { name: 'Verify' }).click();
+
+  await expect(page.getByPlaceholder('Full name')).toHaveValue('Verified Female Delegate');
+  await expect(page.locator('select[name="gender"]')).toHaveValue('Female');
+  await expect(page.locator('select[name="gender"]')).toBeDisabled();
+  await expect(page.getByRole('alert', { name: 'Gender mismatch' })).toHaveText(
+    'Gender mismatch: this block is restricted to male guests only.',
+  );
+  await expect(page.getByRole('button', { name: 'Save & Next' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Allocate', exact: true })).toBeDisabled();
 });
 
 test('filters the caretaker Delegate picker by name or bed number', async ({ page }) => {
