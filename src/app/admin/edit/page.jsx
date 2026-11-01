@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { searchAllocationsByPhone, updatePhoneByPhone, updateNameByPhone, updateEmergencyPhoneByPhone, updateEndDateByPhone, deallocateByPhone, getMe } from "@/lib/api";
+import { searchAllocationsByIdentifier, updatePhoneByPhone, updateNameByPhone, updateEmergencyPhoneByPhone, updateEndDateByPhone, deallocateByPhone, getMe } from "@/lib/api";
 import Notification from "@/components/Notification";
 import { TreeSkeleton } from '@/components/Skeleton';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -30,7 +30,7 @@ function EditByPhoneContent() {
   const load = async (ph) => {
     setLoading(true); setNotification(null); setSelectedIds(new Set());
     try {
-      const res = await searchAllocationsByPhone(ph);
+      const res = await searchAllocationsByIdentifier(ph);
       const me = await getMe().catch(() => null);
       setCurrentUser(me?.user || null);
       
@@ -46,8 +46,8 @@ function EditByPhoneContent() {
       }
       
       setData(batches);
-      // Set newPhone to match search phone by default
-      setNewPhone(ph);
+      const matchedPhone = batches.flatMap((batch) => batch.items || []).find((item) => item.phone)?.phone || '';
+      setNewPhone(matchedPhone);
       // Don't pre-fill contact name, emergency phone and end date - let user specify
       setContactName('');
       setEmergencyPhone('');
@@ -94,7 +94,7 @@ function EditByPhoneContent() {
       // Then update to new phone for subsequent searches
       if (ids && ids.length > 0) {
         // Partial update - still have items with old phone
-        const res = await searchAllocationsByPhone(phone);
+        const res = await searchAllocationsByIdentifier(phone);
         setData(res.batches || []);
         setNewPhone(phone); // Reset to current phone
       } else {
@@ -122,7 +122,7 @@ function EditByPhoneContent() {
       setNotification({ type: 'success', message: 'Name updated' });
       setContactName(name.trim());
       // Reload without clearing selection
-      const res = await searchAllocationsByPhone(phone);
+      const res = await searchAllocationsByIdentifier(phone);
       setData(res.batches || []);
     } catch (e) { 
       setNotification({ type: 'error', message: e.message || 'Failed to update contact' });
@@ -147,7 +147,7 @@ function EditByPhoneContent() {
       setNotification({ type: 'success', message: 'Emergency phone updated' });
       setEmergencyPhone(emergencyPhoneValue ? emergencyPhoneValue.trim() : '');
       // Reload without clearing selection
-      const res = await searchAllocationsByPhone(phone);
+      const res = await searchAllocationsByIdentifier(phone);
       setData(res.batches || []);
     } catch (e) { 
       setNotification({ type: 'error', message: e.message || 'Failed to update emergency phone' });
@@ -172,7 +172,7 @@ function EditByPhoneContent() {
       setNotification({ type: 'success', message: 'End date updated' });
       setEndDate(date);
       // Reload without clearing selection
-      const res = await searchAllocationsByPhone(phone);
+      const res = await searchAllocationsByIdentifier(phone);
       setData(res.batches || []);
     } catch (e) { 
       setNotification({ type: 'error', message: e.message || 'Failed to update end date' });
@@ -197,7 +197,7 @@ function EditByPhoneContent() {
       await deallocateByPhone({ phone, allocationIds: ids });
       setNotification({ type: 'success', message: 'Deallocated' });
       // Reload without clearing selection
-      const res = await searchAllocationsByPhone(phone);
+      const res = await searchAllocationsByIdentifier(phone);
       setData(res.batches || []);
       
       // Clear selections for deallocated items
@@ -333,8 +333,8 @@ function EditByPhoneContent() {
                 Back
               </Link>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-indigo-300 to-fuchsia-300 bg-clip-text text-transparent">Edit by Phone</h2>
-            <p className="text-sm sm:text-base text-indigo-200/80">Search and modify allocations by phone number.</p>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-indigo-300 to-fuchsia-300 bg-clip-text text-transparent">Edit Bookings</h2>
+            <p className="text-sm sm:text-base text-indigo-200/80">Search and modify allocations by phone number or Sai Connect ID.</p>
           </div>
         </div>
       </section>
@@ -343,16 +343,16 @@ function EditByPhoneContent() {
       <section className="rounded-2xl border border-white/10 bg-black/40 backdrop-blur p-4 mb-4">
         <div className="flex items-center gap-2">
           <input
-            type="tel"
+            type="text"
             inputMode="numeric"
-            pattern="\\d{10}"
-            maxLength={10}
-            placeholder="Enter 10-digit phone number"
+            pattern="\\d{1,15}"
+            maxLength={15}
+            placeholder="Phone number or Sai Connect ID"
             className="flex-1 rounded-lg border border-white/10 px-3 py-2 bg-black/40 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             value={phone}
-            onChange={(e)=>setPhone(e.target.value.replace(/\D/g, '').slice(0,10))}
+            onChange={(e)=>setPhone(e.target.value.replace(/\D/g, '').slice(0,15))}
           />
-          <button onClick={()=>phone && load(phone)} disabled={!phone || phone.length !== 10 || loading} className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium disabled:opacity-50">Search</button>
+          <button onClick={()=>phone && load(phone)} disabled={!/^\d{1,15}$/.test(phone) || loading} className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium disabled:opacity-50">Search</button>
         </div>
       </section>
 

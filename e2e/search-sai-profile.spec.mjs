@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('search shows Sai profile details and locks verified fields for a location user', async ({ page }) => {
+test('search accepts a Sai Connect ID and keeps the Sai profile visible while editing', async ({ page }) => {
   await page.route('**/api/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
@@ -18,7 +18,7 @@ test('search shows Sai profile details and locks verified fields for a location 
         json: { user: { id: 2, username: 'location-user', role: 'location_user', locationId: 61 } },
       });
     }
-    if (path === '/api/allocations/by-phone/9876543210') {
+    if (path === '/api/allocations/by-phone/808675') {
       return route.fulfill({
         status: 200,
         headers,
@@ -55,7 +55,7 @@ test('search shows Sai profile details and locks verified fields for a location 
   await page.goto('/login');
   await page.evaluate(() => window.localStorage.setItem('bs_token', 'playwright-token'));
   await page.goto('/search');
-  await page.getByPlaceholder('Enter 10-digit phone number').fill('9876543210');
+  await page.getByPlaceholder('Phone number or Sai Connect ID').fill('808675');
   await page.getByRole('button', { name: 'Search', exact: true }).click();
 
   await expect(page.getByText('808675', { exact: true })).toBeVisible();
@@ -63,6 +63,11 @@ test('search shows Sai profile details and locks verified fields for a location 
   await expect(page.getByText('Delegate', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: /Edit/ }).click();
+  await expect(page.getByText('Sai Connect ID', { exact: true })).toBeVisible();
+  await expect(page.getByText('808675', { exact: true })).toBeVisible();
+  await expect(page.getByText('Sai Connect Age', { exact: true })).toBeVisible();
+  await expect(page.getByText('35', { exact: true })).toBeVisible();
+  await expect(page.getByText('delegate', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Name', { exact: true })).toBeDisabled();
   await expect(page.getByLabel('Phone', { exact: true })).toBeDisabled();
   await expect(page.getByLabel('Gender', { exact: true })).toBeDisabled();
@@ -70,7 +75,7 @@ test('search shows Sai profile details and locks verified fields for a location 
   await expect(page.getByText('Sai Connect verified fields can only be changed by an administrator.')).toBeVisible();
 });
 
-test('bulk edit shows Sai profile details and locks verified name and phone for a location user', async ({ page }) => {
+test('bulk edit accepts a Sai Connect ID and locks verified name and phone for a location user', async ({ page }) => {
   await page.route('**/api/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -123,7 +128,7 @@ test('bulk edit shows Sai profile details and locks verified name and phone for 
 
   await page.goto('/login');
   await page.evaluate(() => window.localStorage.setItem('bs_token', 'playwright-token'));
-  await page.goto('/admin/edit?phone=9876543210');
+  await page.goto('/admin/edit?phone=808675');
 
   await page.getByText('Location 61', { exact: true }).click();
   await page.getByText('Tent 1', { exact: true }).click();

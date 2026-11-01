@@ -309,11 +309,11 @@ export async function smartReserve(payload) {
   return handle(res, 'Failed to smart-reserve');
 }
 
-export async function searchAllocationsByPhone(phone) {
+export async function searchAllocationsByIdentifier(identifier) {
   const url = new URL(`${API_BASE_URL}/api/allocations/by-phone`);
-  url.searchParams.set('phone', phone);
+  url.searchParams.set('phone', identifier);
   const res = await fetch(url.toString(), { headers: authHeaders() });
-  return handle(res, 'Failed to search by phone');
+  return handle(res, 'Failed to search bookings');
 }
 
 export async function confirmAllocations({ batchId, allocationIds }) {

@@ -22,6 +22,12 @@ function authHeaders(extra = {}) {
   };
 }
 
+function formatCategory(value) {
+  return String(value || 'devotee')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function HistoricalDeallocationsContent() {
   const [date, setDate] = useState(() => {
     const today = new Date();
@@ -412,6 +418,7 @@ function HistoricalDeallocationsContent() {
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider whitespace-nowrap w-16">S.No</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider whitespace-nowrap">Name</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Phone</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider whitespace-nowrap">Sai Profile</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider whitespace-nowrap">Location/Bed</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider whitespace-nowrap">Start Date</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider whitespace-nowrap">End Date</th>
@@ -428,6 +435,12 @@ function HistoricalDeallocationsContent() {
                             <td className="px-4 py-3 text-gray-400">{index + 1}</td>
                             <td className="px-4 py-3 text-white/90 whitespace-nowrap font-medium">{alloc.name}</td>
                             <td className="px-4 py-3 text-white/80">{alloc.phone}</td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <div className="text-white/90">
+                                {formatCategory(alloc.accommodation_category)} · Age {alloc.sai_connect_age ?? '—'}
+                              </div>
+                              <div className="text-xs text-gray-400">{alloc.sai_connect_id || 'No Sai Connect ID'}</div>
+                            </td>
                             <td className="px-4 py-3 text-white/90 whitespace-nowrap">
                               {alloc.location_name}<br/>
                               <span className="text-xs text-gray-400">
@@ -473,6 +486,7 @@ function HistoricalDeallocationsContent() {
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider whitespace-nowrap">Deallocated At</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider whitespace-nowrap">Name</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Phone</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider whitespace-nowrap">Sai Profile</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider whitespace-nowrap">Location/Bed</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider whitespace-nowrap">Start Date</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider whitespace-nowrap">End Date</th>
@@ -494,6 +508,12 @@ function HistoricalDeallocationsContent() {
                             </td>
                             <td className="px-4 py-3 text-white/90 whitespace-nowrap font-medium">{dealloc.name}</td>
                             <td className="px-4 py-3 text-white/80">{dealloc.phone}</td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <div className="text-white/90">
+                                {formatCategory(dealloc.accommodation_category)} · Age {dealloc.sai_connect_age ?? '—'}
+                              </div>
+                              <div className="text-xs text-gray-400">{dealloc.sai_connect_id || 'No Sai Connect ID'}</div>
+                            </td>
                             <td className="px-4 py-3 text-white/90 whitespace-nowrap">
                               {dealloc.location_name}<br/>
                               <span className="text-xs text-gray-400">

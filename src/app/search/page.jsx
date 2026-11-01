@@ -27,7 +27,7 @@ function authHeaders(extra = {}) {
 }
 
 export default function SearchPage() {
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [searchIdentifier, setSearchIdentifier] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -46,9 +46,8 @@ export default function SearchPage() {
     getMe().then((session) => setCurrentUser(session?.user || null)).catch(() => setCurrentUser(null));
   }, []);
 
-  // Phone number validation
-  const isValidPhone = phoneNumber.length === 10 && /^\d{10}$/.test(phoneNumber);
-  const showPhoneError = phoneNumber.length > 0 && !isValidPhone;
+  const isValidIdentifier = /^\d{1,15}$/.test(searchIdentifier);
+  const showIdentifierError = searchIdentifier.length > 0 && !isValidIdentifier;
 
   // Memoized validation function
   const errors = useMemo(() => {
@@ -94,10 +93,10 @@ export default function SearchPage() {
 
   const isFormValid = editingId && Object.keys(errors).length === 0;
 
-  const searchByPhone = useCallback(async (e) => {
+  const searchBookings = useCallback(async (e) => {
     e.preventDefault();
     
-    if (!isValidPhone) return;
+    if (!isValidIdentifier) return;
     
     // Clear previous notification
     setNotification(null);
@@ -106,13 +105,13 @@ export default function SearchPage() {
     setLoading(true);
     setResults([]);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/allocations/by-phone/${phoneNumber}`, {
+      const response = await fetch(`${API_BASE_URL}/api/allocations/by-phone/${encodeURIComponent(searchIdentifier)}`, {
         headers: authHeaders(),
       });
 
       if (!response.ok) {
         if (response.status === 404) {
-          setNotification({ type: 'error', message: 'No bookings found for this phone number' });
+          setNotification({ type: 'error', message: 'No bookings found for this phone number or Sai Connect ID' });
           return;
         }
         throw new Error('Search failed');
@@ -121,7 +120,7 @@ export default function SearchPage() {
       const data = await response.json();
       
       if (data.length === 0) {
-        setNotification({ type: 'info', message: 'No bookings found for this phone number' });
+        setNotification({ type: 'info', message: 'No bookings found for this phone number or Sai Connect ID' });
         setResults([]);
       } else {
         setResults(data);
@@ -133,7 +132,7 @@ export default function SearchPage() {
     } finally {
       setLoading(false);
     }
-  }, [phoneNumber, isValidPhone]);
+  }, [searchIdentifier, isValidIdentifier]);
 
   const startEdit = useCallback((allocation) => {
     setEditingId(allocation.id);
@@ -232,14 +231,14 @@ export default function SearchPage() {
       setEditingId(null);
       
       // Refresh results
-      searchByPhone({ preventDefault: () => {} });
+      searchBookings({ preventDefault: () => {} });
     } catch (error) {
       console.error('Save error:', error);
       setNotification({ type: 'error', message: error.message || 'Failed to save changes' });
     } finally {
       setSaving(false);
     }
-  }, [editForm, editPhotos, uploadPhotoToS3, searchByPhone]);
+  }, [editForm, editPhotos, uploadPhotoToS3, searchBookings]);
 
   // Memoized input handlers
   const handleNameChange = useCallback((e) => {
@@ -308,7 +307,7 @@ export default function SearchPage() {
       setNotification({ type: 'success', message: `Bed ${deallocatingAllocation.bed_number} deallocated successfully (${deallocatingAllocation.name} - ${reasonText})` });
 
       // Refresh search results
-      searchByPhone({ preventDefault: () => {} });
+      searchBookings({ preventDefault: () => {} });
     } catch (error) {
       console.error('Deallocate error:', error);
       setNotification({ type: 'error', message: error.message || 'Failed to deallocate bed' });
@@ -316,7 +315,7 @@ export default function SearchPage() {
       setDeallocating(false);
       setDeallocatingAllocation(null);
     }
-  }, [deallocatingAllocation, searchByPhone]);
+  }, [deallocatingAllocation, searchBookings]);
 
   return (
     <>
@@ -335,36 +334,36 @@ export default function SearchPage() {
             <h2 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">
               Search Bookings
             </h2>
-            <p className="text-sm sm:text-base text-blue-200/80">Find and manage allocations by phone number</p>
+            <p className="text-sm sm:text-base text-blue-200/80">Find and manage allocations by phone number or Sai Connect ID</p>
           </div>
         </section>
 
         {/* Search Form */}
-        <form onSubmit={searchByPhone} className="mb-8 bg-gray-900/50 backdrop-blur border border-white/10 rounded-lg shadow-md p-6">
+        <form onSubmit={searchBookings} className="mb-8 bg-gray-900/50 backdrop-blur border border-white/10 rounded-lg shadow-md p-6">
           <div className="flex gap-4">
             <div className="flex-1">
               <label className="block text-sm font-medium text-gray-200 mb-2">
-                Phone Number
+                Phone Number or Sai Connect ID
               </label>
               <div className="min-h-[52px]">
                 <input
-                  type="tel"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  placeholder="Enter 10-digit phone number"
+                  type="text"
+                  value={searchIdentifier}
+                  onChange={(e) => setSearchIdentifier(e.target.value.replace(/\D/g, '').slice(0, 15))}
+                  placeholder="Phone number or Sai Connect ID"
                   inputMode="numeric"
-                  maxLength={10}
+                  maxLength={15}
                   className="w-full p-3 border border-gray-600 bg-gray-800 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400"
                 />
-                {showPhoneError && (
-                  <p className="text-red-400 text-xs mt-1">Please enter a valid 10-digit phone number</p>
+                {showIdentifierError && (
+                  <p className="text-red-400 text-xs mt-1">Enter a numeric phone number or Sai Connect ID</p>
                 )}
               </div>
             </div>
             <div className="flex items-start pt-7">
               <button
                 type="submit"
-                disabled={loading || !isValidPhone}
+                disabled={loading || !isValidIdentifier}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
               >
                 {loading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
@@ -413,7 +412,7 @@ export default function SearchPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <p className="text-lg font-medium text-gray-300">No bookings found</p>
-            <p className="text-sm text-gray-500 mt-2">No results found for this phone number</p>
+            <p className="text-sm text-gray-500 mt-2">No results found for this phone number or Sai Connect ID</p>
           </div>
         )}
 
@@ -462,6 +461,21 @@ export default function SearchPage() {
                         Sai Connect verified fields can only be changed by an administrator.
                       </p>
                     )}
+
+                    <div className="grid grid-cols-1 gap-3 rounded-lg border border-indigo-500/20 bg-indigo-950/20 p-3 sm:grid-cols-3">
+                      <div>
+                        <p className="text-xs text-indigo-200/70">Category</p>
+                        <p className="font-medium capitalize text-white">{allocation.accommodation_category || 'devotee'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-indigo-200/70">Sai Connect ID</p>
+                        <p className="font-medium text-white">{allocation.sai_connect_id || '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-indigo-200/70">Sai Connect Age</p>
+                        <p className="font-medium text-white">{allocation.sai_connect_age ?? '—'}</p>
+                      </div>
+                    </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>

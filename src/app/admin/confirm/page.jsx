@@ -2,7 +2,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { searchAllocationsByPhone, confirmAllocations, getMe } from '@/lib/api';
+import { searchAllocationsByIdentifier, confirmAllocations, getMe } from '@/lib/api';
 import Notification from '@/components/Notification';
 import SearchResultCard from '@/components/SearchResultCard';
 import { TreeSkeleton } from '@/components/Skeleton';
@@ -23,13 +23,13 @@ function AdminConfirmContent() {
   const show = (type, message) => setNote({ type, message });
 
   const onSearch = async () => {
-    if (!phone || !/^\d{10}$/.test(phone)) {
-      show('error', 'Please enter a valid 10-digit phone number');
+    if (!phone || !/^\d{1,15}$/.test(phone)) {
+      show('error', 'Enter a numeric phone number or Sai Connect ID');
       return;
     }
     try {
       setLoading(true);
-      const res = await searchAllocationsByPhone(phone);
+      const res = await searchAllocationsByIdentifier(phone);
       const me = await getMe().catch(() => null);
       
       let batches = res.batches || [];
@@ -73,7 +73,7 @@ function AdminConfirmContent() {
       (async () => {
         try {
           setLoading(true);
-          const res = await searchAllocationsByPhone(qp);
+          const res = await searchAllocationsByIdentifier(qp);
           const me = await getMe().catch(() => null);
           
           let batches = res.batches || [];
@@ -145,7 +145,7 @@ function AdminConfirmContent() {
               </Link>
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-indigo-300 to-fuchsia-300 bg-clip-text text-transparent">Admin · Confirm Reservations</h2>
-            <p className="text-sm sm:text-base text-indigo-200/80">Search by phone and confirm reserved seats.</p>
+            <p className="text-sm sm:text-base text-indigo-200/80">Search by phone number or Sai Connect ID and confirm reserved seats.</p>
           </div>
         </div>
       </section>
@@ -159,16 +159,16 @@ function AdminConfirmContent() {
         </div> */}
         <div className="flex items-center gap-2">
           <input
-            type="tel"
+            type="text"
             inputMode="numeric"
-            pattern="\\d{10}"
-            maxLength={10}
-            placeholder="Enter 10-digit phone number"
+            pattern="\\d{1,15}"
+            maxLength={15}
+            placeholder="Phone number or Sai Connect ID"
             className="flex-1 min-w-0 rounded-lg border border-white/10 px-3 py-2 bg-black/40 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm sm:text-base touch-manipulation"
             value={phone}
-            onChange={(e)=>setPhone(e.target.value.replace(/\D/g, '').slice(0,10))}
+            onChange={(e)=>setPhone(e.target.value.replace(/\D/g, '').slice(0,15))}
           />
-          <button onClick={onSearch} disabled={loading || !phone || phone.length !== 10} className="px-3 sm:px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-medium disabled:opacity-50 text-sm sm:text-base touch-manipulation whitespace-nowrap">Search</button>
+          <button onClick={onSearch} disabled={loading || !/^\d{1,15}$/.test(phone)} className="px-3 sm:px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-medium disabled:opacity-50 text-sm sm:text-base touch-manipulation whitespace-nowrap">Search</button>
         </div>
       </section>
 

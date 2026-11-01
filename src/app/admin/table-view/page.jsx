@@ -354,12 +354,12 @@ function TableViewContent() {
       <section className="rounded-xl border border-gray-700 bg-gray-900/50 backdrop-blur p-4 mb-4">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
           <div>
-            <label className="block text-xs font-medium text-gray-300 mb-1">Search (Name/Phone)</label>
+            <label className="block text-xs font-medium text-gray-300 mb-1">Search (Name/Phone/Sai Connect ID)</label>
             <input
               type="text"
               value={filters.search}
               onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-              placeholder="Search..."
+              placeholder="Name, phone, or Sai Connect ID"
               className="w-full rounded-lg border border-gray-600 px-3 py-2 bg-gray-800 text-white text-sm"
             />
           </div>
