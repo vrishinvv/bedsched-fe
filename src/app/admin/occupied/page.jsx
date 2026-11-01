@@ -171,7 +171,7 @@ function CurrentlyOccupiedContent() {
   };
 
   const downloadCSV = () => {
-    const headers = ['Location ID', 'Location Name', 'Tent Name', 'Block Name', 'Bed Number', 'Name', 'Phone', 'Start Date', 'End Date', 'Status'];
+    const headers = ['Location ID', 'Location Name', 'Tent Name', 'Block Name', 'Bed Number', 'Name', 'Phone', 'Category', 'Sai Connect ID', 'Sai Connect Age', 'Start Date', 'End Date', 'Status'];
     const rows = items.map(item => [
       item.location_id,
       item.location_name || '',
@@ -180,6 +180,9 @@ function CurrentlyOccupiedContent() {
       item.bed_number,
       item.name || '',
       item.phone || '',
+      item.accommodation_category || '',
+      item.sai_connect_id || '',
+      item.sai_connect_age ?? '',
       item.start_date ? new Date(item.start_date).toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') : '',
       item.end_date ? new Date(item.end_date).toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') : '',
       item.status || ''
@@ -447,6 +450,7 @@ function CurrentlyOccupiedContent() {
                       )}
                     </div>
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider whitespace-nowrap">Sai Profile</th>
                   <th onClick={() => handleSort('start_date')} className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider whitespace-nowrap cursor-pointer hover:bg-white/5 transition-colors">
                     <div className="flex items-center gap-1">
                       Check-in
@@ -491,6 +495,10 @@ function CurrentlyOccupiedContent() {
                       >
                         {item.phone}
                       </button>
+                    </td>
+                    <td className="px-4 py-3 text-xs whitespace-nowrap">
+                      <div className="font-medium text-indigo-200 capitalize">{item.accommodation_category || 'Devotee'}</div>
+                      <div className="text-gray-400">ID: {item.sai_connect_id || '—'} · Age: {item.sai_connect_age ?? '—'}</div>
                     </td>
                     <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
                       {item.start_date ? new Date(item.start_date).toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') : 'N/A'}

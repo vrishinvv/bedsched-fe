@@ -655,6 +655,7 @@ function TableViewContent() {
                     Phone <SortIcon field="phone" />
                   </div>
                 </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider whitespace-nowrap">Sai Profile</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider whitespace-nowrap">Location</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Tent</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Block</th>
@@ -686,7 +687,7 @@ function TableViewContent() {
             <tbody className="divide-y divide-white/5">
               {loading ? (
                 <tr>
-                  <td colSpan="13" className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan="14" className="px-4 py-8 text-center text-gray-400">
                     <div className="flex justify-center items-center gap-2">
                       <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
                       Loading...
@@ -695,7 +696,7 @@ function TableViewContent() {
                 </tr>
               ) : allocations.length === 0 ? (
                 <tr>
-                  <td colSpan="13" className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan="14" className="px-4 py-8 text-center text-gray-400">
                     No allocations found
                   </td>
                 </tr>
@@ -719,6 +720,10 @@ function TableViewContent() {
                     <td className="px-4 py-3 text-gray-400">{(page - 1) * itemsPerPage + index + 1}</td>
                     <td className="px-4 py-3 text-white/90 whitespace-nowrap font-medium">{allocation.name}</td>
                     <td className="px-4 py-3 text-white/80">{allocation.phone}</td>
+                    <td className="px-4 py-3 text-xs whitespace-nowrap">
+                      <div className="font-medium text-indigo-200 capitalize">{allocation.accommodation_category || 'Devotee'}</div>
+                      <div className="text-gray-400">ID: {allocation.sai_connect_id || '—'} · Age: {allocation.sai_connect_age ?? '—'}</div>
+                    </td>
                     <td className="px-4 py-3 text-white/90 whitespace-nowrap">{allocation.location_name}</td>
                     <td className="px-4 py-3 text-white/80">{allocation.tent_name || `Tent ${allocation.tent_index}`}</td>
                     <td className="px-4 py-3 text-white/80">{allocation.block_name || `Block ${allocation.block_index}`}</td>

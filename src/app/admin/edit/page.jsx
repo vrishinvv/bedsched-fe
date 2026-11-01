@@ -8,6 +8,9 @@ import { TreeSkeleton } from '@/components/Skeleton';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { BOOKING_MAX_DATE as MAX_DATE, BOOKING_MIN_DATE as MIN_DATE, BOOKING_WINDOW_LABEL, isWithinBookingWindow } from '@/lib/bookingWindow.mjs';
 
+const hasSaiVerifiedProfile = (item) =>
+  item?.categorySource === 'sai_connect' || (Array.isArray(item?.verifiedCategories) && item.verifiedCategories.length > 0);
+
 function EditByPhoneContent() {
   const sp = useSearchParams();
   const [phone, setPhone] = useState(sp.get('phone') || '');
@@ -22,12 +25,14 @@ function EditByPhoneContent() {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [filterBatchId, setFilterBatchId] = useState(null);
   const [userLocationId, setUserLocationId] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
 
   const load = async (ph) => {
     setLoading(true); setNotification(null); setSelectedIds(new Set());
     try {
       const res = await searchAllocationsByPhone(ph);
       const me = await getMe().catch(() => null);
+      setCurrentUser(me?.user || null);
       
       let batches = res.batches || [];
       
@@ -230,6 +235,12 @@ function EditByPhoneContent() {
     const hasContactName = contactName && contactName.trim();
     const hasEmergencyPhone = emergencyPhone && emergencyPhone.trim();
     const hasEndDate = endDate && endDate.trim();
+
+    const selectedItems = (data || []).flatMap(batch => batch.items || []).filter(item => ids?.includes(item.id));
+    if (currentUser?.role === 'location_user' && selectedItems.some(hasSaiVerifiedProfile) && (hasPhoneChange || hasContactName)) {
+      setNotification({ type: 'error', message: 'Sai Connect verified name and phone can only be changed by an administrator.' });
+      return;
+    }
     
     if (!hasPhoneChange && !hasContactName && !hasEmergencyPhone && !hasEndDate) {
       setNotification({ type: 'error', message: 'Please fill in at least one field to update' });
@@ -304,6 +315,13 @@ function EditByPhoneContent() {
     }));
   }, [data]);
 
+  const hasLockedSelectedProfile = useMemo(() => {
+    if (currentUser?.role !== 'location_user' || selectedIds.size === 0) return false;
+    return (data || [])
+      .flatMap(batch => batch.items || [])
+      .some(item => selectedIds.has(item.id) && hasSaiVerifiedProfile(item));
+  }, [currentUser, data, selectedIds]);
+
   return (
     <div className="p-3 sm:p-4 max-w-5xl mx-auto">
       <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-900/20 via-purple-900/20 to-fuchsia-900/20 border border-indigo-500/20 p-4 sm:p-6 mb-6">
@@ -346,7 +364,7 @@ function EditByPhoneContent() {
             <div>
               <label className="block text-sm text-gray-300 mb-1">New Phone Number</label>
               <input 
-                className="w-full px-3 py-2 rounded border border-white/10 bg-black/40 text-white placeholder-gray-400" 
+                className="w-full px-3 py-2 rounded border border-white/10 bg-black/40 text-white placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
                 type="tel" 
                 inputMode="numeric"
                 pattern="\\d{10}"
@@ -354,16 +372,18 @@ function EditByPhoneContent() {
                 value={newPhone} 
                 onChange={(e)=>setNewPhone(e.target.value.replace(/\D/g, '').slice(0,10))}
                 placeholder="10-digit phone" 
+                disabled={hasLockedSelectedProfile}
               />
             </div>
             <div>
               <label className="block text-sm text-gray-300 mb-1">New Contact Name</label>
               <input 
-                className="w-full px-3 py-2 rounded border border-white/10 bg-black/40 text-white placeholder-gray-400" 
+                className="w-full px-3 py-2 rounded border border-white/10 bg-black/40 text-white placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
                 type="text" 
                 value={contactName} 
                 onChange={(e)=>setContactName(e.target.value)}
                 placeholder="Enter name" 
+                disabled={hasLockedSelectedProfile}
               />
             </div>
             <div>
@@ -392,6 +412,11 @@ function EditByPhoneContent() {
               <p className="text-xs text-gray-400 mt-1">{BOOKING_WINDOW_LABEL}</p>
             </div>
           </div>
+          {hasLockedSelectedProfile && (
+            <p className="mt-3 text-xs text-amber-200">
+              The selected booking has Sai Connect verified details. A location user cannot change its name or phone; an administrator can.
+            </p>
+          )}
         </section>
       )}
 
@@ -545,6 +570,7 @@ function EditByPhoneContent() {
                                                               <span className={`px-2 py-0.5 rounded-full text-xs ${bed.status === 'reserved' ? 'bg-blue-500/20 border border-blue-400/30 text-blue-200' : 'bg-emerald-500/20 border border-emerald-400/30 text-emerald-200'}`}>
                                                                 {bed.status}
                                                               </span>
+                                                              <span className="text-xs text-white/80">{bed.name || 'No name'}</span>
                                                             </div>
                                                             <div className="text-xs text-gray-400">
                                                               {new Date(bed.startDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' })} → {new Date(bed.endDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' })}
@@ -555,6 +581,10 @@ function EditByPhoneContent() {
                                                               Emergency: {bed.emergencyPhone}
                                                             </div>
                                                           )}
+                                                          <div className="text-xs text-gray-400 ml-9 mt-1 capitalize">
+                                                            {bed.accommodationCategory || 'devotee'} · Sai ID: {bed.saiConnectId || '—'} · Age: {bed.saiConnectAge ?? '—'}
+                                                            {hasSaiVerifiedProfile(bed) && currentUser?.role === 'location_user' ? ' · Sai verified fields locked' : ''}
+                                                          </div>
                                                         </div>
                                                       ))}
                                                     </div>

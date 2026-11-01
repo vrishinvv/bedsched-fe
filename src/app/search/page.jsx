@@ -5,6 +5,7 @@ import Notification from '@/components/Notification';
 import CameraCapture from '@/components/CameraCapture';
 import DeallocateModal from '@/components/DeallocateModal';
 import { BOOKING_MAX_DATE as MAX_DATE, BOOKING_MIN_DATE as MIN_DATE, BOOKING_WINDOW_LABEL, isWithinBookingWindow } from '@/lib/bookingWindow.mjs';
+import { getMe } from '@/lib/api';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -39,6 +40,11 @@ export default function SearchPage() {
   const [deallocatingAllocation, setDeallocatingAllocation] = useState(null);
   const [deallocating, setDeallocating] = useState(false);
   const [activeTab, setActiveTab] = useState('active'); // 'active' or 'deallocated'
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    getMe().then((session) => setCurrentUser(session?.user || null)).catch(() => setCurrentUser(null));
+  }, []);
 
   // Phone number validation
   const isValidPhone = phoneNumber.length === 10 && /^\d{10}$/.test(phoneNumber);
@@ -83,14 +89,8 @@ export default function SearchPage() {
       newErrors.endDate = 'End date must be after start date';
     }
 
-    const hasPersonPhoto = editPhotos.person?.blob || editPhotos.person?.dataUrl;
-
-    if (!hasPersonPhoto) {
-      newErrors.personPhoto = 'Person photo is required';
-    }
-
     return newErrors;
-  }, [editingId, editForm.name, editForm.phone, editForm.emergencyPhone, editForm.gender, editForm.startDate, editForm.endDate, editPhotos.person, editPhotos.aadhaar]);
+  }, [editingId, editForm.name, editForm.phone, editForm.emergencyPhone, editForm.gender, editForm.startDate, editForm.endDate]);
 
   const isFormValid = editingId && Object.keys(errors).length === 0;
 
@@ -223,7 +223,10 @@ export default function SearchPage() {
         }),
       });
 
-      if (!response.ok) throw new Error('Update failed');
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || 'Update failed');
+      }
 
       setNotification({ type: 'success', message: 'Booking updated successfully!' });
       setEditingId(null);
@@ -232,7 +235,7 @@ export default function SearchPage() {
       searchByPhone({ preventDefault: () => {} });
     } catch (error) {
       console.error('Save error:', error);
-      setNotification({ type: 'error', message: 'Failed to save changes' });
+      setNotification({ type: 'error', message: error.message || 'Failed to save changes' });
     } finally {
       setSaving(false);
     }
@@ -451,33 +454,56 @@ export default function SearchPage() {
                       </div>
                     </div>
 
+                    {currentUser?.role !== 'admin' && (
+                      allocation.category_source === 'sai_connect'
+                      || (Array.isArray(allocation.verified_categories) && allocation.verified_categories.length > 0)
+                    ) && (
+                      <p className="rounded-lg border border-emerald-500/30 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-200">
+                        Sai Connect verified fields can only be changed by an administrator.
+                      </p>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-200 mb-1">Name *</label>
+                        <label htmlFor={`search-name-${allocation.id}`} className="block text-sm font-medium text-gray-200 mb-1">Name *</label>
                         <input
+                          id={`search-name-${allocation.id}`}
+                          aria-label="Name"
                           value={editForm.name}
                           onChange={handleNameChange}
+                          disabled={currentUser?.role !== 'admin' && (
+                            allocation.category_source === 'sai_connect'
+                            || (Array.isArray(allocation.verified_categories) && allocation.verified_categories.length > 0)
+                          )}
                           required
-                          className={`w-full p-2 border rounded-lg bg-gray-800 text-white ${errors.name ? 'border-red-500' : 'border-gray-600'}`}
+                          className={`w-full p-2 border rounded-lg bg-gray-800 text-white disabled:cursor-not-allowed disabled:opacity-60 ${errors.name ? 'border-red-500' : 'border-gray-600'}`}
                         />
                         {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-200 mb-1">Phone *</label>
+                        <label htmlFor={`search-phone-${allocation.id}`} className="block text-sm font-medium text-gray-200 mb-1">Phone *</label>
                         <input
+                          id={`search-phone-${allocation.id}`}
+                          aria-label="Phone"
                           type="tel"
                           inputMode="numeric"
                           value={editForm.phone}
                           onChange={handlePhoneChange}
+                          disabled={currentUser?.role !== 'admin' && (
+                            allocation.category_source === 'sai_connect'
+                            || (Array.isArray(allocation.verified_categories) && allocation.verified_categories.length > 0)
+                          )}
                           maxLength={10}
                           required
-                          className={`w-full p-2 border rounded-lg bg-gray-800 text-white ${errors.phone ? 'border-red-500' : 'border-gray-600'}`}
+                          className={`w-full p-2 border rounded-lg bg-gray-800 text-white disabled:cursor-not-allowed disabled:opacity-60 ${errors.phone ? 'border-red-500' : 'border-gray-600'}`}
                         />
                         {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-200 mb-1">Emergency Phone</label>
+                        <label htmlFor={`search-emergency-${allocation.id}`} className="block text-sm font-medium text-gray-200 mb-1">Emergency Phone</label>
                         <input
+                          id={`search-emergency-${allocation.id}`}
+                          aria-label="Emergency Phone"
                           type="tel"
                           inputMode="numeric"
                           value={editForm.emergencyPhone}
@@ -489,12 +515,18 @@ export default function SearchPage() {
                         {errors.emergencyPhone && <p className="text-red-500 text-xs mt-1">{errors.emergencyPhone}</p>}
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-200 mb-1">Gender *</label>
+                        <label htmlFor={`search-gender-${allocation.id}`} className="block text-sm font-medium text-gray-200 mb-1">Gender *</label>
                         <select
+                          id={`search-gender-${allocation.id}`}
+                          aria-label="Gender"
                           value={editForm.gender}
                           onChange={handleGenderChange}
+                          disabled={currentUser?.role !== 'admin' && (
+                            allocation.category_source === 'sai_connect'
+                            || (Array.isArray(allocation.verified_categories) && allocation.verified_categories.length > 0)
+                          )}
                           required
-                          className={`w-full p-2 border rounded-lg bg-gray-800 text-white ${errors.gender ? 'border-red-500' : 'border-gray-600'}`}
+                          className={`w-full p-2 border rounded-lg bg-gray-800 text-white disabled:cursor-not-allowed disabled:opacity-60 ${errors.gender ? 'border-red-500' : 'border-gray-600'}`}
                         >
                           <option value="Male">Male</option>
                           <option value="Female">Female</option>
@@ -533,11 +565,10 @@ export default function SearchPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
                       <div>
                         <CameraCapture
-                          label="Person Photo *"
+                          label="Person Photo (Optional)"
                           onCapture={handlePersonPhotoCapture}
                           existingPhotoUrl={editPhotos.person.dataUrl}
                         />
-                        {errors.personPhoto && <p className="text-red-500 text-xs mt-1">{errors.personPhoto}</p>}
                       </div>
                       <div>
                         <CameraCapture
@@ -597,6 +628,28 @@ export default function SearchPage() {
                         <p className="text-xs text-gray-400">Gender</p>
                         <p className="font-medium text-white">{allocation.gender}</p>
                       </div>
+                      <div>
+                        <p className="text-xs text-gray-400">Category</p>
+                        <p className="font-medium text-white">
+                          {allocation.accommodation_category === 'delegate'
+                            ? 'Delegate'
+                            : allocation.accommodation_category === 'sevadal'
+                              ? 'Sevadal'
+                              : 'Devotee'}
+                        </p>
+                      </div>
+                      {allocation.sai_connect_id && (
+                        <div>
+                          <p className="text-xs text-gray-400">Sai Connect ID</p>
+                          <p className="font-medium text-white">{allocation.sai_connect_id}</p>
+                        </div>
+                      )}
+                      {allocation.sai_connect_age !== null && allocation.sai_connect_age !== undefined && (
+                        <div>
+                          <p className="text-xs text-gray-400">Sai Connect Age</p>
+                          <p className="font-medium text-white">{allocation.sai_connect_age}</p>
+                        </div>
+                      )}
                       <div>
                         <p className="text-xs text-gray-400">Start Date</p>
                         <p className="font-medium text-white">{allocation.start_date}</p>
