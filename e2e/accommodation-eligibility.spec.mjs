@@ -67,6 +67,8 @@ test('allocates a name-only caretaker into a Delegate-only block', async ({ page
   await page.goto('/locations/61/tents/1/blocks/1');
   await page.getByTitle('Bed 2: Available').click();
   await page.getByLabel('Allocate as caretaker').check();
+  await expect(page.getByText('Sai Connect lookup is not required for caretakers')).toBeVisible();
+  await expect(page.getByText('Sai Connect lookup is required', { exact: true })).toHaveCount(0);
   await page.getByRole('combobox', { name: 'Caretaker for' }).selectOption('101');
   await page.getByPlaceholder('Full name').fill('Devotee Caretaker');
   await page.getByRole('button', { name: 'Allocate', exact: true }).click();

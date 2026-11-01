@@ -637,8 +637,14 @@ export default function AllocateModal({
         {!isEdit && (
           <section className="mb-4 space-y-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3">
             <div>
-              <div className="text-sm font-semibold text-indigo-950">Sai Connect lookup is required</div>
-              <p className="mt-1 text-xs text-indigo-700">Enter a Sai Connect ID or phone number and complete the lookup. If no registration is found, the person is saved as a Devotee.</p>
+              <div className="text-sm font-semibold text-indigo-950">
+                {isCaretaker ? 'Sai Connect lookup is not required for caretakers' : 'Sai Connect lookup is required'}
+              </div>
+              <p className="mt-1 text-xs text-indigo-700">
+                {isCaretaker
+                  ? 'The caretaker is linked to the selected Delegate and only their name is required.'
+                  : 'Enter a Sai Connect ID or phone number and complete the lookup. If no registration is found, the person is saved as a Devotee.'}
+              </p>
             </div>
             <div className="flex gap-2">
               <input
