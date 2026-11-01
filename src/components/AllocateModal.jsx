@@ -902,10 +902,40 @@ export default function AllocateModal({
           </div>
         )}
 
+        {isEdit && (
+          initialData?.saiConnectId
+          || (initialData?.saiConnectAge !== null && initialData?.saiConnectAge !== undefined)
+        ) && (
+          <section
+            aria-label="Sai Connect details"
+            className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-emerald-950">Sai Connect details</h3>
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">Verified profile</span>
+            </div>
+            <dl className="mt-3 grid grid-cols-2 gap-3">
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-emerald-700">Sai Connect ID</dt>
+                <dd className="mt-0.5 text-sm font-semibold text-gray-950">{initialData?.saiConnectId || '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-emerald-700">Age</dt>
+                <dd className="mt-0.5 text-sm font-semibold text-gray-950">
+                  {initialData?.saiConnectAge !== null && initialData?.saiConnectAge !== undefined
+                    ? `${initialData.saiConnectAge} years`
+                    : '—'}
+                </dd>
+              </div>
+            </dl>
+          </section>
+        )}
+
         {isEdit && isAdmin && (
           <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 p-3">
             <label className="block text-sm font-medium text-gray-800">Accommodation category</label>
             <select
+              aria-label="Accommodation category"
               value={accommodationCategory}
               onChange={(event) => setAccommodationCategory(event.target.value)}
               className="mt-2 w-full rounded-lg border border-gray-300 bg-white p-2 text-sm text-gray-900"
