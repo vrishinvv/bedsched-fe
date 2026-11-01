@@ -450,3 +450,79 @@ test('only an admin can edit the accommodation category of an occupied booking',
 
   await expect(page.getByLabel('Accommodation category')).toBeVisible();
 });
+
+test('books without photos using one authoritative success outcome when S3 is unavailable', async ({ page }) => {
+  let submittedPayload;
+  let bookingAttempted = false;
+  await page.route('**/api/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    const headers = {
+      'access-control-allow-credentials': 'true',
+      'access-control-allow-headers': 'authorization,content-type',
+      'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+      'access-control-allow-origin': 'http://127.0.0.1:3100',
+    };
+    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+    if (path === '/api/auth/me') {
+      return route.fulfill({ status: 200, headers, json: { user: { id: 1, username: 'admin', role: 'admin', locationId: null } } });
+    }
+    if (path === '/api/locations/61/tents/1/blocks/1') {
+      return route.fulfill({
+        status: 200,
+        headers,
+        json: {
+          meta: {
+            location: { id: '61', name: 'Test Location' },
+            tent: { index: 1, name: 'Test Tent' },
+            block: { index: 1, name: 'Mixed', genderRestriction: 'both', allowedCategories: ['delegate', 'sevadal', 'devotee'] },
+          },
+          blockSize: 1,
+          beds: bookingAttempted ? {
+            1: {
+              id: 501,
+              ...submittedPayload,
+              status: 'confirmed',
+              accommodationCategory: 'devotee',
+              personPhotoKey: null,
+              aadhaarPhotoKey: null,
+            },
+          } : {},
+        },
+      });
+    }
+    if (path === '/api/upload-url') {
+      return route.fulfill({ status: 503, headers, json: { error: 's3_unavailable' } });
+    }
+    if (path.endsWith('/beds/1/allocate') && request.method() === 'POST') {
+      submittedPayload = request.postDataJSON();
+      bookingAttempted = true;
+      return route.fulfill({
+        status: 503,
+        headers,
+        json: { error: 'response_lost', message: 'The connection dropped after saving.' },
+      });
+    }
+    return route.fulfill({ status: 404, headers, json: { error: `Unexpected request: ${path}` } });
+  });
+
+  await page.goto('/login');
+  await page.evaluate(() => window.localStorage.setItem('bs_token', 'playwright-token'));
+  await page.goto('/locations/61/tents/1/blocks/1');
+  await page.getByTitle('Bed 1: Available').click();
+
+  await expect(page.getByText('Photos are optional')).toBeVisible();
+  await page.getByPlaceholder('Full name').fill('No Photo Guest');
+  await page.locator('input[name="phone"]').fill('9876543210');
+  await page.locator('input[name="startDate"]').fill('2026-11-05');
+  await page.locator('input[name="endDate"]').fill('2026-11-24');
+  await page.getByRole('button', { name: 'Allocate', exact: true }).click();
+
+  await expect.poll(() => submittedPayload).toBeTruthy();
+  expect(submittedPayload.personPhotoKey).toBeFalsy();
+  expect(submittedPayload.aadhaarPhotoKey).toBeFalsy();
+  await expect(page.getByText('Saved with warning')).toBeVisible();
+  await expect(page.getByText('The booking for No Photo Guest is saved in bed 1 without photos. The connection dropped after saving, so the bed was rechecked.')).toBeVisible();
+  await expect(page.getByText(/Failed to save|another operator|just booked by someone else/i)).toHaveCount(0);
+  await expect(page.getByTitle(/Bed 1: No Photo Guest/)).toBeVisible();
+});

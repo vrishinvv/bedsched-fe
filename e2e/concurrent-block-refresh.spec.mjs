@@ -65,7 +65,7 @@ test('refreshes the bed grid and warns when another operator books the selected 
 
   await expect(page.getByRole('heading', { name: 'Allocate bed — Bed 1' })).toHaveCount(0);
   await expect(page.getByTitle(/Bed 1: Other Operator Booking/)).toBeVisible();
-  await expect(page.getByText('Bed 1 was just booked by another operator. Please select another available bed.')).toBeVisible();
+  await expect(page.getByText('Bed 1 was just booked. Please select another available bed.')).toBeVisible();
 
   liveRefreshFails = true;
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));

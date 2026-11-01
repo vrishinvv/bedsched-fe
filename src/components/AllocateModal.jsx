@@ -8,6 +8,7 @@ import {
   ACCOMMODATION_CATEGORY_OPTIONS,
   resolveLookupCategoryChoice,
 } from '@/lib/accommodationEligibility.mjs';
+import { hasMissingOptionalPhotos, uploadOptionalPhotos } from '@/lib/optionalPhotoUploads.mjs';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -399,16 +400,6 @@ export default function AllocateModal({
       return alert('Emergency phone must be exactly 10 digits.');
     }
 
-    // Validate photos are captured (mandatory for new allocations)
-    if (!isEdit && !isCaretaker) {
-      if (!personPhoto.blob && !personPhoto.dataUrl) {
-        return alert('Person photo is required. Please capture the photo.');
-      }
-      if (!aadhaarPhoto.blob && !aadhaarPhoto.dataUrl) {
-        return alert('Identity photo is required. Please capture the photo.');
-      }
-    }
-
     const today = getTodayDate();
     
     // Validate date range
@@ -439,24 +430,32 @@ export default function AllocateModal({
       
       console.log('Starting parallel upload + save process...');
       
-      // Generate photo keys upfront (don't wait for backend!)
-      let personPhotoKey = initialData?.personPhotoKey;
-      let aadhaarPhotoKey = initialData?.aadhaarPhotoKey;
+      const personCandidateKey = personPhoto.blob ? generatePhotoKey('person') : null;
+      const aadhaarCandidateKey = aadhaarPhoto.blob ? generatePhotoKey('aadhaar') : null;
+      const photoResult = isCaretaker
+        ? { personPhotoKey: null, aadhaarPhotoKey: null, failedPhotoTypes: [] }
+        : await uploadOptionalPhotos({
+          person: {
+            blob: personPhoto.blob,
+            key: personCandidateKey,
+            existingKey: initialData?.personPhotoKey || null,
+          },
+          aadhaar: {
+            blob: aadhaarPhoto.blob,
+            key: aadhaarCandidateKey,
+            existingKey: initialData?.aadhaarPhotoKey || null,
+          },
+        }, uploadPhotoToS3);
 
-      if (personPhoto.blob) {
-        personPhotoKey = generatePhotoKey('person');
-      }
-      if (aadhaarPhoto.blob) {
-        aadhaarPhotoKey = generatePhotoKey('aadhaar');
-      }
+      setUploadProgress(60);
 
       // Prepare backend payload (we have keys already!)
       const payload = {
         ...form,
         gender: selectedGender,
         emergencyPhone: emergencyDigits || undefined,
-        personPhotoKey,
-        aadhaarPhotoKey,
+        personPhotoKey: photoResult.personPhotoKey,
+        aadhaarPhotoKey: photoResult.aadhaarPhotoKey,
         ...(!isEdit ? {
           accommodationCategory,
           saiVerificationToken: saiLookup.result?.verificationToken,
@@ -468,42 +467,15 @@ export default function AllocateModal({
         delete payload.status;
       }
 
-      // Upload photos to S3 and save to backend IN PARALLEL! 🚀
-      const parallelPromises = [];
-      
-      if (!isCaretaker && personPhoto.blob) {
-        console.log('Uploading person photo with key:', personPhotoKey);
-        parallelPromises.push(
-          uploadPhotoToS3(personPhoto.blob, 'person', personPhotoKey).then(() => {
-            console.log('Person photo uploaded');
-            return 'person';
-          })
-        );
+      const saveResult = await onSave(payload, saveAndNext, {
+        failedPhotoTypes: photoResult.failedPhotoTypes,
+        bookedWithoutPhotos: hasMissingOptionalPhotos(photoResult, { isCaretaker }),
+      });
+      if (!saveResult?.ok) {
+        setUploading(false);
+        setUploadProgress(0);
+        return;
       }
-      
-      if (!isCaretaker && aadhaarPhoto.blob) {
-        console.log('Uploading aadhaar photo with key:', aadhaarPhotoKey);
-        parallelPromises.push(
-          uploadPhotoToS3(aadhaarPhoto.blob, 'aadhaar', aadhaarPhotoKey).then(() => {
-            console.log('Aadhaar photo uploaded');
-            return 'aadhaar';
-          })
-        );
-      }
-      
-      // Add backend save to parallel promises
-      setUploadProgress(20);
-      parallelPromises.push(
-        onSave(payload, saveAndNext).then(() => { // Pass skipClose flag
-          console.log('Backend save complete');
-          return 'backend';
-        })
-      );
-
-      // Wait for EVERYTHING in parallel
-      console.log('Waiting for all operations (S3 uploads + backend save)...');
-      await Promise.all(parallelPromises);
-      console.log('All operations complete!');
       setUploadProgress(100);
       
       // If save & next, trigger the next bed opening IMMEDIATELY (modal stays open!)
@@ -514,7 +486,6 @@ export default function AllocateModal({
       console.error('Operation failed:', error);
       setUploading(false);
       setUploadProgress(0);
-      alert('Failed to save. Please try again.');
     }
   }
 
@@ -597,8 +568,6 @@ export default function AllocateModal({
     const errs = [];
     if (!form.name || !form.name.trim()) errs.push('Name is required');
     if (!isCaretaker && !/^\d{10}$/.test(form.phone)) errs.push('Enter a valid 10-digit phone number');
-    if (!isEdit && !isCaretaker && !personPhoto.blob && !personPhoto.dataUrl) errs.push('Person photo is required');
-    if (!isEdit && !isCaretaker && !aadhaarPhoto.blob && !aadhaarPhoto.dataUrl) errs.push('Identity photo is required');
     if (!isEdit && saiLookupRequired && !saiLookup.result) errs.push('Complete Sai Connect lookup');
     if (!form.gender) errs.push('Gender is required');
     if (!form.startDate) errs.push(isCaretaker ? 'Choose a Delegate to copy the caretaker stay dates' : 'Start date is required');
@@ -664,7 +633,7 @@ export default function AllocateModal({
                 </div>
               </div>
               <span className="text-gray-700 font-medium text-center">
-                {uploading ? 'Uploading photos...' : (isEdit ? 'Updating allocation...' : 'Allocating bed...')}
+                {isEdit ? 'Updating allocation...' : 'Saving booking...'}
               </span>
             </div>
             
@@ -1054,14 +1023,17 @@ export default function AllocateModal({
           {/* Photo Capture Section */}
           {!isCaretaker && <div className="sm:col-span-2 space-y-4 mt-4">
             <div className="border-t pt-4">
-              <h4 className="text-sm font-semibold text-gray-900 mb-3">📸 Photo Verification*</h4>
+              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3" role="note">
+                <h4 className="text-sm font-semibold text-amber-950">Photos are optional</h4>
+                <p className="mt-1 text-xs text-amber-800">You can save the booking without photos. If photo storage is unavailable, the booking will continue and show a warning.</p>
+              </div>
               
               <CameraCapture
                 key={`person-${bedNumber}-${open}-${initialData?.personPhotoUrl || 'new'}`}
                 label="Person Photo"
                 onCapture={(blob, dataUrl) => setPersonPhoto({ blob, dataUrl })}
                 existingPhotoUrl={initialData?.personPhotoUrl || null}
-                autoOpen={!isEdit} // Auto-open for new bookings
+                autoOpen={false}
               />
               
               <div className="mt-4">
@@ -1070,7 +1042,7 @@ export default function AllocateModal({
                   label="Identity Card Photo"
                   onCapture={(blob, dataUrl) => setAadhaarPhoto({ blob, dataUrl })}
                   existingPhotoUrl={initialData?.aadhaarPhotoUrl || null}
-                  autoOpen={!isEdit} // Auto-open for new bookings
+                  autoOpen={false}
                 />
               </div>
             </div>

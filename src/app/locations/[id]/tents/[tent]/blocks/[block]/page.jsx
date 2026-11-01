@@ -23,6 +23,7 @@ import {
 } from '@/lib/api';
 import { canManageAccommodationStructure } from '@/lib/permissions.mjs';
 import { eligibleDelegateAllocations } from '@/lib/accommodationEligibility.mjs';
+import { allocationMatchesBooking } from '@/lib/bookingOutcome.mjs';
 
 export default function BlockBedsPage({ params }) {
   const { id, tent, block } = use(params);
@@ -197,12 +198,14 @@ export default function BlockBedsPage({ params }) {
         setModal({ open: false, bedNumber: null, data: null });
         setNotification({
           type: 'error',
-          message: `Bed ${conflictedBed} was just booked by another operator. Please select another available bed.`,
+          message: `Bed ${conflictedBed} was just booked. Please select another available bed.`,
         });
       }
+      return blockRes;
     } catch (e) {
       console.error('Failed to refresh block data:', e);
       setLiveUpdatesAvailable(false);
+      return null;
     }
   }, [id, tent, block, modal.open, modal.data, modal.bedNumber]);
 
@@ -234,7 +237,7 @@ export default function BlockBedsPage({ params }) {
     };
   }, [pending, refreshBlockData]);
 
-  async function handleSave(payload, skipClose = false) {
+  async function handleSave(payload, skipClose = false, saveContext = {}) {
     const isBatchEdit = modal.bedNumber === 'Multiple' && Array.isArray(batchSelection) && batchSelection.length > 0;
     const n = isBatchEdit ? null : modal.bedNumber;
     const isEdit = Boolean(modal.data);
@@ -309,10 +312,10 @@ export default function BlockBedsPage({ params }) {
             // Generate view URLs from keys if new photos were uploaded
             const personPhotoUrl = updated.personPhotoKey 
               ? await generatePhotoViewUrl(updated.personPhotoKey)
-              : s.beds?.[n]?.personPhotoUrl; // Preserve existing URL if no new photo
+              : existingPhotos.personPhotoUrl;
             const aadhaarPhotoUrl = updated.aadhaarPhotoKey
               ? await generatePhotoViewUrl(updated.aadhaarPhotoKey)
-              : s.beds?.[n]?.aadhaarPhotoUrl; // Preserve existing URL if no new photo
+              : existingPhotos.aadhaarPhotoUrl;
             
             setBedsState((s) => {
               const mergedData = { 
@@ -331,7 +334,11 @@ export default function BlockBedsPage({ params }) {
               };
             });
           }
-          showNotification('success', `Bed ${n} allocation updated successfully for ${payload.name}`);
+          if (saveContext.failedPhotoTypes?.length) {
+            showNotification('warning', `Bed ${n} was updated, but the selected photo could not be uploaded.`);
+          } else {
+            showNotification('success', `Bed ${n} allocation updated successfully for ${payload.name}`);
+          }
         } else {
           const created = await allocateBed(id, Number(tent), Number(block), n, payload);
           if (created && typeof created === 'object') {
@@ -360,7 +367,13 @@ export default function BlockBedsPage({ params }) {
               };
             });
           }
-          showNotification('success', `Bed ${n} allocated successfully to ${payload.name}`);
+          if (saveContext.failedPhotoTypes?.length) {
+            showNotification('warning', `Bed ${n} was booked for ${payload.name}, but photo storage was unavailable. The booking is saved without the failed photo.`);
+          } else if (saveContext.bookedWithoutPhotos) {
+            showNotification('warning', `Booking saved without photos for ${payload.name} in bed ${n}.`);
+          } else {
+            showNotification('success', `Bed ${n} allocated successfully to ${payload.name}`);
+          }
         }
       }
 
@@ -369,7 +382,23 @@ export default function BlockBedsPage({ params }) {
         setModal({ open: false, bedNumber: null, data: null });
       }
       setBatchSelection([]);
+      return { ok: true };
     } catch (e) {
+      if (!isEdit && n != null) {
+        const refreshedBlock = await refreshBlockData();
+        if (allocationMatchesBooking(refreshedBlock?.beds?.[n], payload)) {
+          setModal({ open: false, bedNumber: null, data: null });
+          setBatchSelection([]);
+          const withoutPhotos = saveContext.bookedWithoutPhotos || saveContext.failedPhotoTypes?.length;
+          const photoStatus = withoutPhotos ? ' without photos' : '';
+          showNotification(
+            'warning',
+            `The booking for ${payload.name} is saved in bed ${n}${photoStatus}. The connection dropped after saving, so the bed was rechecked.`
+          );
+          return { ok: true, recovered: true };
+        }
+      }
+
       // Check for 409 conflict error (bed already allocated by someone else)
       const is409Conflict = 
         e.response?.status === 409 || 
@@ -379,23 +408,10 @@ export default function BlockBedsPage({ params }) {
         e.message?.toLowerCase().includes('overlapping_allocation');
       
       if (is409Conflict && !isEdit && n != null) {
-        // Only handle 409 for new allocations (not edits)
-        // Close modal immediately
         setModal({ open: false, bedNumber: null, data: null });
         setBatchSelection([]);
-        setPending(false);
-        
-        // Show conflict notification
-        showNotification('error', `Bed ${n} was just booked by someone else. Refreshing...`);
-        
-        // Auto-refresh the bed grid after a short delay
-        setTimeout(async () => {
-          await refreshBlockData();
-          // Show success notification after refresh
-          showNotification('info', 'Updated! Please select another available bed.');
-        }, 500);
-        
-        return; // Exit early, don't revert
+        showNotification('error', `Bed ${n} is already booked. Please choose another available bed.`);
+        return { ok: false, conflict: true };
       }
       
       // Revert optimistic update on non-409 error
@@ -413,6 +429,7 @@ export default function BlockBedsPage({ params }) {
       
       const errorMessage = e.message || (isEdit ? 'Failed to update allocation' : 'Failed to allocate bed');
       showNotification('error', errorMessage);
+      return { ok: false, error: e };
     } finally {
       setPending(false);
     }
