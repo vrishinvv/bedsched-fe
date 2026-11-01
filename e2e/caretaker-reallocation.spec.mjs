@@ -28,6 +28,7 @@ function blockResponse() {
         gender: 'Male',
         caretakerForAllocationId: 101,
         caretakerForName: 'Verified Delegate',
+        caretakerForBedNumber: 1,
       },
     },
   };
@@ -134,6 +135,7 @@ test('shows the linked Delegate and reallocates a caretaker within the same bloc
 
   const assignment = page.getByRole('region', { name: 'Caretaker assignment' });
   await expect(assignment).toContainText('Verified Delegate');
+  await expect(assignment).toContainText('Bed 1');
 
   await page.getByRole('button', { name: 'Reallocate' }).click();
   const reallocationDialog = page.getByRole('dialog', { name: 'Reallocate Bed' });

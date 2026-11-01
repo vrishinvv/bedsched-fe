@@ -509,6 +509,7 @@ export default function BlockBedsPage({ params }) {
         endDate: allocationData.endDate,
         createdAt: allocationData.createdAt,
         caretakerForName: allocationData.caretakerForName,
+        caretakerForBedNumber: allocationData.caretakerForBedNumber,
       }
     });
   }

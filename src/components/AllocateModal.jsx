@@ -879,6 +879,7 @@ export default function AllocateModal({
             <div className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Caretaker assignment</div>
             <div className="mt-1 text-sm text-indigo-950">
               Caretaker for <strong>{initialData?.caretakerForName || `Delegate allocation #${initialData.caretakerForAllocationId}`}</strong>
+              {initialData?.caretakerForBedNumber != null && <span> — Bed {initialData.caretakerForBedNumber}</span>}
             </div>
             <p className="mt-1 text-xs text-indigo-700">This caretaker must remain in the same block as the Delegate.</p>
           </section>

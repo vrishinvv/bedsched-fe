@@ -245,7 +245,10 @@ export default function ReallocationModal({
                   {currentAllocation?.caretakerForName && (
                     <div className="col-span-1 sm:col-span-2 rounded-lg border border-indigo-200 bg-white/70 p-2">
                       <span className="text-indigo-700">Caretaker for:</span>
-                      <div className="font-semibold text-indigo-950">{currentAllocation.caretakerForName}</div>
+                      <div className="font-semibold text-indigo-950">
+                        {currentAllocation.caretakerForName}
+                        {currentAllocation.caretakerForBedNumber != null && ` — Bed ${currentAllocation.caretakerForBedNumber}`}
+                      </div>
                     </div>
                   )}
                   <div>
