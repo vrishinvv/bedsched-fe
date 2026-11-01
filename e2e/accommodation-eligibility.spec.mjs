@@ -32,6 +32,8 @@ test('allocates a caretaker with gender and locked Delegate stay dates', async (
               name: 'Verified Delegate',
               status: 'confirmed',
               accommodationCategory: 'delegate',
+              categorySource: 'sai_connect',
+              verifiedCategories: ['delegate'],
               startDate: '2026-11-05',
               endDate: '2026-11-24',
               gender: 'Male',
@@ -48,6 +50,7 @@ test('allocates a caretaker with gender and locked Delegate stay dates', async (
           matched: false,
           outcome: 'not_registered',
           message: 'Participant not registered.',
+          validIdentifier: true,
           defaultCategory: 'devotee',
           verificationToken: 'unregistered-token',
         },
@@ -83,17 +86,18 @@ test('allocates a caretaker with gender and locked Delegate stay dates', async (
   await expect(categoryTags.getByText('Sevadal', { exact: true })).toHaveCount(0);
   await expect(categoryTags.getByText('Devotee', { exact: true })).toHaveCount(0);
   await page.getByTitle('Bed 2: Available').click();
+  const allocationDialog = page.getByRole('dialog', { name: 'Allocate bed 2' });
   await expect(page.getByText('Sai Connect lookup is required')).toBeVisible();
   await expect(page.getByText('Complete the lookup to verify eligibility for this restricted block. A person without an eligible registration cannot be allocated here.')).toBeVisible();
   await expect(page.getByText('Complete Sai Connect lookup')).toBeVisible();
-  await expect(page.getByText(/devotee/i)).toHaveCount(0);
+  await expect(allocationDialog.getByText(/devotee/i)).toHaveCount(0);
   await page.getByPlaceholder('Sai Connect ID or phone').fill('800717');
   await page.getByRole('button', { name: 'Verify' }).click();
   await expect(page.getByRole('status', { name: 'Sai Connect lookup result' })).toContainText(
     'No Delegate or Sevadal registration was found. This person cannot be allocated to this restricted block.',
   );
   await expect(page.getByText('No eligible Delegate or Sevadal registration was found for this block.')).toBeVisible();
-  await expect(page.getByText(/devotee/i)).toHaveCount(0);
+  await expect(allocationDialog.getByText(/devotee/i)).toHaveCount(0);
   await page.getByLabel('Allocate as caretaker').check();
   await expect(page.getByText('Sai Connect lookup is optional for caretakers')).toBeVisible();
   await expect(page.getByText('Sai Connect lookup is required', { exact: true })).toHaveCount(0);
@@ -153,6 +157,8 @@ test('submits a verified caretaker with their Sai Connect profile and actual cat
               name: 'Verified Delegate',
               status: 'confirmed',
               accommodationCategory: 'delegate',
+              categorySource: 'sai_connect',
+              verifiedCategories: ['delegate'],
               startDate: '2026-11-05',
               endDate: '2026-11-24',
               gender: 'Male',
@@ -372,7 +378,7 @@ test('prefills and locks Sai gender while blocking a gender mismatch', async ({ 
     };
     if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
     if (path === '/api/auth/me') {
-      return route.fulfill({ status: 200, headers, json: { user: { id: 1, username: 'admin', role: 'admin', locationId: null } } });
+      return route.fulfill({ status: 200, headers, json: { user: { id: 10, username: 'location-user', role: 'location_user', locationId: 61 } } });
     }
     if (path === '/api/locations/61/tents/1/blocks/1') {
       return route.fulfill({
@@ -571,7 +577,9 @@ test('shows verified Sai categories without exposing the backend Devotee default
           matched: false,
           outcome: 'not_registered',
           message: 'Participant not registered.',
+          validIdentifier: true,
           defaultCategory: 'devotee',
+          verificationToken: 'valid-unregistered-token',
         },
       });
     }
@@ -610,6 +618,7 @@ test('shows verified Sai categories without exposing the backend Devotee default
   await expect(page.getByRole('status', { name: 'Sai Connect lookup result' })).toContainText(
     'No Delegate or Sevadal registration was found. You can continue with the normal allocation flow.',
   );
+  await expect(identifier).toHaveValue('999999');
   await expect(page.getByText('Continue as a Devotee')).toHaveCount(0);
   await expect(page.getByText(/Booking as: devotee/i)).toHaveCount(0);
   await expect(page.getByText('Participant not registered.')).toHaveCount(0);
@@ -663,6 +672,8 @@ async function mockOccupiedSaiBooking(page, role) {
               gender: 'Male',
               saiConnectId: '808675',
               saiConnectAge: 35,
+              categorySource: 'sai_connect',
+              verifiedCategories: ['delegate'],
             },
           },
         },
@@ -686,12 +697,18 @@ test('shows saved Sai Connect ID and age for an occupied booking', async ({ page
   await expect(details.getByText('808675', { exact: true })).toBeVisible();
   await expect(details.getByText('35 years', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Accommodation category')).toHaveCount(0);
+  await expect(page.getByPlaceholder('Full name')).toBeDisabled();
+  await expect(page.locator('input[name="phone"]')).toBeDisabled();
+  await expect(page.locator('select[name="gender"]')).toBeDisabled();
 });
 
 test('only an admin can edit the accommodation category of an occupied booking', async ({ page }) => {
   await mockOccupiedSaiBooking(page, 'admin');
 
   await expect(page.getByLabel('Accommodation category')).toBeVisible();
+  await expect(page.getByPlaceholder('Full name')).toBeEnabled();
+  await expect(page.locator('input[name="phone"]')).toBeEnabled();
+  await expect(page.locator('select[name="gender"]')).toBeEnabled();
 });
 
 test('books without photos using one authoritative success outcome when S3 is unavailable', async ({ page }) => {
@@ -768,4 +785,194 @@ test('books without photos using one authoritative success outcome when S3 is un
   await expect(page.getByText('The booking for No Photo Guest is saved in bed 1 without photos. The connection dropped after saving, so the bed was rechecked.')).toBeVisible();
   await expect(page.getByText(/Failed to save|another operator|just booked by someone else/i)).toHaveCount(0);
   await expect(page.getByTitle(/Bed 1: No Photo Guest/)).toBeVisible();
+});
+
+test('clears invalid or unapproved Sai Connect identifiers and shows the reason beside Verify', async ({ page }) => {
+  await page.route('**/api/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    const headers = {
+      'access-control-allow-credentials': 'true',
+      'access-control-allow-headers': 'authorization,content-type',
+      'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+      'access-control-allow-origin': 'http://127.0.0.1:3100',
+    };
+    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+    if (path === '/api/auth/me') {
+      return route.fulfill({ status: 200, headers, json: { user: { id: 1, username: 'admin', role: 'admin', locationId: null } } });
+    }
+    if (path === '/api/locations/61/tents/1/blocks/1') {
+      return route.fulfill({
+        status: 200,
+        headers,
+        json: {
+          meta: {
+            location: { id: '61', name: 'Test Location' },
+            tent: { index: 1, name: 'Test Tent' },
+            block: { index: 1, name: 'Mixed', genderRestriction: 'both', allowedCategories: ['delegate', 'sevadal', 'devotee'] },
+          },
+          blockSize: 1,
+          beds: {},
+        },
+      });
+    }
+    if (path === '/api/sai-connect/lookup' && request.method() === 'POST') {
+      const { identifier } = request.postDataJSON();
+      const notApproved = identifier === '222222';
+      return route.fulfill({
+        status: 200,
+        headers,
+        json: {
+          matched: false,
+          outcome: notApproved ? 'not_approved' : 'invalid',
+          validIdentifier: false,
+          clearIdentifier: true,
+          message: notApproved ? 'Sai Connect ID not approved.' : 'Invalid Sai connect ID.',
+          defaultCategory: 'devotee',
+        },
+      });
+    }
+    if (path === '/api/upload-url') return route.fulfill({ status: 503, headers, json: {} });
+    return route.fulfill({ status: 404, headers, json: { error: `Unexpected request: ${path}` } });
+  });
+
+  await page.goto('/login');
+  await page.evaluate(() => window.localStorage.setItem('bs_token', 'playwright-token'));
+  await page.goto('/locations/61/tents/1/blocks/1');
+  await page.getByTitle('Bed 1: Available').click();
+  const identifier = page.getByPlaceholder('Sai Connect ID or phone');
+
+  await identifier.fill('111111');
+  await page.getByRole('button', { name: 'Verify' }).click();
+  await expect(identifier).toHaveValue('');
+  await expect(page.getByRole('alert', { name: 'Sai Connect lookup error' })).toHaveText('Invalid Sai connect ID.');
+
+  await identifier.fill('222222');
+  await page.getByRole('button', { name: 'Verify' }).click();
+  await expect(identifier).toHaveValue('');
+  await expect(page.getByRole('alert', { name: 'Sai Connect lookup error' })).toHaveText('Sai Connect ID not approved.');
+});
+
+test('locks Sai-sourced profile fields for location users but leaves admins in control', async ({ page }) => {
+  let role = 'location_user';
+  await page.route('**/api/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    const headers = {
+      'access-control-allow-credentials': 'true',
+      'access-control-allow-headers': 'authorization,content-type',
+      'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+      'access-control-allow-origin': 'http://127.0.0.1:3100',
+    };
+    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+    if (path === '/api/auth/me') {
+      return route.fulfill({ status: 200, headers, json: { user: { id: 10, username: role, role, locationId: role === 'admin' ? null : 61 } } });
+    }
+    if (path === '/api/locations/61/tents/1/blocks/1') {
+      return route.fulfill({
+        status: 200,
+        headers,
+        json: {
+          meta: {
+            location: { id: '61', name: 'Test Location' },
+            tent: { index: 1, name: 'Test Tent' },
+            block: { index: 1, name: 'Mixed', genderRestriction: 'both', allowedCategories: ['delegate', 'sevadal', 'devotee'] },
+          },
+          blockSize: 1,
+          beds: {},
+        },
+      });
+    }
+    if (path === '/api/sai-connect/lookup' && request.method() === 'POST') {
+      return route.fulfill({
+        status: 200,
+        headers,
+        json: {
+          matched: true,
+          saiConnectId: '808675',
+          fullName: 'Verified Delegate',
+          mobileNo: '9876543210',
+          gender: 'Female',
+          verifiedCategories: ['delegate'],
+          verificationToken: 'verified-token',
+        },
+      });
+    }
+    if (path === '/api/upload-url') return route.fulfill({ status: 503, headers, json: {} });
+    return route.fulfill({ status: 404, headers, json: { error: `Unexpected request: ${path}` } });
+  });
+
+  async function openAndVerify() {
+    await page.goto('/locations/61/tents/1/blocks/1');
+    await page.getByTitle('Bed 1: Available').click();
+    await page.getByPlaceholder('Sai Connect ID or phone').fill('808675');
+    await page.getByRole('button', { name: 'Verify' }).click();
+  }
+
+  await page.goto('/login');
+  await page.evaluate(() => window.localStorage.setItem('bs_token', 'playwright-token'));
+  await openAndVerify();
+  await expect(page.getByPlaceholder('Sai Connect ID or phone')).toBeDisabled();
+  await expect(page.getByPlaceholder('Full name')).toBeDisabled();
+  await expect(page.locator('input[name="phone"]')).toBeDisabled();
+  await expect(page.locator('select[name="gender"]')).toBeDisabled();
+
+  role = 'admin';
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await openAndVerify();
+  await expect(page.getByPlaceholder('Sai Connect ID or phone')).toBeEnabled();
+  await expect(page.getByPlaceholder('Full name')).toBeEnabled();
+  await expect(page.locator('input[name="phone"]')).toBeEnabled();
+  await expect(page.locator('select[name="gender"]')).toBeEnabled();
+});
+
+test('lets an admin update block category tags directly from the bed view', async ({ page }) => {
+  let updatedCategories = ['delegate', 'sevadal', 'devotee'];
+  let patchPayload;
+  await page.route('**/api/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    const headers = {
+      'access-control-allow-credentials': 'true',
+      'access-control-allow-headers': 'authorization,content-type',
+      'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+      'access-control-allow-origin': 'http://127.0.0.1:3100',
+    };
+    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+    if (path === '/api/auth/me') {
+      return route.fulfill({ status: 200, headers, json: { user: { id: 1, username: 'admin', role: 'admin', locationId: null } } });
+    }
+    if (path === '/api/locations/61/tents/1/blocks/1' && request.method() === 'PATCH') {
+      patchPayload = request.postDataJSON();
+      updatedCategories = patchPayload.allowedCategories;
+      return route.fulfill({ status: 200, headers, json: { ok: true } });
+    }
+    if (path === '/api/locations/61/tents/1/blocks/1') {
+      return route.fulfill({
+        status: 200,
+        headers,
+        json: {
+          meta: {
+            location: { id: '61', name: 'Test Location' },
+            tent: { index: 1, name: 'Test Tent' },
+            block: { index: 1, name: 'Mixed', genderRestriction: 'both', allowedCategories: updatedCategories },
+          },
+          blockSize: 1,
+          beds: {},
+        },
+      });
+    }
+    return route.fulfill({ status: 404, headers, json: { error: `Unexpected request: ${path}` } });
+  });
+
+  await page.goto('/login');
+  await page.evaluate(() => window.localStorage.setItem('bs_token', 'playwright-token'));
+  await page.goto('/locations/61/tents/1/blocks/1');
+  await page.getByLabel('Allowed categories').selectOption('delegate,sevadal');
+
+  await expect.poll(() => patchPayload).toEqual({ allowedCategories: ['delegate', 'sevadal'] });
+  const tags = page.getByRole('region', { name: 'Allowed accommodation categories' });
+  await expect(tags.getByText('Delegate', { exact: true })).toBeVisible();
+  await expect(tags.getByText('Sevadal', { exact: true })).toBeVisible();
+  await expect(tags.getByText('Devotee', { exact: true })).toHaveCount(0);
 });

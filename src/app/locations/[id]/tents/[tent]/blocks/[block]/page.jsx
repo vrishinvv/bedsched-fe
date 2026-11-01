@@ -25,6 +25,21 @@ import { canManageAccommodationStructure } from '@/lib/permissions.mjs';
 import { eligibleDelegateAllocations } from '@/lib/accommodationEligibility.mjs';
 import { allocationMatchesBooking } from '@/lib/bookingOutcome.mjs';
 
+const CATEGORY_PRESETS = Object.freeze([
+  { value: 'delegate', label: 'Delegate only', categories: ['delegate'] },
+  { value: 'sevadal', label: 'Sevadal only', categories: ['sevadal'] },
+  { value: 'devotee', label: 'Devotee only', categories: ['devotee'] },
+  { value: 'delegate,sevadal', label: 'Delegate + Sevadal', categories: ['delegate', 'sevadal'] },
+  { value: 'delegate,devotee', label: 'Delegate + Devotee', categories: ['delegate', 'devotee'] },
+  { value: 'sevadal,devotee', label: 'Sevadal + Devotee', categories: ['sevadal', 'devotee'] },
+  { value: 'delegate,sevadal,devotee', label: 'All categories', categories: ['delegate', 'sevadal', 'devotee'] },
+]);
+
+function categoryPresetValue(categories) {
+  const selected = new Set(categories || []);
+  return ['delegate', 'sevadal', 'devotee'].filter((category) => selected.has(category)).join(',');
+}
+
 export default function BlockBedsPage({ params }) {
   const { id, tent, block } = use(params);
   const [meta, setMeta] = useState(null); // { location, tent, block }
@@ -40,6 +55,7 @@ export default function BlockBedsPage({ params }) {
   const [notification, setNotification] = useState(null);
   const [liveUpdatesAvailable, setLiveUpdatesAvailable] = useState(true);
   const [updatingRestriction, setUpdatingRestriction] = useState(false);
+  const [updatingCategories, setUpdatingCategories] = useState(false);
   const [deallocating, setDeallocating] = useState(false);
   const [confirmDeallocate, setConfirmDeallocate] = useState(null);
   const [showDeallocateModal, setShowDeallocateModal] = useState(false);
@@ -164,6 +180,16 @@ export default function BlockBedsPage({ params }) {
     }
     if (!selectionIdenticalDetails) {
       showNotification('info', 'Selected beds have different details. Select beds with identical details to batch edit.');
+      return;
+    }
+    if (
+      !canManageAccommodationStructure(currentUser)
+      && selectedAllocations.some(({ data }) => (
+        data?.categorySource === 'sai_connect'
+        || (Array.isArray(data?.verifiedCategories) && data.verifiedCategories.length > 0)
+      ))
+    ) {
+      showNotification('error', 'Sai Connect profile fields can only be changed by an administrator.');
       return;
     }
     // Use the same AllocateModal, but treat as batch edit by setting bedNumber to a label
@@ -721,6 +747,32 @@ export default function BlockBedsPage({ params }) {
               </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
+              {canManageAccommodationStructure(currentUser) && (
+                <select
+                  aria-label="Allowed categories"
+                  value={categoryPresetValue(allowedCategories)}
+                  disabled={updatingCategories}
+                  onChange={async (event) => {
+                    const preset = CATEGORY_PRESETS.find(({ value }) => value === event.target.value);
+                    if (!preset || preset.value === categoryPresetValue(allowedCategories)) return;
+                    try {
+                      setUpdatingCategories(true);
+                      await updateBlock(id, Number(tent), Number(block), { allowedCategories: preset.categories });
+                      setAllowedCategories(preset.categories);
+                      showNotification('success', `Block categories updated to ${preset.label}.`);
+                    } catch (error) {
+                      showNotification('error', error.message || 'Failed to update block categories.');
+                    } finally {
+                      setUpdatingCategories(false);
+                    }
+                  }}
+                  className="cursor-pointer rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {CATEGORY_PRESETS.map((preset) => (
+                    <option key={preset.value} value={preset.value}>{preset.label}</option>
+                  ))}
+                </select>
+              )}
               {canManageAccommodationStructure(currentUser) && <div className="relative">
                 <select
                   value={genderRestriction}

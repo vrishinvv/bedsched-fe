@@ -270,6 +270,15 @@ export default function AllocateModal({
       const result = await lookupSaiConnect(saiIdentifier.trim());
       if (!result.matched) {
         setAccommodationCategory('devotee');
+        if (result.clearIdentifier || ['invalid', 'not_approved'].includes(result.outcome)) {
+          setSaiIdentifier('');
+          setSaiLookup({
+            loading: false,
+            result: null,
+            error: result.message || 'Sai Connect could not verify this identifier.',
+          });
+          return;
+        }
         setSaiLookup({ loading: false, result, error: '' });
         return;
       }
@@ -341,9 +350,24 @@ export default function AllocateModal({
   };
 
   const availableGenders = getAvailableGenderOptions();
-  const saiVerifiedGender = !isCaretaker && saiLookup.result?.matched
+  const saiVerifiedGender = saiLookup.result?.matched
     ? normalizeGender(saiLookup.result.gender)
     : '';
+  const hasSavedSaiProfile = Boolean(
+    isEdit
+    && (
+      initialData?.categorySource === 'sai_connect'
+      || (Array.isArray(initialData?.verifiedCategories) && initialData.verifiedCategories.length > 0)
+    )
+  );
+  const lockSaiProfileForLocationUser = !isAdmin && (
+    Boolean(saiLookup.result?.matched)
+    || hasSavedSaiProfile
+  );
+  const lockVerifiedPhone = lockSaiProfileForLocationUser && (
+    hasSavedSaiProfile
+    || /^\d{10}$/.test(String(saiLookup.result?.mobileNo || ''))
+  );
   const displayedGenderOptions = saiVerifiedGender && !availableGenders.some(({ value }) => value === saiVerifiedGender)
     ? [...availableGenders, { value: saiVerifiedGender, label: saiVerifiedGender }]
     : availableGenders;
@@ -568,7 +592,14 @@ export default function AllocateModal({
     const errs = [];
     if (!form.name || !form.name.trim()) errs.push('Name is required');
     if (!isCaretaker && !/^\d{10}$/.test(form.phone)) errs.push('Enter a valid 10-digit phone number');
-    if (!isEdit && saiLookupRequired && !saiLookup.result) errs.push('Complete Sai Connect lookup');
+    if (
+      !isEdit
+      && saiLookupRequired
+      && !(
+        saiLookup.result?.matched
+        || (saiLookup.result?.outcome === 'not_registered' && saiLookup.result?.verificationToken)
+      )
+    ) errs.push('Complete Sai Connect lookup');
     if (!form.gender) errs.push('Gender is required');
     if (!form.startDate) errs.push(isCaretaker ? 'Choose a Delegate to copy the caretaker stay dates' : 'Start date is required');
     if (!form.endDate) errs.push(isCaretaker ? 'Choose a Delegate to copy the caretaker stay dates' : 'End date is required');
@@ -598,7 +629,15 @@ export default function AllocateModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4" data-preserve-selection="true" onClick={(e) => e.stopPropagation()}>
       <div className="absolute inset-0 bg-black/40" onClick={!isProcessing ? onClose : undefined} data-preserve-selection="true" />
-      <div ref={ref} className="relative w-full max-w-lg max-h-[95vh] flex flex-col rounded-2xl bg-white shadow-xl overflow-hidden" data-preserve-selection="true" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={ref}
+        role="dialog"
+        aria-modal="true"
+        aria-label={isEdit ? `Edit allocation for bed ${bedNumber}` : `Allocate bed ${bedNumber}`}
+        className="relative w-full max-w-lg max-h-[95vh] flex flex-col rounded-2xl bg-white shadow-xl overflow-hidden"
+        data-preserve-selection="true"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div ref={scrollRef} className="overflow-y-auto flex-1 p-4 sm:p-5">
         {/* Enhanced loading overlay with skeleton and progress */}
         {isProcessing && (
@@ -696,44 +735,48 @@ export default function AllocateModal({
                     : 'Use a Sai Connect ID or phone number to verify Delegate or Sevadal status. If skipped or not found, continue with the normal allocation flow.'}
               </p>
             </div>
-            <div className="flex gap-2">
-              <input
-                value={saiIdentifier}
-                onChange={(event) => {
-                  const shouldResetVerifiedGender = Boolean(saiLookup.result?.matched && normalizeGender(saiLookup.result.gender));
-                  setSaiIdentifier(event.target.value.replace(/\D/g, '').slice(0, 15));
-                  setSaiLookup({ loading: false, result: null, error: '' });
-                  setAccommodationCategory('devotee');
-                  if (shouldResetVerifiedGender) {
-                    setForm((current) => ({
-                      ...current,
-                      gender: genderRestriction === 'female_only' ? 'Female' : 'Male',
-                    }));
-                  }
-                }}
-                inputMode="numeric"
-                placeholder="Sai Connect ID or phone"
-                disabled={isProcessing || saiLookup.loading}
-                className="min-w-0 flex-1 rounded-lg border border-indigo-200 bg-white p-2 text-sm text-gray-900 outline-none focus:border-indigo-500"
-              />
-              <button
-                type="button"
-                onClick={handleSaiLookup}
-                disabled={isProcessing || saiLookup.loading || !saiIdentifier.trim()}
-                className="rounded-lg bg-indigo-700 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-800 disabled:opacity-50"
-              >
-                {saiLookup.loading ? 'Checking…' : 'Verify'}
-              </button>
-            </div>
-            {saiLookup.error && (
-              <div
-                role="alert"
-                aria-label="Sai Connect lookup error"
-                className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900"
-              >
-                {saiLookup.error}
+            <div>
+              <div className="flex gap-2">
+                <input
+                  value={saiIdentifier}
+                  onChange={(event) => {
+                    const shouldResetVerifiedGender = Boolean(saiLookup.result?.matched && normalizeGender(saiLookup.result.gender));
+                    setSaiIdentifier(event.target.value.replace(/\D/g, '').slice(0, 15));
+                    setSaiLookup({ loading: false, result: null, error: '' });
+                    setAccommodationCategory('devotee');
+                    if (shouldResetVerifiedGender) {
+                      setForm((current) => ({
+                        ...current,
+                        gender: genderRestriction === 'female_only' ? 'Female' : 'Male',
+                      }));
+                    }
+                  }}
+                  inputMode="numeric"
+                  placeholder="Sai Connect ID or phone"
+                  aria-describedby={saiLookup.error ? 'sai-connect-lookup-error' : undefined}
+                  disabled={isProcessing || saiLookup.loading || (!isAdmin && Boolean(saiLookup.result?.matched))}
+                  className="min-w-0 flex-1 rounded-lg border border-indigo-200 bg-white p-2 text-sm text-gray-900 outline-none focus:border-indigo-500 disabled:cursor-not-allowed disabled:bg-gray-100"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaiLookup}
+                  disabled={isProcessing || saiLookup.loading || !saiIdentifier.trim() || (!isAdmin && Boolean(saiLookup.result?.matched))}
+                  className="rounded-lg bg-indigo-700 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-800 disabled:opacity-50"
+                >
+                  {saiLookup.loading ? 'Checking…' : 'Verify'}
+                </button>
               </div>
-            )}
+              {saiLookup.error && (
+                <p
+                  id="sai-connect-lookup-error"
+                  role="alert"
+                  aria-label="Sai Connect lookup error"
+                  className="mt-1.5 text-xs font-medium text-red-700"
+                >
+                  {saiLookup.error}
+                </p>
+              )}
+            </div>
             {saiLookup.result && !saiLookup.result.matched && (
               <div
                 role="status"
@@ -960,7 +1003,7 @@ export default function AllocateModal({
               name="name" 
               value={form.name} 
               onChange={handleChange} 
-              disabled={isProcessing}
+              disabled={isProcessing || lockSaiProfileForLocationUser}
               className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
               placeholder="Full name" 
             />
@@ -972,7 +1015,7 @@ export default function AllocateModal({
               name="phone" 
               value={form.phone} 
               onChange={handleChange} 
-              disabled={isProcessing}
+              disabled={isProcessing || lockVerifiedPhone}
               type="tel"
               inputMode="numeric"
               pattern="\\d{10}"
@@ -1004,14 +1047,14 @@ export default function AllocateModal({
               name="gender" 
               value={form.gender} 
               onChange={handleChange} 
-              disabled={isProcessing || Boolean(saiVerifiedGender)}
+              disabled={isProcessing || lockSaiProfileForLocationUser}
               className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
               {displayedGenderOptions.map(option => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
-            {saiVerifiedGender
+            {saiVerifiedGender && !isAdmin
               ? <p className="mt-1 text-xs text-gray-500">Verified by Sai Connect and cannot be edited</p>
               : genderRestriction !== 'both' && <p className="mt-1 text-xs text-gray-500">Limited by tent restriction</p>}
             {genderMismatchMessage && (
