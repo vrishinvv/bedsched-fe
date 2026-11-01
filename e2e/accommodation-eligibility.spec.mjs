@@ -234,13 +234,18 @@ test('shows Sai lookups as Delegate, Sevadal, or Devotee category outcomes', asy
   const identifier = page.getByPlaceholder('Sai Connect ID or phone');
   const verify = page.getByRole('button', { name: 'Verify' });
 
+  await expect(page.getByText('Sai Connect lookup is required')).toBeVisible();
+  await expect(page.getByText('Complete Sai Connect lookup')).toBeVisible();
+
   await identifier.fill('239910');
   await verify.click();
   await expect(page.getByRole('status')).toContainText('Delegate');
   await expect(page.getByRole('status')).toContainText('Sai Connect verified');
   await expect(page.getByRole('status')).toHaveClass(/bg-emerald-50/);
+  await expect(page.getByText('Complete Sai Connect lookup')).toHaveCount(0);
 
   await identifier.fill('888888');
+  await expect(page.getByText('Complete Sai Connect lookup')).toBeVisible();
   await verify.click();
   await expect(page.getByRole('status')).toContainText('Sevadal');
 
@@ -251,4 +256,5 @@ test('shows Sai lookups as Delegate, Sevadal, or Devotee category outcomes', asy
   await expect(categoryOutcome).toContainText('Devotee');
   await expect(categoryOutcome).toContainText('Continue as a Devotee');
   await expect(page.getByText('Participant not registered.')).toHaveCount(0);
+  await expect(page.getByText('Complete Sai Connect lookup')).toHaveCount(0);
 });

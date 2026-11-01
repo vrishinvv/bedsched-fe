@@ -231,12 +231,8 @@ export default function AllocateModal({
       setAccommodationCategory('devotee');
       setSaiLookup({
         loading: false,
-        result: {
-          matched: false,
-          outcome: 'unavailable',
-          defaultCategory: 'devotee',
-        },
-        error: '',
+        result: null,
+        error: 'Sai Connect could not be checked. Try again.',
       });
     }
   }
@@ -536,6 +532,7 @@ export default function AllocateModal({
     if (!isCaretaker && !/^\d{10}$/.test(form.phone)) errs.push('Enter a valid 10-digit phone number');
     if (!isEdit && !isCaretaker && !personPhoto.blob && !personPhoto.dataUrl) errs.push('Person photo is required');
     if (!isEdit && !isCaretaker && !aadhaarPhoto.blob && !aadhaarPhoto.dataUrl) errs.push('Identity photo is required');
+    if (!isEdit && !isCaretaker && !saiLookup.result) errs.push('Complete Sai Connect lookup');
     if (!isCaretaker && !form.startDate) errs.push('Start date is required');
     if (!isCaretaker && !form.endDate) errs.push('End date is required');
     if (!isCaretaker && form.startDate && !isWithinBookingWindow(form.startDate)) errs.push(`Start date must be ${BOOKING_WINDOW_LABEL}`);
@@ -640,13 +637,17 @@ export default function AllocateModal({
         {!isEdit && (
           <section className="mb-4 space-y-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3">
             <div>
-              <div className="text-sm font-semibold text-indigo-950">Sai Connect lookup <span className="font-normal text-indigo-700">(optional)</span></div>
-              <p className="mt-1 text-xs text-indigo-700">Use a Sai Connect ID or phone number to verify Delegate or Sevadal status. If skipped or not found, the person is saved as a Devotee.</p>
+              <div className="text-sm font-semibold text-indigo-950">Sai Connect lookup is required</div>
+              <p className="mt-1 text-xs text-indigo-700">Enter a Sai Connect ID or phone number and complete the lookup. If no registration is found, the person is saved as a Devotee.</p>
             </div>
             <div className="flex gap-2">
               <input
                 value={saiIdentifier}
-                onChange={(event) => setSaiIdentifier(event.target.value.replace(/\D/g, '').slice(0, 15))}
+                onChange={(event) => {
+                  setSaiIdentifier(event.target.value.replace(/\D/g, '').slice(0, 15));
+                  setSaiLookup({ loading: false, result: null, error: '' });
+                  setAccommodationCategory('devotee');
+                }}
                 inputMode="numeric"
                 placeholder="Sai Connect ID or phone"
                 disabled={isProcessing || saiLookup.loading}
@@ -661,6 +662,11 @@ export default function AllocateModal({
                 {saiLookup.loading ? 'Checking…' : 'Verify'}
               </button>
             </div>
+            {saiLookup.error && (
+              <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                {saiLookup.error}
+              </div>
+            )}
             {saiLookup.result && !saiLookup.result.matched && (
               <div role="status" className="rounded-lg border border-gray-200 bg-white p-3">
                 <div className="text-sm font-semibold text-gray-900">Devotee</div>
