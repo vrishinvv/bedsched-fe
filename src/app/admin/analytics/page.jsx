@@ -130,7 +130,6 @@ function AnalyticsContent() {
       'Dharmakshetra Enclave': '#f97316', // Orange
       'Shivam Enclave': '#6366f1', // Indigo
       'Sundaram Enclave': '#ec4899', // Pink
-      'Sathyam Enclave': '#10b981', // Emerald
       'New Block B Basement': '#ef4444', // Red
       'New Block A': '#f43f5e', // Rosy Red
       'New Block B': '#991b1b', // Maroon Red
