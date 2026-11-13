@@ -130,6 +130,7 @@ function AnalyticsContent() {
       'Dharmakshetra Enclave': '#f97316', // Orange
       'Shivam Enclave': '#6366f1', // Indigo
       'Sundaram Enclave': '#ec4899', // Pink
+      'Sathyam Enclave': '#10b981', // Emerald
       'New Block B Basement': '#ef4444', // Red
       'New Block A': '#f43f5e', // Rosy Red
       'New Block B': '#991b1b', // Maroon Red
@@ -439,6 +440,30 @@ function AnalyticsContent() {
             )}
           </div>
 
+          {/* Category Breakdown Card */}
+          {Array.isArray(data.categoryBreakdown) && (
+            <div className="md:col-span-2 lg:col-span-3 bg-gradient-to-br from-gray-900/90 to-gray-800/90 border border-gray-700/50 rounded-xl p-6 backdrop-blur-sm">
+              <h3 className="text-lg font-semibold text-white mb-3">Accommodation Category Breakdown</h3>
+              {data.categoryBreakdown.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {['delegate', 'sevadal', 'devotee', 'caretaker'].map((cat) => {
+                    const count = Number(
+                      data.categoryBreakdown.find((row) => String(row.category || '').toLowerCase() === cat)?.count || 0
+                    );
+                    return (
+                      <div key={cat} className="rounded-lg border border-white/10 bg-white/5 p-4">
+                        <p className="text-xs font-medium uppercase tracking-wider text-gray-400">{cat}</p>
+                        <p className="mt-1 text-2xl font-bold text-white">{count.toLocaleString()}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-gray-400 text-sm">No category data available</p>
+              )}
+            </div>
+          )}
+
           {/* Daily Allocations Timeline */}
           <div className="md:col-span-2 lg:col-span-3 bg-gradient-to-br from-gray-900/90 to-gray-800/90 border border-gray-700/50 rounded-xl p-6 backdrop-blur-sm">
             <h3 className="text-lg font-semibold text-white mb-3">Daily Allocations Timeline</h3>
@@ -559,7 +584,7 @@ function AnalyticsContent() {
 
 export default function AnalyticsPage() {
   return (
-    <ProtectedRoute adminOnly={true}>
+    <ProtectedRoute requiredRole="admin">
       <AnalyticsContent />
     </ProtectedRoute>
   );

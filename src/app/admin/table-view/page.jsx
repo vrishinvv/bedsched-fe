@@ -65,25 +65,12 @@ function TableViewContent() {
   const userDropdownRef = useRef(null);
 
   useEffect(() => {
-    loadUsers();
-    loadLocations();
-  }, []);
-
-  useEffect(() => {
-    console.log('=== TABLE VIEW: useEffect triggered ===');
-    console.log('API_BASE_URL:', API_BASE_URL);
     loadLocations();
     loadUsers();
     // Fetch user role and location
-    console.log('About to fetch /api/auth/me');
     fetch(`${API_BASE_URL}/api/auth/me`, { headers: authHeaders() })
-      .then(res => {
-        console.log('Response status:', res.status);
-        return res.json();
-      })
+      .then(res => res.json())
       .then(data => {
-        console.log('User data fetched:', data);
-        console.log('User role:', data?.user?.role);
         setUserRole(data?.user?.role);
         if (data?.user?.role === 'location_user' && data?.user?.locationId) {
           setUserLocationId(data.user.locationId);
@@ -339,7 +326,7 @@ function TableViewContent() {
             All Allocations
           </h2>
           <p className="text-sm sm:text-base text-indigo-200/80">
-            Complete history of all allocations (was_occupied = true)
+            Complete history of all allocations across active, expired, and deallocated bookings
           </p>
         </div>
       </section>
@@ -572,8 +559,6 @@ function TableViewContent() {
 
         {/* Apply Filters Button */}
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end mt-4">
-          {/* Debug: Show current user role */}
-          <div className="text-xs text-gray-500">Role: {userRole || 'not loaded'}</div>
           {userRole === 'admin' && (
             <div className="flex-1">
               <label className="block text-xs font-medium text-gray-300 mb-1">Send CSV to Email</label>
@@ -719,9 +704,16 @@ function TableViewContent() {
                   >
                     <td className="px-4 py-3 text-gray-400">{(page - 1) * itemsPerPage + index + 1}</td>
                     <td className="px-4 py-3 text-white/90 whitespace-nowrap font-medium">{allocation.name}</td>
-                    <td className="px-4 py-3 text-white/80">{allocation.phone}</td>
+                    <td className="px-4 py-3 text-white/80">{allocation.phone || '—'}</td>
                     <td className="px-4 py-3 text-xs whitespace-nowrap">
-                      <div className="font-medium text-indigo-200 capitalize">{allocation.accommodation_category || 'Devotee'}</div>
+                      <div className="font-medium text-indigo-200 capitalize">
+                        {allocation.accommodation_category || 'Devotee'}
+                        {allocation.caretaker_for_allocation_id && (
+                          <span className="ml-1.5 inline-block rounded bg-teal-500/20 px-1.5 py-0.5 text-[11px] font-medium text-teal-200">
+                            Caretaker{allocation.caretaker_for_bed ? ` (Bed ${allocation.caretaker_for_bed})` : ''}
+                          </span>
+                        )}
+                      </div>
                       <div className="text-gray-400">ID: {allocation.sai_connect_id || '—'} · Age: {allocation.sai_connect_age ?? '—'}</div>
                     </td>
                     <td className="px-4 py-3 text-white/90 whitespace-nowrap">{allocation.location_name}</td>

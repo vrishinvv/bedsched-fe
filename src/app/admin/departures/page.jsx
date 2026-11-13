@@ -119,10 +119,9 @@ function DeparturesContent() {
     load(date, page, sortConfig.key, sortConfig.direction); 
   }, [page, sortConfig]);
 
-  // Load data on mount
+  // Load locations and user role on mount
   useEffect(() => {
     loadLocations();
-    load(date, 1, sortConfig.key, sortConfig.direction);
     // Fetch user role and location
     fetch(`${API_BASE_URL}/api/auth/me`, { headers: authHeaders() })
       .then(res => res.json())
@@ -568,15 +567,26 @@ function DeparturesContent() {
                     <td className="px-4 py-3 text-white/90 font-semibold">{item.bed_number}</td>
                     <td className="px-4 py-3 text-white/90 whitespace-nowrap">{item.name || 'No name'}</td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => router.push(`/admin/edit?phone=${encodeURIComponent(item.phone)}`)}
-                        className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-xs transition-colors"
-                      >
-                        {item.phone}
-                      </button>
+                      {item.phone || item.sai_connect_id ? (
+                        <button
+                          onClick={() => router.push(`/admin/edit?phone=${encodeURIComponent(item.phone || item.sai_connect_id)}`)}
+                          className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-xs transition-colors"
+                        >
+                          {item.phone || `Sai ID: ${item.sai_connect_id}`}
+                        </button>
+                      ) : (
+                        <span className="text-gray-400 text-xs">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-xs whitespace-nowrap">
-                      <div className="font-medium text-indigo-200 capitalize">{item.accommodation_category || 'Devotee'}</div>
+                      <div className="font-medium text-indigo-200 capitalize">
+                        {item.accommodation_category || 'Devotee'}
+                        {item.caretaker_for_allocation_id && (
+                          <span className="ml-1.5 inline-block rounded bg-teal-500/20 px-1.5 py-0.5 text-[11px] font-medium text-teal-200">
+                            Caretaker{item.caretaker_for_bed ? ` (Bed ${item.caretaker_for_bed})` : ''}
+                          </span>
+                        )}
+                      </div>
                       <div className="text-gray-400">ID: {item.sai_connect_id || '—'} · Age: {item.sai_connect_age ?? '—'}</div>
                     </td>
                     <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">

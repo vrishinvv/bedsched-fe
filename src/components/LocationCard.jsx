@@ -10,6 +10,7 @@ const LANDMARKS = {
   'Dharmakshetra Enclave': 'Sai Hira Hall',
   'Shivam Enclave': 'West South',
   'Sundaram Enclave': 'West North',
+  'Sathyam Enclave': 'Sathyam Enclave',
   'New Block B Basement': 'New Block B Basement',
   'New Block A': 'New Block A',
   'New Block B': 'New Block B'

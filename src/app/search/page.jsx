@@ -50,16 +50,29 @@ export default function SearchPage() {
   const showIdentifierError = searchIdentifier.length > 0 && !isValidIdentifier;
 
   // Memoized validation function
+  const editingAllocation = useMemo(
+    () => results.find((r) => r.id === editingId) || null,
+    [results, editingId]
+  );
+
   const errors = useMemo(() => {
     if (!editingId) return {};
 
     const newErrors = {};
+    const isCaretaker = Boolean(editingAllocation?.caretaker_for_allocation_id);
+    const hasSaiLockedProfile = currentUser?.role !== 'admin' && Boolean(
+      editingAllocation?.category_source === 'sai_connect'
+      || (Array.isArray(editingAllocation?.verified_categories) && editingAllocation.verified_categories.length > 0)
+    );
 
     if (!editForm.name?.trim()) {
       newErrors.name = 'Name is required';
     }
 
-    if (!editForm.phone || editForm.phone.length !== 10) {
+    if (
+      (!isCaretaker && !hasSaiLockedProfile && (!editForm.phone || editForm.phone.length !== 10))
+      || ((isCaretaker || hasSaiLockedProfile) && editForm.phone && editForm.phone.length !== 10)
+    ) {
       newErrors.phone = 'Valid 10-digit phone number is required';
     }
 
@@ -89,7 +102,7 @@ export default function SearchPage() {
     }
 
     return newErrors;
-  }, [editingId, editForm.name, editForm.phone, editForm.emergencyPhone, editForm.gender, editForm.startDate, editForm.endDate]);
+  }, [editingId, editingAllocation, editForm.name, editForm.phone, editForm.emergencyPhone, editForm.gender, editForm.startDate, editForm.endDate]);
 
   const isFormValid = editingId && Object.keys(errors).length === 0;
 
@@ -137,8 +150,8 @@ export default function SearchPage() {
   const startEdit = useCallback((allocation) => {
     setEditingId(allocation.id);
     setEditForm({
-      name: allocation.name,
-      phone: allocation.phone,
+      name: allocation.name || '',
+      phone: allocation.phone || '',
       emergencyPhone: allocation.emergency_phone || '',
       gender: allocation.gender,
       startDate: allocation.start_date,
@@ -217,6 +230,7 @@ export default function SearchPage() {
         headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           ...editForm,
+          phone: editForm.phone?.trim() || null,
           personPhotoKey,
           aadhaarPhotoKey,
         }),
@@ -301,7 +315,10 @@ export default function SearchPage() {
         body: JSON.stringify({ wasOccupied, reason }),
       });
 
-      if (!response.ok) throw new Error('Failed to deallocate');
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to deallocate');
+      }
 
       const reasonText = reason === 'left_early' ? 'left early' : reason === 'no_show' ? 'no-show' : 'booking error';
       setNotification({ type: 'success', message: `Bed ${deallocatingAllocation.bed_number} deallocated successfully (${deallocatingAllocation.name} - ${reasonText})` });
@@ -465,7 +482,12 @@ export default function SearchPage() {
                     <div className="grid grid-cols-1 gap-3 rounded-lg border border-indigo-500/20 bg-indigo-950/20 p-3 sm:grid-cols-3">
                       <div>
                         <p className="text-xs text-indigo-200/70">Category</p>
-                        <p className="font-medium capitalize text-white">{allocation.accommodation_category || 'devotee'}</p>
+                        <p className="font-medium capitalize text-white">
+                          {allocation.accommodation_category || 'devotee'}
+                          {allocation.caretaker_for_allocation_id
+                            ? ` (Caretaker${allocation.caretaker_for_name ? ` for ${allocation.caretaker_for_name}` : ''})`
+                            : ''}
+                        </p>
                       </div>
                       <div>
                         <p className="text-xs text-indigo-200/70">Sai Connect ID</p>
@@ -495,7 +517,9 @@ export default function SearchPage() {
                         {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
                       </div>
                       <div>
-                        <label htmlFor={`search-phone-${allocation.id}`} className="block text-sm font-medium text-gray-200 mb-1">Phone *</label>
+                        <label htmlFor={`search-phone-${allocation.id}`} className="block text-sm font-medium text-gray-200 mb-1">
+                          Phone {allocation.caretaker_for_allocation_id ? '(Optional)' : '*'}
+                        </label>
                         <input
                           id={`search-phone-${allocation.id}`}
                           aria-label="Phone"
@@ -503,12 +527,12 @@ export default function SearchPage() {
                           inputMode="numeric"
                           value={editForm.phone}
                           onChange={handlePhoneChange}
-                          disabled={currentUser?.role !== 'admin' && (
+                          disabled={currentUser?.role !== 'admin' && Boolean(allocation.phone) && (
                             allocation.category_source === 'sai_connect'
                             || (Array.isArray(allocation.verified_categories) && allocation.verified_categories.length > 0)
                           )}
                           maxLength={10}
-                          required
+                          required={!allocation.caretaker_for_allocation_id}
                           className={`w-full p-2 border rounded-lg bg-gray-800 text-white disabled:cursor-not-allowed disabled:opacity-60 ${errors.phone ? 'border-red-500' : 'border-gray-600'}`}
                         />
                         {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
@@ -556,9 +580,13 @@ export default function SearchPage() {
                           onChange={handleStartDateChange}
                           min={MIN_DATE}
                           max={MAX_DATE}
+                          disabled={Boolean(allocation.caretaker_for_allocation_id)}
                           required
-                          className={`w-full p-2 border rounded-lg bg-gray-800 text-white ${errors.startDate ? 'border-red-500' : 'border-gray-600'}`}
+                          className={`w-full p-2 border rounded-lg bg-gray-800 text-white disabled:cursor-not-allowed disabled:opacity-60 ${errors.startDate ? 'border-red-500' : 'border-gray-600'}`}
                         />
+                        {allocation.caretaker_for_allocation_id && (
+                          <p className="text-xs text-gray-400 mt-1">Follows linked Delegate stay dates</p>
+                        )}
                         {errors.startDate && <p className="text-red-500 text-xs mt-1">{errors.startDate}</p>}
                       </div>
                       <div>
@@ -569,9 +597,13 @@ export default function SearchPage() {
                           onChange={handleEndDateChange}
                           min={editForm.startDate || MIN_DATE}
                           max={MAX_DATE}
+                          disabled={Boolean(allocation.caretaker_for_allocation_id)}
                           required
-                          className={`w-full p-2 border rounded-lg bg-gray-800 text-white ${errors.endDate ? 'border-red-500' : 'border-gray-600'}`}
+                          className={`w-full p-2 border rounded-lg bg-gray-800 text-white disabled:cursor-not-allowed disabled:opacity-60 ${errors.endDate ? 'border-red-500' : 'border-gray-600'}`}
                         />
+                        {allocation.caretaker_for_allocation_id && (
+                          <p className="text-xs text-gray-400 mt-1">Follows linked Delegate stay dates</p>
+                        )}
                         {errors.endDate && <p className="text-red-500 text-xs mt-1">{errors.endDate}</p>}
                       </div>
                     </div>
@@ -630,7 +662,7 @@ export default function SearchPage() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                       <div>
                         <p className="text-xs text-gray-400">Phone</p>
-                        <p className="font-medium text-white">{allocation.phone}</p>
+                        <p className="font-medium text-white">{allocation.phone || '—'}</p>
                       </div>
                       {allocation.emergency_phone && (
                         <div>
@@ -650,6 +682,11 @@ export default function SearchPage() {
                             : allocation.accommodation_category === 'sevadal'
                               ? 'Sevadal'
                               : 'Devotee'}
+                          {allocation.caretaker_for_allocation_id && (
+                            <span className="ml-2 inline-block rounded bg-teal-500/20 px-1.5 py-0.5 text-xs text-teal-200">
+                              Caretaker{allocation.caretaker_for_name ? ` (${allocation.caretaker_for_name}${allocation.caretaker_for_bed ? ` · Bed ${allocation.caretaker_for_bed}` : ''})` : ''}
+                            </span>
+                          )}
                         </p>
                       </div>
                       {allocation.sai_connect_id && (

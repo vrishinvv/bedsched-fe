@@ -362,11 +362,11 @@ export async function updateEndDateByPhone({ phone, endDate, batchId, allocation
   return handle(res, 'Failed to update end date');
 }
 
-export async function deallocateByPhone({ phone, batchId, allocationIds }) {
+export async function deallocateByPhone({ phone, batchId, allocationIds, reason }) {
   const res = await fetch(`${API_BASE_URL}/api/allocations/by-phone/deallocate`, {
     method: 'POST',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ phone, batchId, allocationIds }),
+    body: JSON.stringify({ phone, batchId, allocationIds, ...(reason ? { reason } : {}) }),
   });
   return handle(res, 'Failed to deallocate');
 }

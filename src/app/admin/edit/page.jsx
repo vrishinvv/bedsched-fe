@@ -14,6 +14,7 @@ const hasSaiVerifiedProfile = (item) =>
 function EditByPhoneContent() {
   const sp = useSearchParams();
   const [phone, setPhone] = useState(sp.get('phone') || '');
+  const [loadedPhone, setLoadedPhone] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [contactName, setContactName] = useState('');
   const [emergencyPhone, setEmergencyPhone] = useState('');
@@ -47,6 +48,7 @@ function EditByPhoneContent() {
       
       setData(batches);
       const matchedPhone = batches.flatMap((batch) => batch.items || []).find((item) => item.phone)?.phone || '';
+      setLoadedPhone(matchedPhone);
       setNewPhone(matchedPhone);
       // Don't pre-fill contact name, emergency phone and end date - let user specify
       setContactName('');
@@ -78,11 +80,11 @@ function EditByPhoneContent() {
   }, []);
 
   const onUpdatePhone = async (newPhoneValue, allocationIds = null) => {
-    if (!newPhoneValue || newPhoneValue === phone) return;
+    if (!newPhoneValue || newPhoneValue === loadedPhone) return true;
     // Must be a 10-digit number if provided
     if (!/^\d{10}$/.test(newPhoneValue)) {
       setNotification({ type: 'error', message: 'Please enter a valid 10-digit phone number.' });
-      return;
+      return false;
     }
     const ids = allocationIds !== null ? allocationIds : (selectedIds.size > 0 ? Array.from(selectedIds) : undefined);
     try {
@@ -92,18 +94,25 @@ function EditByPhoneContent() {
       
       // If we updated specific items, reload with old phone first
       // Then update to new phone for subsequent searches
-      if (ids && ids.length > 0) {
-        // Partial update - still have items with old phone
+      if (ids && ids.length > 0 && /^\d{10}$/.test(phone)) {
+        // Partial update by phone - still have items with old phone
         const res = await searchAllocationsByIdentifier(phone);
         setData(res.batches || []);
-        setNewPhone(phone); // Reset to current phone
-      } else {
+        const matchedPhone = (res.batches || []).flatMap((batch) => batch.items || []).find((item) => item.phone)?.phone || '';
+        setLoadedPhone(matchedPhone);
+        setNewPhone(matchedPhone);
+      } else if (/^\d{10}$/.test(phone)) {
         // Full update - all items now have new phone
         setPhone(newPhoneValue);
         await load(newPhoneValue);
+      } else {
+        // Searched by Sai Connect ID - reload by the same Sai Connect ID
+        await load(phone);
       }
+      return true;
     } catch (e) { 
       setNotification({ type: 'error', message: e.message || 'Failed to update phone' });
+      return false;
     } finally {
       setLoading(false);
     }
@@ -113,7 +122,7 @@ function EditByPhoneContent() {
     // Don't update if name is empty or just whitespace
     if (!name || !name.trim()) {
       setNotification({ type: 'error', message: 'Name cannot be empty' });
-      return;
+      return false;
     }
     const ids = allocationIds !== null ? allocationIds : (selectedIds.size > 0 ? Array.from(selectedIds) : undefined);
     try {
@@ -124,8 +133,10 @@ function EditByPhoneContent() {
       // Reload without clearing selection
       const res = await searchAllocationsByIdentifier(phone);
       setData(res.batches || []);
+      return true;
     } catch (e) { 
       setNotification({ type: 'error', message: e.message || 'Failed to update contact' });
+      return false;
     } finally {
       setLoading(false);
     }
@@ -137,7 +148,7 @@ function EditByPhoneContent() {
       // Must be a 10-digit number if provided
       if (!/^\d{10}$/.test(emergencyPhoneValue.trim())) {
         setNotification({ type: 'error', message: 'Please enter a valid 10-digit emergency phone number.' });
-        return;
+        return false;
       }
     }
     const ids = allocationIds !== null ? allocationIds : (selectedIds.size > 0 ? Array.from(selectedIds) : undefined);
@@ -149,8 +160,10 @@ function EditByPhoneContent() {
       // Reload without clearing selection
       const res = await searchAllocationsByIdentifier(phone);
       setData(res.batches || []);
+      return true;
     } catch (e) { 
       setNotification({ type: 'error', message: e.message || 'Failed to update emergency phone' });
+      return false;
     } finally {
       setLoading(false);
     }
@@ -159,11 +172,11 @@ function EditByPhoneContent() {
   const onUpdateEndDate = async (date, allocationIds = null) => {
     if (!date || !date.trim()) {
       setNotification({ type: 'error', message: 'End date cannot be empty' });
-      return;
+      return false;
     }
     if (!isWithinBookingWindow(date)) {
       setNotification({ type: 'error', message: `End date must be between ${MIN_DATE} and ${MAX_DATE}` });
-      return;
+      return false;
     }
     const ids = allocationIds !== null ? allocationIds : (selectedIds.size > 0 ? Array.from(selectedIds) : undefined);
     try {
@@ -174,8 +187,10 @@ function EditByPhoneContent() {
       // Reload without clearing selection
       const res = await searchAllocationsByIdentifier(phone);
       setData(res.batches || []);
+      return true;
     } catch (e) { 
       setNotification({ type: 'error', message: e.message || 'Failed to update end date' });
+      return false;
     } finally {
       setLoading(false);
     }
@@ -231,7 +246,7 @@ function EditByPhoneContent() {
     }
     
     // Check if any field has a value
-    const hasPhoneChange = newPhone && newPhone.trim() && newPhone !== phone;
+    const hasPhoneChange = Boolean(newPhone && newPhone.trim() && newPhone.trim() !== loadedPhone);
     const hasContactName = contactName && contactName.trim();
     const hasEmergencyPhone = emergencyPhone && emergencyPhone.trim();
     const hasEndDate = endDate && endDate.trim();
@@ -247,10 +262,10 @@ function EditByPhoneContent() {
       return;
     }
     
-    if (hasPhoneChange) await onUpdatePhone(newPhone, ids);
-    if (hasContactName) await onUpdateContact(contactName, ids);
-    if (hasEmergencyPhone) await onUpdateEmergencyPhone(emergencyPhone, ids);
-    if (hasEndDate) await onUpdateEndDate(endDate, ids);
+    if (hasContactName && !(await onUpdateContact(contactName, ids))) return;
+    if (hasEmergencyPhone && !(await onUpdateEmergencyPhone(emergencyPhone, ids))) return;
+    if (hasEndDate && !(await onUpdateEndDate(endDate, ids))) return;
+    if (hasPhoneChange && !(await onUpdatePhone(newPhone, ids))) return;
     
     // Clear selections for items in this batch after successful update
     if (batchItemIds && ids) {
@@ -582,7 +597,9 @@ function EditByPhoneContent() {
                                                             </div>
                                                           )}
                                                           <div className="text-xs text-gray-400 ml-9 mt-1 capitalize">
-                                                            {bed.accommodationCategory || 'devotee'} · Sai ID: {bed.saiConnectId || '—'} · Age: {bed.saiConnectAge ?? '—'}
+                                                            {bed.accommodationCategory || 'devotee'}
+                                                            {bed.caretakerForAllocationId ? ' (Caretaker)' : ''}
+                                                            {' · '}Sai ID: {bed.saiConnectId || '—'} · Age: {bed.saiConnectAge ?? '—'}
                                                             {hasSaiVerifiedProfile(bed) && currentUser?.role === 'location_user' ? ' · Sai verified fields locked' : ''}
                                                           </div>
                                                         </div>

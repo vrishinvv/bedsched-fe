@@ -440,7 +440,7 @@ export default function AllocateModal({
         : 'Name, phone, gender, start & end dates are required');
     }
 
-    if (!isCaretaker && !/^\d{10}$/.test(form.phone)) {
+    if ((!isCaretaker && !/^\d{10}$/.test(form.phone)) || (isCaretaker && form.phone?.trim() && !/^\d{10}$/.test(form.phone.trim()))) {
       return alert('Please enter a valid 10-digit phone number.');
     }
 
@@ -523,6 +523,7 @@ export default function AllocateModal({
       // Prepare backend payload (we have keys already!)
       const payload = {
         ...form,
+        phone: isCaretaker ? (form.phone?.trim() || null) : form.phone,
         gender: selectedGender,
         emergencyPhone: emergencyDigits || undefined,
         personPhotoKey: photoResult.personPhotoKey,
@@ -531,7 +532,13 @@ export default function AllocateModal({
           accommodationCategory,
           saiVerificationToken: saiLookup.result?.verificationToken,
           caretakerForAllocationId: isCaretaker ? Number(caretakerForAllocationId) : undefined,
-        } : (isAdmin ? { accommodationCategory } : {})),
+        } : (
+          isAdmin
+          && accommodationCategory
+          && accommodationCategory !== (initialData?.accommodationCategory || 'devotee')
+            ? { accommodationCategory }
+            : {}
+        )),
       };
       
       if (payload.status) {
@@ -639,6 +646,8 @@ export default function AllocateModal({
     const errs = [];
     if (!form.name || !form.name.trim()) errs.push('Name is required');
     if (!isCaretaker && !/^\d{10}$/.test(form.phone)) errs.push('Enter a valid 10-digit phone number');
+    if (isCaretaker && form.phone && form.phone.trim() && !/^\d{10}$/.test(form.phone.trim())) errs.push('Enter a valid 10-digit phone number');
+    if (form.emergencyPhone && form.emergencyPhone.trim() && !/^\d{10}$/.test(form.emergencyPhone.trim())) errs.push('Enter a valid 10-digit emergency phone number');
     if (
       !isEdit
       && saiLookupRequired
@@ -1084,7 +1093,6 @@ export default function AllocateModal({
               placeholder="Full name" 
             />
           </div>
-          {!isCaretaker && <>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Phone{isCaretaker ? ' (Optional)' : '*'}</label>
             <input 
@@ -1116,7 +1124,6 @@ export default function AllocateModal({
             />
             <p className="text-xs text-gray-500 mt-1">Alternative contact number</p>
           </div>
-          </>}
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Gender*</label>
             <select 

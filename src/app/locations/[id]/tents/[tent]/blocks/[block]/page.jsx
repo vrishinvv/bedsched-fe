@@ -361,12 +361,25 @@ export default function BlockBedsPage({ params }) {
                 aadhaarPhotoUrl,
                 status: updated.status || (s.beds?.[n]?.status || 'confirmed') 
               };
+              const nextBeds = {
+                ...s.beds,
+                [n]: mergedData,
+              };
+              if (updated?.id && (updated.startDate || updated.endDate)) {
+                Object.keys(nextBeds).forEach((bedKey) => {
+                  const bedAlloc = nextBeds[bedKey];
+                  if (bedAlloc && Number(bedAlloc.caretakerForAllocationId) === Number(updated.id)) {
+                    nextBeds[bedKey] = {
+                      ...bedAlloc,
+                      startDate: updated.startDate || bedAlloc.startDate,
+                      endDate: updated.endDate || bedAlloc.endDate,
+                    };
+                  }
+                });
+              }
               return { 
                 ...s, 
-                beds: { 
-                  ...s.beds, 
-                  [n]: mergedData
-                } 
+                beds: nextBeds,
               };
             });
           }
@@ -945,17 +958,17 @@ export default function BlockBedsPage({ params }) {
         </div> */}
       </section>
 
-      {/* Controls above grid: phone filter + batch actions */}
+      {/* Controls above grid: phone / Sai Connect ID filter + batch actions */}
       <section className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative z-50" data-preserve-selection="true">
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <div className="relative w-full sm:w-64">
             <input
               value={phoneFilter}
-              onChange={(e) => setPhoneFilter(e.target.value.replace(/\D/g, '').slice(0, 10))}
-              placeholder="Filter by 10-digit phone"
+              onChange={(e) => setPhoneFilter(e.target.value.replace(/\D/g, '').slice(0, 15))}
+              placeholder="Filter by phone or Sai ID"
               className="w-full rounded-lg border border-gray-600 bg-gray-700 text-white placeholder-gray-400 p-2 pr-10"
               inputMode="numeric"
-              maxLength={10}
+              maxLength={15}
             />
             {phoneFilter && (
               <button
@@ -967,9 +980,6 @@ export default function BlockBedsPage({ params }) {
               </button>
             )}
           </div>
-          {phoneFilter && phoneFilter.length !== 10 && (
-            <span className="text-xs text-amber-300">Enter exactly 10 digits</span>
-          )}
         </div>
         <div
           className={`flex items-center gap-2 text-xs font-medium ${liveUpdatesAvailable ? 'text-emerald-300' : 'text-amber-300'}`}

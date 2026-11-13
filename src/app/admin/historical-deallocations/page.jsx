@@ -28,15 +28,18 @@ function formatCategory(value) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function getTodayIST() {
+  return new Date().toLocaleDateString('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+}
+
 function HistoricalDeallocationsContent() {
-  const [date, setDate] = useState(() => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  });
-  const [tempDate, setTempDate] = useState(() => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  });
+  const [date, setDate] = useState(getTodayIST);
+  const [tempDate, setTempDate] = useState(getTodayIST);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -434,10 +437,15 @@ function HistoricalDeallocationsContent() {
                           >
                             <td className="px-4 py-3 text-gray-400">{index + 1}</td>
                             <td className="px-4 py-3 text-white/90 whitespace-nowrap font-medium">{alloc.name}</td>
-                            <td className="px-4 py-3 text-white/80">{alloc.phone}</td>
+                            <td className="px-4 py-3 text-white/80">{alloc.phone || '—'}</td>
                             <td className="px-4 py-3 whitespace-nowrap">
                               <div className="text-white/90">
                                 {formatCategory(alloc.accommodation_category)} · Age {alloc.sai_connect_age ?? '—'}
+                                {alloc.caretaker_for_allocation_id && (
+                                  <span className="ml-1.5 inline-block rounded bg-teal-500/20 px-1.5 py-0.5 text-[11px] font-medium text-teal-200">
+                                    Caretaker{alloc.caretaker_for_bed ? ` (Bed ${alloc.caretaker_for_bed})` : ''}
+                                  </span>
+                                )}
                               </div>
                               <div className="text-xs text-gray-400">{alloc.sai_connect_id || 'No Sai Connect ID'}</div>
                             </td>
@@ -507,10 +515,15 @@ function HistoricalDeallocationsContent() {
                               {new Date(dealloc.deleted_at).toLocaleString()}
                             </td>
                             <td className="px-4 py-3 text-white/90 whitespace-nowrap font-medium">{dealloc.name}</td>
-                            <td className="px-4 py-3 text-white/80">{dealloc.phone}</td>
+                            <td className="px-4 py-3 text-white/80">{dealloc.phone || '—'}</td>
                             <td className="px-4 py-3 whitespace-nowrap">
                               <div className="text-white/90">
                                 {formatCategory(dealloc.accommodation_category)} · Age {dealloc.sai_connect_age ?? '—'}
+                                {dealloc.caretaker_for_allocation_id && (
+                                  <span className="ml-1.5 inline-block rounded bg-teal-500/20 px-1.5 py-0.5 text-[11px] font-medium text-teal-200">
+                                    Caretaker{dealloc.caretaker_for_bed ? ` (Bed ${dealloc.caretaker_for_bed})` : ''}
+                                  </span>
+                                )}
                               </div>
                               <div className="text-xs text-gray-400">{dealloc.sai_connect_id || 'No Sai Connect ID'}</div>
                             </td>

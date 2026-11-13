@@ -223,7 +223,12 @@ export default function BedGrid({
                 {items.map((n) => {
                     const allocation = beds?.[n];
                     const status = statuses.get(n);
-                    const phoneMatch = allocation?.phone && normalizedPhone.length === 10 && allocation.phone === normalizedPhone;
+                    const hasFilter = normalizedPhone.length >= 1 && normalizedPhone.length <= 15;
+                    const phoneMatch = Boolean(
+                        hasFilter
+                        && allocation
+                        && (allocation.phone === normalizedPhone || String(allocation.saiConnectId || '') === normalizedPhone)
+                    );
                     
                     // Define styles based on status
                     const getStatusStyles = () => {
@@ -292,7 +297,7 @@ export default function BedGrid({
                                 shadow-lg transition-all duration-300 ease-out transform cursor-pointer
                                 hover:scale-110 hover:shadow-xl hover:z-10
                                 ${styles.bg} ${styles.shadow}
-                                ${normalizedPhone.length === 10 && !phoneMatch ? 'opacity-40' : ''}
+                                ${hasFilter && !phoneMatch ? 'opacity-40' : ''}
                                 ${isSelected(n) ? 'ring-4 ring-yellow-300 ring-offset-2 ring-offset-gray-800' : ''}
                             `}
                             title={getTooltipText()}
