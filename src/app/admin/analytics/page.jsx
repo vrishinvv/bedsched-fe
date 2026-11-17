@@ -1,14 +1,307 @@
 "use client";
-import { useEffect, useState, useMemo } from "react";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { fetchAnalytics, triggerBackup, getLocations } from "@/lib/api";
-import { BOOKING_MIN_DATE } from '@/lib/bookingWindow.mjs';
+import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { LineChart, Line, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { fetchAnalytics, getLocations } from "@/lib/api";
+import { BOOKING_MIN_DATE } from "@/lib/bookingWindow.mjs";
+import {
+  buildAllocatorRanking,
+  buildCategoryGenderSummary,
+  buildGenderTotals,
+  buildLocationSummaries,
+  isValidAnalyticsRange,
+  percent,
+} from "@/lib/analytics.mjs";
 
 const EVENT_YEAR = BOOKING_MIN_DATE.slice(0, 4);
-const DEFAULT_ANALYTICS_START_DATE = `${EVENT_YEAR}-01-01`;
-const DEFAULT_ANALYTICS_END_DATE = `${EVENT_YEAR}-12-31`;
+const DEFAULT_FILTERS = Object.freeze({
+  startDate: `${EVENT_YEAR}-10-01`,
+  endDate: `${EVENT_YEAR}-12-31`,
+  locationId: "",
+  tentIndex: "",
+  blockIndex: "",
+});
+
+const CHART = Object.freeze({
+  male: "#245f8f",
+  female: "#bd4b6b",
+  other: "#6b7280",
+  accent: "#a65f00",
+  ink: "#1f2937",
+  muted: "#667085",
+  grid: "#e5e7eb",
+});
+
+const TOOLTIP_STYLE = {
+  backgroundColor: "#ffffff",
+  border: "1px solid #d7dce2",
+  borderRadius: "8px",
+  color: "#171717",
+  boxShadow: "0 8px 24px rgba(17, 24, 39, 0.12)",
+};
+
+function formatDateLabel(dateValue) {
+  if (!dateValue) return "";
+  return new Date(dateValue).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+}
+
+function formatRangeLabel({ startDate, endDate }) {
+  const start = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+  const sameYear = start.getUTCFullYear() === end.getUTCFullYear();
+  const startLabel = start.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: sameYear ? undefined : "numeric",
+    timeZone: "UTC",
+  });
+  const endLabel = end.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  return `${startLabel} – ${endLabel}`;
+}
+
+function EmptyState({ message }) {
+  return <p className="mt-4 rounded-md border border-dashed border-[#cfd4da] px-3 py-3 text-sm text-[#5d6672]">{message}</p>;
+}
+
+function SummaryStrip({ total, genders, locationCount }) {
+  const items = [
+    { label: "People allocated", value: total },
+    { label: "Men", value: genders.male },
+    { label: "Women", value: genders.female },
+    { label: "Locations used", value: locationCount },
+  ];
+
+  return (
+    <section aria-label="Allocation summary" className="grid grid-cols-2 overflow-hidden rounded-lg border border-[#dfe3e8] bg-white lg:grid-cols-4">
+      {items.map((item, index) => (
+        <div
+          key={item.label}
+          className={`min-w-0 border-[#e9ecef] px-4 py-4 sm:px-5 ${index % 2 ? "border-l" : ""} ${index >= 2 ? "border-t lg:border-t-0" : ""} lg:border-l lg:first:border-l-0`}
+        >
+          <p className="text-sm font-medium text-[#5d6672]">{item.label}</p>
+          <p className="mt-1 text-[28px] font-semibold leading-none tabular-nums text-[#171717]">
+            {Number(item.value || 0).toLocaleString()}
+          </p>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function ChartLegend({ showOther = false }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-[#4b5563]" aria-label="Gender legend">
+      <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-[#245f8f]" />Men</span>
+      <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-[#bd4b6b]" />Women</span>
+      {showOther && <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-[#6b7280]" />Other</span>}
+    </div>
+  );
+}
+
+function CategoryGenderPanel({ rows }) {
+  const hasData = rows.some((row) => row.total > 0);
+  const hasOther = rows.some((row) => row.other > 0);
+
+  return (
+    <section aria-labelledby="category-gender-title" className="rounded-lg border border-[#dfe3e8] bg-white p-4 sm:p-5">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 id="category-gender-title" className="text-lg font-semibold text-[#171717]">Men and women by category</h3>
+          <p className="mt-1 text-sm text-[#5d6672]">Compare delegates, sevadals, devotees and caretakers.</p>
+        </div>
+        <ChartLegend showOther={hasOther} />
+      </div>
+      {hasData ? (
+        <div role="img" aria-label="Grouped bars comparing men, women and other genders in every accommodation category">
+          <ResponsiveContainer width="100%" height={258}>
+            <BarChart data={rows} layout="vertical" margin={{ top: 4, right: 38, bottom: 4, left: 6 }} barGap={3}>
+              <CartesianGrid stroke={CHART.grid} horizontal={false} />
+              <XAxis type="number" allowDecimals={false} stroke={CHART.muted} tickLine={false} axisLine={{ stroke: "#cfd4da" }} />
+              <YAxis type="category" dataKey="label" width={82} stroke={CHART.muted} tickLine={false} axisLine={false} />
+              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value, name) => [Number(value).toLocaleString(), name]} />
+              <Bar dataKey="male" name="Men" fill={CHART.male} radius={0}>
+                <LabelList dataKey="male" position="right" fill={CHART.ink} fontSize={12} formatter={(value) => value || ""} />
+              </Bar>
+              <Bar dataKey="female" name="Women" fill={CHART.female} radius={0}>
+                <LabelList dataKey="female" position="right" fill={CHART.ink} fontSize={12} formatter={(value) => value || ""} />
+              </Bar>
+              <Bar dataKey="other" name="Other" fill={CHART.other} radius={0}>
+                <LabelList dataKey="other" position="right" fill={CHART.ink} fontSize={12} formatter={(value) => value || ""} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <EmptyState message="No allocations match this date range and filter." />
+      )}
+    </section>
+  );
+}
+
+function LocationTotalsPanel({ locations }) {
+  const chartRows = locations.slice(0, 10);
+  return (
+    <section aria-labelledby="location-total-title" className="rounded-lg border border-[#dfe3e8] bg-white p-4 sm:p-5">
+      <h3 id="location-total-title" className="text-lg font-semibold text-[#171717]">Allocations by location</h3>
+      <p className="mt-1 text-sm text-[#5d6672]">Largest locations appear first. Exact category splits are below.</p>
+      {chartRows.length ? (
+        <div className="mt-4" role="img" aria-label="Horizontal bars comparing total allocations across locations">
+          <ResponsiveContainer width="100%" height={258}>
+            <BarChart data={chartRows} layout="vertical" margin={{ top: 4, right: 42, bottom: 4, left: 4 }}>
+              <CartesianGrid stroke={CHART.grid} horizontal={false} />
+              <XAxis type="number" allowDecimals={false} stroke={CHART.muted} tickLine={false} axisLine={{ stroke: "#cfd4da" }} />
+              <YAxis type="category" dataKey="name" width={118} stroke={CHART.muted} tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
+              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value) => [Number(value).toLocaleString(), "People"]} />
+              <Bar dataKey="total" name="People" fill={CHART.accent} radius={0}>
+                <LabelList dataKey="total" position="right" fill={CHART.ink} fontSize={12} formatter={(value) => Number(value).toLocaleString()} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <EmptyState message="No locations have allocations in this view." />
+      )}
+    </section>
+  );
+}
+
+function SplitBar({ male, female, other, total, label }) {
+  return (
+    <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-[#e7e9ed]" role="img" aria-label={`${label}: ${male} men, ${female} women, ${other} other`}>
+      {male > 0 && <span className="h-full bg-[#245f8f]" style={{ width: `${percent(male, total)}%` }} />}
+      {female > 0 && <span className="h-full bg-[#bd4b6b]" style={{ width: `${percent(female, total)}%` }} />}
+      {other > 0 && <span className="h-full bg-[#6b7280]" style={{ width: `${percent(other, total)}%` }} />}
+    </div>
+  );
+}
+
+function GenderCounts({ row }) {
+  const showOther = row.other > 0;
+  return (
+    <div className={`grid ${showOther ? "grid-cols-3" : "grid-cols-2"} gap-2 text-right text-xs tabular-nums text-[#4b5563] sm:text-sm`}>
+      <span><span className="font-semibold text-[#245f8f]">{row.male.toLocaleString()}</span> men</span>
+      <span><span className="font-semibold text-[#bd4b6b]">{row.female.toLocaleString()}</span> women</span>
+      {showOther && <span><span className="font-semibold text-[#6b7280]">{row.other.toLocaleString()}</span> other</span>}
+    </div>
+  );
+}
+
+function LocationBreakdownCard({ location }) {
+  const activeCategories = location.categories.filter((category) => category.total > 0);
+  return (
+    <article className="rounded-lg border border-[#dfe3e8] bg-white p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h4 className="text-base font-semibold text-[#171717]">{location.name}</h4>
+          <p className="mt-0.5 text-sm text-[#5d6672]">{location.total.toLocaleString()} people allocated</p>
+        </div>
+        <div className="text-right">
+          <p className="text-2xl font-semibold leading-none tabular-nums text-[#171717]">{location.total.toLocaleString()}</p>
+          <p className="mt-1 text-xs text-[#5d6672]">total</p>
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <GenderCounts row={location.genders} />
+        <div className="mt-2"><SplitBar {...location.genders} total={location.total} label={`${location.name} overall`} /></div>
+      </div>
+
+      <div className="mt-5 space-y-4">
+        {activeCategories.map((category) => (
+          <div key={category.category}>
+            <div className="mb-1.5 flex items-baseline justify-between gap-3">
+              <p className="text-sm font-medium text-[#303844]">{category.label}</p>
+              <p className="text-sm tabular-nums text-[#5d6672]">{category.total.toLocaleString()}</p>
+            </div>
+            <SplitBar {...category} label={`${location.name}, ${category.label}`} />
+            <div className="mt-1.5"><GenderCounts row={category} /></div>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function ActivityPanel({ title, subtitle, rows, color }) {
+  const chartRows = rows.map((row) => ({ ...row, count: Number(row.count || 0), dateLabel: formatDateLabel(row.date) }));
+  return (
+    <section className="rounded-lg border border-[#dfe3e8] bg-white p-4 sm:p-5">
+      <h3 className="text-lg font-semibold text-[#171717]">{title}</h3>
+      <p className="mt-1 text-sm text-[#5d6672]">{subtitle}</p>
+      {chartRows.length >= 4 ? (
+        <div className="mt-4" role="img" aria-label={`${title} bar chart`}>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={chartRows} margin={{ top: 8, right: 8, bottom: 10, left: 0 }}>
+              <CartesianGrid stroke={CHART.grid} vertical={false} />
+              <XAxis dataKey="dateLabel" stroke={CHART.muted} tickLine={false} axisLine={{ stroke: "#cfd4da" }} minTickGap={18} />
+              <YAxis stroke={CHART.muted} allowDecimals={false} tickLine={false} axisLine={false} width={36} />
+              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value) => [Number(value).toLocaleString(), "People"]} />
+              <Bar dataKey="count" name="People" fill={color} radius={0} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      ) : chartRows.length ? (
+        <div className="mt-4 space-y-2">
+          {chartRows.map((row) => (
+            <div key={`${row.date}-${row.count}`} className="flex items-center justify-between rounded-md bg-[#f5f6f8] px-3 py-2 text-sm">
+              <span className="text-[#4b5563]">{formatDateLabel(row.date)}</span>
+              <span className="font-semibold tabular-nums text-[#171717]">{row.count.toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+      ) : <EmptyState message="No activity in this date range." />}
+    </section>
+  );
+}
+
+function AllocatorPanel({ rows }) {
+  const max = Math.max(...rows.map((row) => row.count), 0);
+  return (
+    <section aria-labelledby="allocator-title" className="rounded-lg border border-[#dfe3e8] bg-white p-4 sm:p-5">
+      <h3 id="allocator-title" className="text-lg font-semibold text-[#171717]">Allocations recorded by each user</h3>
+      <p className="mt-1 text-sm text-[#5d6672]">A simple count of records added in the selected period.</p>
+      {rows.length ? (
+        <div className="mt-5 space-y-3">
+          {rows.map((row) => (
+            <div key={row.username} className="grid grid-cols-[minmax(90px,180px)_1fr_auto] items-center gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-[#303844]">{row.username}</p>
+                {row.locationNames.length > 0 && <p className="truncate text-xs text-[#68717d]">{row.locationNames.join(", ")}</p>}
+              </div>
+              <div className="h-3 overflow-hidden rounded-full bg-[#e7e9ed]" role="img" aria-label={`${row.username}: ${row.count} allocations`}>
+                <div className="h-full bg-[#3f4a56]" style={{ width: `${max ? (row.count / max) * 100 : 0}%` }} />
+              </div>
+              <span className="min-w-10 text-right text-sm font-semibold tabular-nums text-[#171717]">{row.count.toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+      ) : <EmptyState message="No allocator activity in this view." />}
+    </section>
+  );
+}
+
+function InitialLoading() {
+  return (
+    <div className="rounded-2xl bg-[#f2f4f7] p-4 text-[#171717] sm:p-6" aria-live="polite">
+      <h2 className="text-2xl font-semibold">Analytics</h2>
+      <p className="mt-2 text-sm text-[#5d6672]">Loading allocation totals and breakdowns…</p>
+      <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((item) => <div key={item} className="h-20 rounded-lg bg-[#e3e7eb]" />)}
+      </div>
+    </div>
+  );
+}
 
 function AnalyticsContent() {
   const [data, setData] = useState(null);
@@ -17,574 +310,162 @@ function AnalyticsContent() {
   const [blocks, setBlocks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [backupLoading, setBackupLoading] = useState(false);
-  const [backupSuccess, setBackupSuccess] = useState(false);
-  
-  // Filters
-  const [filters, setFilters] = useState({
-    startDate: DEFAULT_ANALYTICS_START_DATE,
-    endDate: DEFAULT_ANALYTICS_END_DATE,
-    locationId: '',
-    tentIndex: '',
-    blockIndex: ''
-  });
+  const [filters, setFilters] = useState({ ...DEFAULT_FILTERS });
+  const [appliedFilters, setAppliedFilters] = useState({ ...DEFAULT_FILTERS });
 
-  // Load locations for filter
   useEffect(() => {
-    getLocations().then(res => {
-      // API returns array directly, not wrapped
-      setLocations(Array.isArray(res) ? res : []);
-    }).catch(console.error);
+    getLocations().then((result) => setLocations(Array.isArray(result) ? result : []))
+      .catch(() => setError("Could not load the list of locations."));
   }, []);
 
-  // Load tents when location changes
   useEffect(() => {
     if (!filters.locationId) {
       setTents([]);
       setBlocks([]);
       return;
     }
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/locations/${filters.locationId}/tents`, {
-      headers: {
-        'Authorization': `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('bs_token') : ''}`
-      }
-    })
-      .then(res => res.json())
-      .then(data => setTents(data.tents || []))
-      .catch(console.error);
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/api/locations/${filters.locationId}/tents`, {
+      headers: { Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("bs_token") : ""}` },
+    }).then((response) => response.json()).then((result) => setTents(result.tents || []))
+      .catch(() => setError("Could not load floors for this location."));
   }, [filters.locationId]);
 
-  // Load blocks when tent changes
   useEffect(() => {
     if (!filters.locationId || !filters.tentIndex) {
       setBlocks([]);
       return;
     }
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/locations/${filters.locationId}/tents/${filters.tentIndex}/blocks`, {
-      headers: {
-        'Authorization': `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('bs_token') : ''}`
-      }
-    })
-      .then(res => res.json())
-      .then(data => setBlocks(data.blocks || []))
-      .catch(console.error);
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/api/locations/${filters.locationId}/tents/${filters.tentIndex}/blocks`, {
+      headers: { Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("bs_token") : ""}` },
+    }).then((response) => response.json()).then((result) => setBlocks(result.blocks || []))
+      .catch(() => setError("Could not load rooms for this floor."));
   }, [filters.locationId, filters.tentIndex]);
 
-  // Load analytics data
-  const loadData = async () => {
+  const loadData = useCallback(async (nextFilters) => {
     setLoading(true);
     setError("");
     try {
-      const result = await fetchAnalytics(filters);
+      const result = await fetchAnalytics(nextFilters);
       setData(result.data);
-    } catch (e) {
-      setError(e.message || "Failed to load analytics");
+      setAppliedFilters({ ...nextFilters });
+    } catch (loadError) {
+      setError(loadError.message || "Could not load analytics data.");
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadData();
   }, []);
 
-  const handleTriggerBackup = async () => {
-    setBackupLoading(true);
-    setBackupSuccess(false);
-    try {
-      await triggerBackup();
-      setBackupSuccess(true);
-      setTimeout(() => setBackupSuccess(false), 5000);
-    } catch (e) {
-      setError(e.message || "Failed to trigger backup");
-    } finally {
-      setBackupLoading(false);
-    }
-  };
+  useEffect(() => { loadData(DEFAULT_FILTERS); }, [loadData]);
+
+  const categoryRows = useMemo(() => buildCategoryGenderSummary(data?.categoryGenderBreakdown || []), [data?.categoryGenderBreakdown]);
+  const genderTotals = useMemo(() => buildGenderTotals(categoryRows), [categoryRows]);
+  const locationRows = useMemo(() => buildLocationSummaries(data?.locationCategoryGenderBreakdown || []), [data?.locationCategoryGenderBreakdown]);
+  const allocatorRows = useMemo(() => buildAllocatorRanking(data?.allocatorTotals || [], 10), [data?.allocatorTotals]);
+  const hasOtherGender = genderTotals.other > 0;
+  const dateRangeValid = isValidAnalyticsRange(filters.startDate, filters.endDate);
 
   const handleFilterChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-  };
-
-  const applyFilters = () => {
-    loadData();
+    setFilters((current) => {
+      if (key === "locationId") return { ...current, locationId: value, tentIndex: "", blockIndex: "" };
+      if (key === "tentIndex") return { ...current, tentIndex: value, blockIndex: "" };
+      return { ...current, [key]: value };
+    });
   };
 
   const resetFilters = () => {
-    setFilters({
-      startDate: DEFAULT_ANALYTICS_START_DATE,
-      endDate: DEFAULT_ANALYTICS_END_DATE,
-      locationId: '',
-      tentIndex: '',
-      blockIndex: ''
-    });
-    setTimeout(() => loadData(), 100);
+    const defaults = { ...DEFAULT_FILTERS };
+    setFilters(defaults);
+    setTents([]);
+    setBlocks([]);
+    loadData(defaults);
   };
 
-  // Location-based color mapping by location name (stable function)
-  const getLocationColor = (locationName) => {
-    const colorMap = {
-      'Anand Vilas Enclave': '#fbbf24', // Yellow
-      'Brindavan Enclave': '#10b981', // Green
-      'Sai Sruthi Enclave': '#3b82f6', // Blue
-      'Dharmakshetra Enclave': '#f97316', // Orange
-      'Shivam Enclave': '#6366f1', // Indigo
-      'Sundaram Enclave': '#ec4899', // Pink
-      'New Block B Basement': '#ef4444', // Red
-      'New Block A': '#f43f5e', // Rosy Red
-      'New Block B': '#991b1b', // Maroon Red
-    };
-    return colorMap[locationName] || '#6b7280'; // gray fallback
-  };
-
-  // Gender pie chart colors (handle both lowercase and capitalized)
-  const getGenderColor = (gender) => {
-    const normalized = gender?.toLowerCase();
-    if (normalized === 'male') return '#3b82f6';
-    if (normalized === 'female') return '#ec4899';
-    return '#6b7280'; // gray for other
-  };
-
-  // Include the month so historical and pre-event activity is unambiguous.
-  const formatDateLabel = (dateStr) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'UTC',
-    });
-  };
-
-  // Process deallocations data for stacked bar chart
-  const deallocationChartData = useMemo(() => {
-    if (!data?.dailyDeallocations) return [];
-    
-    // Group by date
-    const grouped = {};
-    data.dailyDeallocations.forEach(row => {
-      const dateLabel = formatDateLabel(row.date);
-      if (!grouped[dateLabel]) {
-        grouped[dateLabel] = { dateLabel, date: row.date, left_early: 0, no_show: 0, booking_error: 0, not_specified: 0 };
-      }
-      const reason = row.reason || 'not_specified';
-      grouped[dateLabel][reason] = parseInt(row.count);
-    });
-    
-    return Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date));
-  }, [data?.dailyDeallocations]);
-
-  // Process user allocations data for multi-line chart
-  const userChartData = useMemo(() => {
-    if (!data?.userAllocations) return [];
-    
-    // Group by date
-    const byDate = {};
-    data.userAllocations.forEach(item => {
-      const date = item.date;
-      if (!byDate[date]) byDate[date] = { date, dateLabel: formatDateLabel(date) };
-      const username = item.username && item.username !== 'Unknown' ? item.username : 'Unknown';
-      byDate[date][username] = (byDate[date][username] || 0) + parseInt(item.count);
-      byDate[date][`${username}_location`] = item.location_id;
-      byDate[date][`${username}_locationName`] = item.location_name;
-    });
-    
-    return Object.values(byDate).sort((a, b) => new Date(a.date) - new Date(b.date));
-  }, [data?.userAllocations]);
-
-  // Get unique users for line chart with their location names for color coding
-  const uniqueUsers = useMemo(() => {
-    if (!data?.userAllocations) return [];
-    const users = new Map();
-    data.userAllocations.forEach(item => {
-      const username = item.username && item.username !== 'Unknown' ? item.username : 'Unknown';
-      if (!users.has(username)) {
-        let color;
-        if (username.toLowerCase() === 'admin') {
-          color = '#ffffff'; // White for admin
-        } else if (username.toLowerCase() === 'unknown') {
-          color = '#6b7280'; // Grey for unknown
-        } else {
-          color = getLocationColor(item.location_name);
-        }
-        users.set(username, {
-          username,
-          location_name: item.location_name,
-          color
-        });
-      }
-    });
-    return Array.from(users.values());
-  }, [data?.userAllocations]);
-
-  // Custom tooltip for user chart
-  const CustomUserTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-gray-900/95 backdrop-blur-sm border border-white/20 p-3 rounded-lg shadow-xl">
-          <p className="text-white font-semibold mb-2">{label}</p>
-          {payload.map((entry, index) => (
-            <p key={index} style={{ color: entry.color }} className="text-sm">
-              {entry.name}: {entry.value}
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
-
-  if (loading && !data) {
-    return (
-      <div className="p-4 max-w-7xl mx-auto">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-700 rounded w-1/4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3, 4, 5, 6].map(i => (
-              <div key={i} className="h-64 bg-gray-700 rounded"></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (!data && loading) return <InitialLoading />;
 
   return (
-    <div className="p-3 sm:p-4 max-w-7xl mx-auto">
-      {/* Header */}
-      <section className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-purple-900/20 via-indigo-900/20 to-blue-900/20 border border-purple-500/20 p-4 sm:p-6 mb-4 sm:mb-6">
-        <div className="relative">
-          <div className="flex items-center gap-2 sm:gap-3 mb-2">
-            <Link href="/" className="inline-flex items-center gap-2 text-purple-300 hover:underline text-sm sm:text-base">
-              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-              </svg>
-              Back
+    <main className="overflow-hidden rounded-2xl bg-[#f2f4f7] text-[#171717]">
+      <div className="px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
+        <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <Link href="/" className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[#4f5965] hover:text-[#171717] focus:outline-none focus:ring-2 focus:ring-[#a65f00] focus:ring-offset-2">
+              <span aria-hidden="true">←</span> Back to bookings
             </Link>
+            <h2 className="mt-2 text-2xl font-semibold tracking-[-0.02em] text-[#171717]">Analytics</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-[#5d6672]">See who was allocated, where they stayed, and how every group was split by gender.</p>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-purple-300 to-blue-300 bg-clip-text text-transparent">
-            Analytics Dashboard
-          </h2>
-          <p className="text-sm sm:text-base text-purple-200/80">
-            Comprehensive insights and statistics for bed allocations
-          </p>
-        </div>
-      </section>
+          <div className="md:pt-11 md:text-right">
+            <p className="text-sm font-medium text-[#303844]">{formatRangeLabel(appliedFilters)}</p>
+            <p className="mt-1 text-xs text-[#68717d]">Counts exclude no-shows and booking errors.</p>
+          </div>
+        </header>
 
-      {error && (
-        <div className="mb-4 p-3 bg-red-900/30 border border-red-500/20 rounded text-red-100">
-          {error}
-        </div>
-      )}
+        {error && <div role="alert" className="mt-5 rounded-lg border border-[#e5b6b9] bg-[#fff1f1] px-4 py-3 text-sm text-[#8b1f25]">{error}</div>}
 
-      {/* Filters */}
-      <section className="rounded-xl sm:rounded-2xl border border-gray-200 bg-white/70 backdrop-blur p-3 sm:p-4 mb-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-3">
-          <div className="min-w-0">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Start Date</label>
-            <input
-              type="date"
-              value={filters.startDate}
-              onChange={(e) => handleFilterChange('startDate', e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 text-sm min-w-0"
-            />
+        <section aria-label="Analytics filters" className="mt-6 rounded-lg border border-[#dfe3e8] bg-white p-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <label className="text-sm font-medium text-[#303844]">From
+              <input type="date" value={filters.startDate} onChange={(event) => handleFilterChange("startDate", event.target.value)} className="mt-1 block h-10 w-full rounded-md border border-[#c9cfd6] bg-white px-3 text-sm text-[#171717] focus:border-[#a65f00] focus:outline-none focus:ring-2 focus:ring-[#f3d6ad]" />
+            </label>
+            <label className="text-sm font-medium text-[#303844]">To
+              <input type="date" value={filters.endDate} onChange={(event) => handleFilterChange("endDate", event.target.value)} className="mt-1 block h-10 w-full rounded-md border border-[#c9cfd6] bg-white px-3 text-sm text-[#171717] focus:border-[#a65f00] focus:outline-none focus:ring-2 focus:ring-[#f3d6ad]" />
+            </label>
+            <label className="text-sm font-medium text-[#303844]">Location
+              <select value={filters.locationId} onChange={(event) => handleFilterChange("locationId", event.target.value)} className="mt-1 block h-10 w-full rounded-md border border-[#c9cfd6] bg-white px-3 text-sm text-[#171717] focus:border-[#a65f00] focus:outline-none focus:ring-2 focus:ring-[#f3d6ad]">
+                <option value="">All locations</option>
+                {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+              </select>
+            </label>
+            <label className="text-sm font-medium text-[#303844]">Floor
+              <select value={filters.tentIndex} onChange={(event) => handleFilterChange("tentIndex", event.target.value)} disabled={!filters.locationId} className="mt-1 block h-10 w-full rounded-md border border-[#c9cfd6] bg-white px-3 text-sm text-[#171717] disabled:bg-[#f1f2f4] disabled:text-[#747d88] focus:border-[#a65f00] focus:outline-none focus:ring-2 focus:ring-[#f3d6ad]">
+                <option value="">All floors</option>
+                {tents.map((tent) => <option key={tent.index} value={tent.index}>{tent.name || `Floor ${tent.index}`}</option>)}
+              </select>
+            </label>
+            <label className="text-sm font-medium text-[#303844]">Room
+              <select value={filters.blockIndex} onChange={(event) => handleFilterChange("blockIndex", event.target.value)} disabled={!filters.tentIndex} className="mt-1 block h-10 w-full rounded-md border border-[#c9cfd6] bg-white px-3 text-sm text-[#171717] disabled:bg-[#f1f2f4] disabled:text-[#747d88] focus:border-[#a65f00] focus:outline-none focus:ring-2 focus:ring-[#f3d6ad]">
+                <option value="">All rooms</option>
+                {blocks.map((block) => <option key={block.index} value={block.index}>{block.name || `Room ${block.index}`}</option>)}
+              </select>
+            </label>
           </div>
-          <div className="min-w-0">
-            <label className="block text-xs font-medium text-gray-700 mb-1">End Date</label>
-            <input
-              type="date"
-              value={filters.endDate}
-              onChange={(e) => handleFilterChange('endDate', e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 text-sm min-w-0"
-            />
-          </div>
-          <div className="min-w-0">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Location</label>
-            <select
-              value={filters.locationId}
-              onChange={(e) => handleFilterChange('locationId', e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 text-sm min-w-0"
-            >
-              <option value="">All Locations</option>
-              {locations.map(loc => (
-                <option key={loc.id} value={loc.id}>{loc.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="min-w-0">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Tent</label>
-            <select
-              value={filters.tentIndex}
-              onChange={(e) => handleFilterChange('tentIndex', e.target.value)}
-              disabled={!filters.locationId}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 text-sm disabled:opacity-50 min-w-0"
-            >
-              <option value="">All Tents</option>
-              {tents.map(tent => (
-                <option key={tent.index} value={tent.index}>{tent.name || `Tent ${tent.index}`}</option>
-              ))}
-            </select>
-          </div>
-          <div className="min-w-0">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Block</label>
-            <select
-              value={filters.blockIndex}
-              onChange={(e) => handleFilterChange('blockIndex', e.target.value)}
-              disabled={!filters.tentIndex}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 text-sm disabled:opacity-50 min-w-0"
-            >
-              <option value="">All Blocks</option>
-              {blocks.map(block => (
-                <option key={block.index} value={block.index}>{block.name || `Block ${block.index}`}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={applyFilters}
-            disabled={loading}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition disabled:opacity-50"
-          >
-            {loading ? 'Loading...' : 'Apply Filters'}
-          </button>
-          <button
-            onClick={resetFilters}
-            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition"
-          >
-            Reset
-          </button>
-          <button
-            onClick={loadData}
-            disabled={loading}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition disabled:opacity-50"
-          >
-            <svg className="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Refresh
-          </button>
-        </div>
-      </section>
-
-      {data && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Backup Button Card */}
-          <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 border border-gray-700/50 rounded-xl p-6 backdrop-blur-sm">
-            <h3 className="text-lg font-semibold text-white mb-3">Database Backup</h3>
-            <p className="text-sm text-gray-300 mb-4">
-              Trigger immediate backup email with current data snapshot
-            </p>
-            <button
-              onClick={handleTriggerBackup}
-              disabled={backupLoading}
-              className="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {backupLoading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Sending...
-                </>
-              ) : backupSuccess ? (
-                <>
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  Email Sent!
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  Send Backup Email
-                </>
-              )}
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button type="button" onClick={() => loadData(filters)} disabled={loading || !dateRangeValid} className="min-h-11 rounded-md bg-[#202428] px-5 text-sm font-semibold text-white hover:bg-black focus:outline-none focus:ring-2 focus:ring-[#a65f00] focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-[#9ca3af]">
+              {loading ? "Updating…" : "Show analytics"}
             </button>
+            <button type="button" onClick={resetFilters} disabled={loading} className="min-h-11 px-2 text-sm font-medium text-[#4f5965] underline-offset-4 hover:text-[#171717] hover:underline focus:outline-none focus:ring-2 focus:ring-[#a65f00] focus:ring-offset-2">Reset filters</button>
+            {!dateRangeValid && <p className="text-sm text-[#9b252b]">The “From” date must be before the “To” date.</p>}
           </div>
+        </section>
 
-          {/* Total Allocations Card */}
-          <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 border border-gray-700/50 rounded-xl p-6 backdrop-blur-sm">
-            <h3 className="text-lg font-semibold text-white mb-2">Total Lifetime Allocations</h3>
-            <p className="text-5xl font-bold text-gray-100 mb-2">{data.totalAllocations.toLocaleString()}</p>
-            <p className="text-sm text-gray-400">All-time bed allocations</p>
+        {data && <div className="mt-5 space-y-5">
+          <SummaryStrip total={data.totalAllocations} genders={genderTotals} locationCount={locationRows.length} />
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+            <CategoryGenderPanel rows={categoryRows} />
+            <LocationTotalsPanel locations={locationRows} />
           </div>
-
-          {/* Gender Breakdown Card */}
-          <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 border border-gray-700/50 rounded-xl p-6 backdrop-blur-sm">
-            <h3 className="text-lg font-semibold text-white mb-3">Gender Breakdown</h3>
-            {data.genderBreakdown?.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie
-                    data={data.genderBreakdown.map(item => ({ gender: item.gender, count: parseInt(item.count) }))}
-                    dataKey="count"
-                    nameKey="gender"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    label={(entry) => `${entry.gender}: ${entry.count}`}
-                    animationBegin={0}
-                    animationDuration={800}
-                  >
-                    {data.genderBreakdown.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={getGenderColor(entry.gender)} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="text-gray-400 text-sm">No data available</p>
-            )}
-          </div>
-
-          {/* Category Breakdown Card */}
-          {Array.isArray(data.categoryBreakdown) && (
-            <div className="md:col-span-2 lg:col-span-3 bg-gradient-to-br from-gray-900/90 to-gray-800/90 border border-gray-700/50 rounded-xl p-6 backdrop-blur-sm">
-              <h3 className="text-lg font-semibold text-white mb-3">Accommodation Category Breakdown</h3>
-              {data.categoryBreakdown.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {['delegate', 'sevadal', 'devotee', 'caretaker'].map((cat) => {
-                    const count = Number(
-                      data.categoryBreakdown.find((row) => String(row.category || '').toLowerCase() === cat)?.count || 0
-                    );
-                    return (
-                      <div key={cat} className="rounded-lg border border-white/10 bg-white/5 p-4">
-                        <p className="text-xs font-medium uppercase tracking-wider text-gray-400">{cat}</p>
-                        <p className="mt-1 text-2xl font-bold text-white">{count.toLocaleString()}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-gray-400 text-sm">No category data available</p>
-              )}
+          <section aria-labelledby="location-details-title">
+            <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h3 id="location-details-title" className="text-lg font-semibold text-[#171717]">Inside each location</h3>
+                <p className="mt-1 text-sm text-[#5d6672]">Every category shows its men–women split and exact counts.</p>
+              </div>
+              <ChartLegend showOther={hasOtherGender} />
             </div>
-          )}
-
-          {/* Daily Allocations Timeline */}
-          <div className="md:col-span-2 lg:col-span-3 bg-gradient-to-br from-gray-900/90 to-gray-800/90 border border-gray-700/50 rounded-xl p-6 backdrop-blur-sm">
-            <h3 className="text-lg font-semibold text-white mb-3">Daily Allocations Timeline</h3>
-            {data.dailyAllocations?.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={data.dailyAllocations.map(d => ({ ...d, dateLabel: formatDateLabel(d.date) }))} margin={{ bottom: 25 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="dateLabel" stroke="#9ca3af" height={60} label={{ value: 'Date', position: 'insideBottom', offset: -5, fill: '#9ca3af' }} />
-                  <YAxis stroke="#9ca3af" domain={[0, (dataMax) => Math.ceil(dataMax * 1.15)]} />
-                  <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }} />
-                  <Legend wrapperStyle={{ paddingTop: '30px' }} />
-                  <Line type="monotone" dataKey="count" name="Allocations" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 4 }} animationDuration={1000} />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="text-gray-400 text-sm">No data available</p>
-            )}
+            {locationRows.length ? <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              {locationRows.map((location) => <LocationBreakdownCard key={location.id || location.name} location={location} />)}
+            </div> : <EmptyState message="No location breakdown is available for this view." />}
+          </section>
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+            <ActivityPanel title="Bookings recorded by day" subtitle="When allocation records were added." rows={data.dailyAllocations || []} color={CHART.accent} />
+            <ActivityPanel title="Departures by day" subtitle="When allocated stays were due to end." rows={data.dailyDepartures || []} color={CHART.ink} />
           </div>
-
-          {/* Daily Departures Timeline */}
-          <div className="md:col-span-2 lg:col-span-3 bg-gradient-to-br from-gray-900/90 to-gray-800/90 border border-gray-700/50 rounded-xl p-6 backdrop-blur-sm">
-            <h3 className="text-lg font-semibold text-white mb-3">Daily Departures Timeline</h3>
-            {data.dailyDepartures?.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={data.dailyDepartures.map(d => ({ ...d, dateLabel: formatDateLabel(d.date) }))} margin={{ bottom: 25 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="dateLabel" stroke="#9ca3af" height={60} label={{ value: 'Date', position: 'insideBottom', offset: -5, fill: '#9ca3af' }} />
-                  <YAxis stroke="#9ca3af" domain={[0, (dataMax) => Math.ceil(dataMax * 1.15)]} />
-                  <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }} />
-                  <Legend wrapperStyle={{ paddingTop: '30px' }} />
-                  <Line type="monotone" dataKey="count" name="Departures" stroke="#ef4444" strokeWidth={2} dot={{ fill: '#ef4444', r: 4 }} animationDuration={1000} />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="text-gray-400 text-sm">No data available</p>
-            )}
-          </div>
-
-          {/* Daily Deallocations Timeline */}
-          <div className="md:col-span-2 lg:col-span-3 bg-gradient-to-br from-gray-900/90 to-gray-800/90 border border-gray-700/50 rounded-xl p-6 backdrop-blur-sm">
-            <h3 className="text-lg font-semibold text-white mb-3">Daily Deallocations by Reason</h3>
-            {deallocationChartData?.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={deallocationChartData} margin={{ bottom: 25 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="dateLabel" stroke="#9ca3af" height={60} label={{ value: 'Date', position: 'insideBottom', offset: -5, fill: '#9ca3af' }} />
-                  <YAxis stroke="#9ca3af" domain={[0, (dataMax) => Math.ceil(dataMax * 1.15)]} allowDecimals={false} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
-                    formatter={(value, name) => {
-                      const labels = {
-                        left_early: 'Left Early',
-                        no_show: 'No-show',
-                        booking_error: 'Booking Error',
-                        not_specified: 'Not Specified'
-                      };
-                      return [value, labels[name] || name];
-                    }}
-                  />
-                  <Legend 
-                    wrapperStyle={{ paddingTop: '30px' }}
-                    formatter={(value) => {
-                      const labels = {
-                        left_early: 'Left Early',
-                        no_show: 'No-show',
-                        booking_error: 'Booking Error',
-                        not_specified: 'Not Specified'
-                      };
-                      return labels[value] || value;
-                    }}
-                  />
-                  <Bar dataKey="left_early" stackId="a" fill="#10b981" animationDuration={1000} />
-                  <Bar dataKey="no_show" stackId="a" fill="#f97316" animationDuration={1000} animationBegin={200} />
-                  <Bar dataKey="booking_error" stackId="a" fill="#ef4444" animationDuration={1000} animationBegin={400} />
-                  <Bar dataKey="not_specified" stackId="a" fill="#6b7280" animationDuration={1000} animationBegin={600} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="text-gray-400 text-sm">No deallocations yet</p>
-            )}
-          </div>
-
-          {/* User Allocations Timeline */}
-          <div className="md:col-span-2 lg:col-span-3 bg-gradient-to-br from-gray-900/90 to-gray-800/90 border border-gray-700/50 rounded-xl p-6 backdrop-blur-sm">
-            <h3 className="text-lg font-semibold text-white mb-3">Allocations by User Over Time</h3>
-            {userChartData?.length > 0 ? (
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={userChartData} margin={{ bottom: 25 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="dateLabel" stroke="#9ca3af" height={60} label={{ value: 'Date', position: 'insideBottom', offset: -5, fill: '#9ca3af' }} />
-                  <YAxis stroke="#9ca3af" domain={[0, (dataMax) => Math.ceil(dataMax * 1.15)]} />
-                  <Tooltip content={<CustomUserTooltip />} />
-                  <Legend wrapperStyle={{ paddingTop: '30px' }} />
-                  {uniqueUsers.map((user, index) => (
-                    <Line
-                      key={user.username}
-                      type="monotone"
-                      dataKey={user.username}
-                      name={user.username}
-                      stroke={user.color}
-                      strokeWidth={2}
-                      dot={{ fill: user.color, r: 3 }}
-                      animationDuration={1000}
-                      animationBegin={index * 100}
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="text-gray-400 text-sm">No data available</p>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+          <AllocatorPanel rows={allocatorRows} />
+        </div>}
+      </div>
+    </main>
   );
 }
 
 export default function AnalyticsPage() {
-  return (
-    <ProtectedRoute requiredRole="admin">
-      <AnalyticsContent />
-    </ProtectedRoute>
-  );
+  return <ProtectedRoute requiredRole="admin"><AnalyticsContent /></ProtectedRoute>;
 }
