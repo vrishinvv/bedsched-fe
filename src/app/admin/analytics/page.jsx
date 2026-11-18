@@ -415,13 +415,13 @@ function AnalyticsContent() {
                 {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
               </select>
             </label>
-            <label className="text-sm font-medium text-[#303844]">Floor
+            <label className="text-sm font-medium text-[#303844]">Section / Floor
               <select value={filters.tentIndex} onChange={(event) => handleFilterChange("tentIndex", event.target.value)} disabled={!filters.locationId} className="mt-1 block h-10 w-full rounded-md border border-[#c9cfd6] bg-white px-3 text-sm text-[#171717] disabled:bg-[#f1f2f4] disabled:text-[#747d88] focus:border-[#a65f00] focus:outline-none focus:ring-2 focus:ring-[#f3d6ad]">
-                <option value="">All floors</option>
+                <option value="">All sections</option>
                 {tents.map((tent) => <option key={tent.index} value={tent.index}>{tent.name || `Floor ${tent.index}`}</option>)}
               </select>
             </label>
-            <label className="text-sm font-medium text-[#303844]">Room
+            <label className="text-sm font-medium text-[#303844]">Room / Block
               <select value={filters.blockIndex} onChange={(event) => handleFilterChange("blockIndex", event.target.value)} disabled={!filters.tentIndex} className="mt-1 block h-10 w-full rounded-md border border-[#c9cfd6] bg-white px-3 text-sm text-[#171717] disabled:bg-[#f1f2f4] disabled:text-[#747d88] focus:border-[#a65f00] focus:outline-none focus:ring-2 focus:ring-[#f3d6ad]">
                 <option value="">All rooms</option>
                 {blocks.map((block) => <option key={block.index} value={block.index}>{block.name || `Room ${block.index}`}</option>)}

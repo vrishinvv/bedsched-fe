@@ -16,6 +16,26 @@ test('builds a normalized location-user payload', () => {
       password: 'safe-password',
       role: 'location_user',
       locationId: 61,
+      locationIds: [61],
+    }
+  );
+});
+
+test('builds a normalized multi-location user payload', () => {
+  assert.deepEqual(
+    validateAdminUserForm({
+      username: 'dir_1',
+      password: 'safe-password',
+      confirmPassword: 'safe-password',
+      role: 'location_user',
+      locationIds: ['9', '3', '9', '7'],
+    }),
+    {
+      username: 'dir_1',
+      password: 'safe-password',
+      role: 'location_user',
+      locationId: 3,
+      locationIds: [3, 7, 9],
     }
   );
 });
@@ -30,6 +50,7 @@ test('removes location assignment from global roles', () => {
   });
 
   assert.equal(result.locationId, null);
+  assert.deepEqual(result.locationIds, []);
 });
 
 test('rejects mismatched passwords', () => {
@@ -54,6 +75,6 @@ test('requires a location for location users', () => {
       role: 'location_user',
       locationId: '',
     }),
-    (error) => error instanceof AdminUserFormError && error.field === 'locationId'
+    (error) => error instanceof AdminUserFormError && error.field === 'locationIds'
   );
 });

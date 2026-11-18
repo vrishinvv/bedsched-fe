@@ -64,6 +64,7 @@ export default function TentBlocksPage({ params }) {
   const { location, blocks } = data;
   const tentInfo = data.tentInfo || data.tent || {}; // Handle both tentInfo and tent properties
   const tentName = tentInfo.name || `Tent ${tentInfo.index || tent}`;
+  const directionalLocation = /^(North|South|East|West)$/i.test(location.name.trim());
 
   const breadcrumbItems = [
     { label: 'Home', href: '/' },
@@ -90,7 +91,9 @@ export default function TentBlocksPage({ params }) {
             {location.name} | {tentName}
           </h2>
           <div className="flex items-center gap-4">
-            <p className="text-xs sm:text-sm text-purple-200/80">Managing {blocks.length} block{blocks.length !== 1 ? 's' : ''} • {stats.totalCapacity} total beds</p>
+            <p className="text-xs sm:text-sm text-purple-200/80">
+              Managing {blocks.length} {directionalLocation ? 'room' : 'block'}{blocks.length !== 1 ? 's' : ''} • {stats.totalCapacity} total beds
+            </p>
           </div>
         </div>
       </section>

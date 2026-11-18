@@ -62,6 +62,7 @@ export default function LocationTentsPage({ params }) {
   if (err) return <div className="text-red-400">{err}</div>;
 
   const { location, tents } = data;
+  const directionalLocation = /^(North|South|East|West)$/i.test(location.name.trim());
 
   const breadcrumbItems = [
     { label: 'Home', href: '/' },
@@ -87,7 +88,9 @@ export default function LocationTentsPage({ params }) {
           <h2 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
             {location.name}
           </h2>
-          <p className="text-xs sm:text-sm text-purple-200/80">Managing {tents.length} tent{tents.length !== 1 ? 's' : ''} • {stats.totalCapacity} total beds</p>
+          <p className="text-xs sm:text-sm text-purple-200/80">
+            Managing {tents.length} {directionalLocation ? 'section' : 'tent'}{tents.length !== 1 ? 's' : ''} • {stats.totalCapacity} total beds
+          </p>
         </div>
       </section>
 

@@ -36,10 +36,22 @@ export function validateAdminUserForm(form) {
     throw new AdminUserFormError('Select a valid role.', 'role');
   }
 
-  const locationId = role === 'location_user' ? Number(form.locationId) : null;
-  if (role === 'location_user' && (!Number.isSafeInteger(locationId) || locationId <= 0)) {
-    throw new AdminUserFormError('Select a location for this user.', 'locationId');
+  const rawLocationIds = Array.isArray(form.locationIds) ? form.locationIds : [form.locationId];
+  const locationIds = role === 'location_user'
+    ? Array.from(new Set(rawLocationIds.filter(Boolean).map(Number))).sort((a, b) => a - b)
+    : [];
+  if (
+    role === 'location_user'
+    && (locationIds.length === 0 || locationIds.some((id) => !Number.isSafeInteger(id) || id <= 0))
+  ) {
+    throw new AdminUserFormError('Select at least one location for this user.', 'locationIds');
   }
 
-  return { username, password, role, locationId };
+  return {
+    username,
+    password,
+    role,
+    locationId: role === 'location_user' ? locationIds[0] : null,
+    locationIds,
+  };
 }

@@ -10,7 +10,7 @@ const EMPTY_FORM = {
   password: '',
   confirmPassword: '',
   role: 'location_user',
-  locationId: '',
+  locationIds: [],
 };
 
 const ROLE_LABELS = Object.fromEntries(ADMIN_USER_ROLES.map(({ value, label }) => [value, label]));
@@ -59,11 +59,31 @@ function UserAccountsContent() {
     setForm((current) => ({
       ...current,
       [field]: value,
-      ...(field === 'role' && value !== 'location_user' ? { locationId: '' } : {}),
+      ...(field === 'role' && value !== 'location_user' ? { locationIds: [] } : {}),
     }));
     setFieldError('');
     setError('');
     setCreatedCredentials(null);
+  };
+
+  const toggleLocation = (locationId) => {
+    setForm((current) => {
+      const selected = new Set(current.locationIds || []);
+      if (selected.has(locationId)) selected.delete(locationId);
+      else selected.add(locationId);
+      return { ...current, locationIds: Array.from(selected) };
+    });
+    setFieldError('');
+    setError('');
+    setCreatedCredentials(null);
+  };
+
+  const selectDirectionalLocations = () => {
+    const directional = locations
+      .filter((location) => ['north', 'south', 'east', 'west'].includes(location.name.trim().toLowerCase()))
+      .map((location) => String(location.id));
+    setForm((current) => ({ ...current, locationIds: directional }));
+    setFieldError('');
   };
 
   const handleSubmit = async (event) => {
@@ -173,7 +193,7 @@ function UserAccountsContent() {
                 ))}
               </select>
               <p className="mt-1.5 text-xs text-gray-500">
-                {form.role === 'location_user' && 'Can manage bookings only for the assigned location.'}
+                {form.role === 'location_user' && 'Can manage bookings only for the selected locations.'}
                 {form.role === 'dashboard' && 'Can view the dashboard and use smart reserve.'}
                 {form.role === 'admin' && 'Has full access, including creating other accounts.'}
               </p>
@@ -181,19 +201,33 @@ function UserAccountsContent() {
 
             {form.role === 'location_user' && (
               <div>
-                <label htmlFor="locationId" className="mb-1.5 block text-sm font-medium text-gray-200">Location</label>
-                <select
-                  id="locationId"
-                  value={form.locationId}
-                  onChange={(event) => updateField('locationId', event.target.value)}
-                  className={inputClass('locationId')}
-                  required
-                >
-                  <option value="">Select a location</option>
-                  {locations.map((location) => (
-                    <option key={location.id} value={location.id}>{location.name}</option>
-                  ))}
-                </select>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <label className="block text-sm font-medium text-gray-200">Locations</label>
+                  <button
+                    type="button"
+                    onClick={selectDirectionalLocations}
+                    className="text-xs font-medium text-blue-300 hover:text-blue-200"
+                  >
+                    Select North, South, East &amp; West
+                  </button>
+                </div>
+                <div className={`max-h-52 space-y-1 overflow-y-auto rounded-lg border p-2 ${fieldError === 'locationIds' ? 'border-red-400' : 'border-gray-700'}`}>
+                  {locations.map((location) => {
+                    const locationId = String(location.id);
+                    return (
+                      <label key={location.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-gray-200 hover:bg-white/5">
+                        <input
+                          type="checkbox"
+                          checked={(form.locationIds || []).includes(locationId)}
+                          onChange={() => toggleLocation(locationId)}
+                          className="rounded border-gray-500"
+                        />
+                        {location.name}
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="mt-1.5 text-xs text-gray-500">Select one location for a standard account or several for shared coverage.</p>
               </div>
             )}
 
@@ -279,7 +313,11 @@ function UserAccountsContent() {
                   <tr key={user.id} className="text-gray-200 hover:bg-white/[0.03]">
                     <td className="whitespace-nowrap px-5 py-3 font-medium text-white">{user.username}</td>
                     <td className="whitespace-nowrap px-5 py-3">{ROLE_LABELS[user.role] || user.role}</td>
-                    <td className="px-5 py-3 text-gray-400">{user.location_name || 'All locations'}</td>
+                    <td className="px-5 py-3 text-gray-400">
+                      {Array.isArray(user.location_names) && user.location_names.length
+                        ? user.location_names.join(', ')
+                        : 'All locations'}
+                    </td>
                     <td className="whitespace-nowrap px-5 py-3 text-gray-400">{formatCreatedAt(user.created_at)}</td>
                   </tr>
                 ))}
