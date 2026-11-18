@@ -240,7 +240,7 @@ export default function ReallocationModal({
           </h3>
 
           {/* Current allocation info */}
-          <div className="mb-4 sm:mb-6 p-3 sm:p-5 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg sm:rounded-xl border-2 border-blue-200 shadow-sm">
+          <div className="mb-4 sm:mb-6 p-3 sm:p-5 bg-blue-50 rounded-lg sm:rounded-xl border-2 border-blue-200">
             <div className="flex items-start gap-2 sm:gap-3">
               <div className="p-1.5 sm:p-2 bg-blue-500 rounded-lg flex-shrink-0">
                 <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -265,9 +265,9 @@ export default function ReallocationModal({
                     </div>
                   )}
                   {currentAllocation?.caretakerForName && (
-                    <div className="col-span-1 sm:col-span-2 rounded-lg border border-indigo-200 bg-white/70 p-2">
-                      <span className="text-indigo-700">Caretaker for:</span>
-                      <div className="font-semibold text-indigo-950">
+                    <div className="col-span-1 sm:col-span-2 rounded-lg border border-blue-200 bg-white p-2">
+                      <span className="text-blue-700">Caretaker for:</span>
+                      <div className="font-semibold text-blue-950">
                         {currentAllocation.caretakerForName}
                         {currentAllocation.caretakerForBedNumber != null && ` — Bed ${currentAllocation.caretakerForBedNumber}`}
                       </div>
@@ -278,11 +278,11 @@ export default function ReallocationModal({
                     <div className="font-medium text-gray-800 truncate">{currentAllocation?.location}</div>
                   </div>
                   <div>
-                    <span className="text-gray-600">Tent:</span>
+                    <span className="text-gray-600">Section:</span>
                     <div className="font-medium text-gray-800 truncate">{currentAllocation?.tent}</div>
                   </div>
                   <div>
-                    <span className="text-gray-600">Block:</span>
+                    <span className="text-gray-600">Room:</span>
                     <div className="font-medium text-gray-800 truncate">{currentAllocation?.block}</div>
                   </div>
                   <div>
@@ -315,12 +315,12 @@ export default function ReallocationModal({
             <div className={`h-0.5 flex-1 ${step >= 2 ? 'bg-blue-500' : 'bg-gray-200'}`}></div>
             <div className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-md sm:rounded-lg ${step >= 2 ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'}`}>
               <span className="font-semibold">2</span>
-              <span className="hidden xs:inline">Tent</span>
+              <span className="hidden xs:inline">Section</span>
             </div>
             <div className={`h-0.5 flex-1 ${step >= 3 ? 'bg-blue-500' : 'bg-gray-200'}`}></div>
             <div className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-md sm:rounded-lg ${step >= 3 ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'}`}>
               <span className="font-semibold">3</span>
-              <span className="hidden xs:inline">Block</span>
+              <span className="hidden xs:inline">Room</span>
             </div>
             <div className={`h-0.5 flex-1 ${step >= 4 ? 'bg-blue-500' : 'bg-gray-200'}`}></div>
             <div className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-md sm:rounded-lg ${step >= 4 ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'}`}>
@@ -331,7 +331,7 @@ export default function ReallocationModal({
 
           {/* Selection summary */}
           {(selectedLocation || selectedTent || selectedBlock || selectedBed) && (
-            <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border-2 border-green-200 shadow-sm">
+            <div className="mb-6 p-4 bg-green-50 rounded-xl border-2 border-green-200">
               <div className="flex items-center gap-2 mb-3">
                 <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -341,22 +341,22 @@ export default function ReallocationModal({
               <div className="flex flex-wrap gap-2 text-sm">
                 {selectedLocation && (
                   <div className="px-3 py-1.5 bg-white rounded-lg border border-green-300 text-green-800 font-medium">
-                    📍 {selectedLocation.name}
+                    Location: {selectedLocation.name}
                   </div>
                 )}
                 {selectedTent && (
                   <div className="px-3 py-1.5 bg-white rounded-lg border border-green-300 text-green-800 font-medium">
-                    ⛺ {selectedTent.name}
+                    Section: {selectedTent.name}
                   </div>
                 )}
                 {selectedBlock && (
                   <div className="px-3 py-1.5 bg-white rounded-lg border border-green-300 text-green-800 font-medium">
-                    🏗️ {selectedBlock.name}
+                    Room: {selectedBlock.name}
                   </div>
                 )}
                 {selectedBed && (
                   <div className="px-3 py-1.5 bg-white rounded-lg border border-green-300 text-green-800 font-medium">
-                    🛏️ Bed #{selectedBed}
+                    Bed #{selectedBed}
                   </div>
                 )}
               </div>
@@ -381,7 +381,7 @@ export default function ReallocationModal({
                     <button
                       key={location.id}
                       onClick={() => handleLocationSelect(location)}
-                      className="group p-4 text-left border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:shadow-md transition-all duration-200 bg-white"
+                      className="group p-4 text-left border-2 border-gray-200 rounded-xl hover:border-blue-500 transition-colors duration-200 bg-white"
                     >
                       <div className="flex items-center justify-between">
                         <div>
@@ -399,10 +399,10 @@ export default function ReallocationModal({
             </div>
           )}
 
-          {/* Step 2: Select Tent */}
+          {/* Step 2: Select Section */}
           {step === 2 && (
             <div>
-              <h4 className="text-md font-semibold text-gray-900 mb-3">Select Tent in {selectedLocation?.name}</h4>
+              <h4 className="text-md font-semibold text-gray-900 mb-3">Select Section in {selectedLocation?.name}</h4>
               {loading ? (
                 <div className="space-y-2">
                   <Skeleton className="h-16 w-full" />
@@ -416,7 +416,7 @@ export default function ReallocationModal({
                     <button
                       key={tent.id}
                       onClick={() => handleTentSelect(tent)}
-                      className="group p-4 text-left border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:shadow-md transition-all duration-200 bg-white"
+                      className="group p-4 text-left border-2 border-gray-200 rounded-xl hover:border-blue-500 transition-colors duration-200 bg-white"
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">{tent.name}</div>
@@ -425,8 +425,8 @@ export default function ReallocationModal({
                         </svg>
                       </div>
                       <div className="flex gap-3 text-xs text-gray-600">
-                        <span className="px-2 py-1 bg-gray-100 rounded">📏 {tent.size} beds</span>
-                        <span className="px-2 py-1 bg-gray-100 rounded">🏗️ {tent.block_count} blocks</span>
+                        <span className="px-2 py-1 bg-gray-100 rounded">{tent.size} beds</span>
+                        <span className="px-2 py-1 bg-gray-100 rounded">{tent.block_count} rooms</span>
                       </div>
                     </button>
                   ))}
@@ -435,10 +435,10 @@ export default function ReallocationModal({
             </div>
           )}
 
-          {/* Step 3: Select Block */}
+          {/* Step 3: Select Room */}
           {step === 3 && (
             <div>
-              <h4 className="text-md font-semibold text-gray-900 mb-3">Select Block in {selectedTent?.name}</h4>
+              <h4 className="text-md font-semibold text-gray-900 mb-3">Select Room in {selectedTent?.name}</h4>
               {loading ? (
                 <div className="space-y-2">
                   <Skeleton className="h-16 w-full" />
@@ -452,7 +452,7 @@ export default function ReallocationModal({
                     <button
                       key={block.id}
                       onClick={() => handleBlockSelect(block)}
-                      className="group p-4 text-left border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:shadow-md transition-all duration-200 bg-white"
+                      className="group p-4 text-left border-2 border-gray-200 rounded-xl hover:border-blue-500 transition-colors duration-200 bg-white"
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">{block.name}</div>
@@ -461,10 +461,10 @@ export default function ReallocationModal({
                         </svg>
                       </div>
                       <div className="flex gap-3 text-xs text-gray-600">
-                        <span className="px-2 py-1 bg-gray-100 rounded">📏 {block.size} beds</span>
+                        <span className="px-2 py-1 bg-gray-100 rounded">{block.size} beds</span>
                         {block.gender_restriction && block.gender_restriction !== 'both' && (
                           <span className={`px-2 py-1 rounded ${block.gender_restriction === 'male_only' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}`}>
-                            {block.gender_restriction === 'male_only' ? '♂️ Male only' : '♀️ Female only'}
+                            {block.gender_restriction === 'male_only' ? 'Male only' : 'Female only'}
                           </span>
                         )}
                         {Number(block.minimumAge) > 0 && (
@@ -513,10 +513,10 @@ export default function ReallocationModal({
                       <button
                         key={bedNumber}
                         onClick={() => handleBedSelect(bedNumber)}
-                        className={`aspect-square rounded-lg font-semibold text-sm transition-all duration-200 ${
+                        className={`aspect-square rounded-lg font-semibold text-sm transition-colors duration-200 ${
                           selectedBed === bedNumber
-                            ? 'bg-blue-600 text-white shadow-lg scale-110 ring-2 ring-blue-300'
-                            : 'bg-white border-2 border-gray-200 text-gray-700 hover:border-blue-400 hover:shadow-md hover:scale-105'
+                            ? 'bg-blue-600 text-white ring-2 ring-blue-300'
+                            : 'bg-white border-2 border-gray-200 text-gray-700 hover:border-blue-400'
                         }`}
                       >
                         {bedNumber}
@@ -545,13 +545,13 @@ export default function ReallocationModal({
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-gradient-to-r from-gray-50 to-white p-6 border-t shadow-lg">
+        <div className="sticky bottom-0 bg-gray-50 p-6 border-t shadow-lg">
           <div className="flex items-center justify-between">
             <div className="flex gap-3">
               <button
                 onClick={onClose}
                 disabled={pending}
-                className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
+                className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
               >
                 Cancel
               </button>
@@ -559,7 +559,7 @@ export default function ReallocationModal({
                 <button
                   onClick={handleBack}
                   disabled={pending || loading}
-                  className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm flex items-center gap-2"
+                  className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 flex items-center gap-2"
                 >
                   <span className="text-lg">←</span>
                   Back
@@ -570,10 +570,9 @@ export default function ReallocationModal({
               <button
                 onClick={handleConfirmReallocation}
                 disabled={!canConfirm || pending}
-                className="px-6 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg hover:from-blue-700 hover:to-blue-800 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:from-gray-400 disabled:to-gray-400 transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-2"
+                className="px-6 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400 transition-colors duration-200 flex items-center gap-2"
               >
                 {pending && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
-                <span>✓</span>
                 Confirm Reallocation
               </button>
             )}

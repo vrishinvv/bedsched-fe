@@ -4,8 +4,10 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import Notification from '@/components/Notification';
 import CameraCapture from '@/components/CameraCapture';
 import DeallocateModal from '@/components/DeallocateModal';
+import ReallocationModal from '@/components/ReallocationModal';
 import { BOOKING_MAX_DATE as MAX_DATE, BOOKING_MIN_DATE as MIN_DATE, BOOKING_WINDOW_LABEL, isWithinBookingWindow } from '@/lib/bookingWindow.mjs';
 import { getMe } from '@/lib/api';
+import { buildReallocationContext } from '@/lib/reallocation.mjs';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -39,6 +41,12 @@ export default function SearchPage() {
   const [showDeallocateModal, setShowDeallocateModal] = useState(false);
   const [deallocatingAllocation, setDeallocatingAllocation] = useState(null);
   const [deallocating, setDeallocating] = useState(false);
+  const [reallocationModal, setReallocationModal] = useState({
+    open: false,
+    allocationId: null,
+    currentAllocation: null,
+  });
+  const [reallocating, setReallocating] = useState(false);
   const [activeTab, setActiveTab] = useState('active'); // 'active' or 'deallocated'
   const [currentUser, setCurrentUser] = useState(null);
 
@@ -302,6 +310,44 @@ export default function SearchPage() {
     setShowDeallocateModal(true);
   }, []);
 
+  const startReallocate = useCallback((allocation) => {
+    setReallocationModal({
+      open: true,
+      allocationId: allocation.id,
+      currentAllocation: buildReallocationContext(allocation),
+    });
+  }, []);
+
+  const closeReallocation = useCallback(() => {
+    if (reallocating) return;
+    setReallocationModal({ open: false, allocationId: null, currentAllocation: null });
+  }, [reallocating]);
+
+  const handleReallocate = useCallback(async (payload) => {
+    if (!reallocationModal.allocationId) return;
+
+    setReallocating(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/allocations/${reallocationModal.allocationId}/reallocate`, {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || 'Reallocation failed');
+
+      const successMessage = `${reallocationModal.currentAllocation?.name || 'Booking'} moved to bed ${data.to?.bed || payload.newBedNumber}.`;
+      setReallocationModal({ open: false, allocationId: null, currentAllocation: null });
+      await searchBookings({ preventDefault: () => {} });
+      setNotification({ type: 'success', message: successMessage });
+    } catch (error) {
+      setNotification({ type: 'error', message: error.message || 'Failed to reallocate booking' });
+      throw error;
+    } finally {
+      setReallocating(false);
+    }
+  }, [reallocationModal, searchBookings]);
+
   const handleDeallocateConfirm = useCallback(async (wasOccupied, reason) => {
     if (!deallocatingAllocation) return;
 
@@ -338,17 +384,16 @@ export default function SearchPage() {
     <>
       {notification && (
         <Notification
-          type={notification.type}
-          message={notification.message}
+          notification={notification}
           onClose={() => setNotification(null)}
         />
       )}
 
       <div>
         {/* Page Header */}
-        <section className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-blue-900/20 via-indigo-900/20 to-purple-900/20 border border-blue-500/20 p-4 sm:p-6 mb-6">
+        <section className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gray-900 border border-white/10 p-4 sm:p-6 mb-6">
           <div className="relative">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">
+            <h2 className="text-2xl sm:text-3xl font-bold mb-2 text-white">
               Search Bookings
             </h2>
             <p className="text-sm sm:text-base text-blue-200/80">Find and manage allocations by phone number or Sai Connect ID</p>
@@ -356,7 +401,7 @@ export default function SearchPage() {
         </section>
 
         {/* Search Form */}
-        <form onSubmit={searchBookings} className="mb-8 bg-gray-900/50 backdrop-blur border border-white/10 rounded-lg shadow-md p-6">
+        <form onSubmit={searchBookings} className="mb-8 bg-gray-900/50 border border-white/10 rounded-lg p-6">
           <div className="flex gap-4">
             <div className="flex-1">
               <label className="block text-sm font-medium text-gray-200 mb-2">
@@ -446,7 +491,7 @@ export default function SearchPage() {
               </div>
             ) : (
               filteredResults.map((allocation) => (
-              <div key={allocation.id} className="bg-gray-900/50 backdrop-blur border border-white/10 rounded-lg shadow-md p-6">
+              <div key={allocation.id} className="bg-gray-900/50 border border-white/10 rounded-lg p-6">
                 {editingId === allocation.id ? (
                   /* Edit Mode */
                   <div className="space-y-4">
@@ -479,9 +524,9 @@ export default function SearchPage() {
                       </p>
                     )}
 
-                    <div className="grid grid-cols-1 gap-3 rounded-lg border border-indigo-500/20 bg-indigo-950/20 p-3 sm:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-3 rounded-lg border border-blue-500/20 bg-blue-950/20 p-3 sm:grid-cols-3">
                       <div>
-                        <p className="text-xs text-indigo-200/70">Category</p>
+                        <p className="text-xs text-blue-200/70">Category</p>
                         <p className="font-medium capitalize text-white">
                           {allocation.accommodation_category || 'devotee'}
                           {allocation.caretaker_for_allocation_id
@@ -490,11 +535,11 @@ export default function SearchPage() {
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs text-indigo-200/70">Sai Connect ID</p>
+                        <p className="text-xs text-blue-200/70">Sai Connect ID</p>
                         <p className="font-medium text-white">{allocation.sai_connect_id || '—'}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-indigo-200/70">Sai Connect Age</p>
+                        <p className="text-xs text-blue-200/70">Sai Connect Age</p>
                         <p className="font-medium text-white">{allocation.sai_connect_age ?? '—'}</p>
                       </div>
                     </div>
@@ -628,7 +673,7 @@ export default function SearchPage() {
                 ) : (
                   /* View Mode */
                   <div>
-                    <div className="flex justify-between items-start mb-4">
+                    <div className="flex flex-col items-start gap-4 mb-4 sm:flex-row sm:justify-between">
                       <div>
                         <h3 className="text-lg font-semibold text-white">{allocation.name}</h3>
                         <p className="text-sm text-gray-300">
@@ -637,24 +682,31 @@ export default function SearchPage() {
                         </p>
                         {allocation.deleted_at && (
                           <p className="text-xs text-red-400 mt-1">
-                            ⚠️ This booking has been deallocated
+                            This booking has been deallocated
                           </p>
                         )}
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex w-full flex-wrap justify-start gap-2 sm:w-auto sm:justify-end">
                         <button
                           onClick={() => startEdit(allocation)}
                           disabled={allocation.deleted_at}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="min-h-10 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          ✏️ Edit
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => startReallocate(allocation)}
+                          disabled={reallocating || allocation.deleted_at}
+                          className="min-h-10 px-4 py-2 border border-sky-400/70 text-sky-100 rounded-lg hover:border-sky-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Reallocate
                         </button>
                         <button
                           onClick={() => startDeallocate(allocation)}
                           disabled={deallocating || allocation.deleted_at}
-                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="min-h-10 px-4 py-2 border border-red-500 text-red-200 rounded-lg hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          🗑️ Deallocate
+                          Deallocate
                         </button>
                       </div>
                     </div>
@@ -760,6 +812,15 @@ export default function SearchPage() {
         }}
         onConfirm={handleDeallocateConfirm}
         personName={deallocatingAllocation?.name || 'guest'}
+      />
+
+      <ReallocationModal
+        open={reallocationModal.open}
+        onClose={closeReallocation}
+        allocationId={reallocationModal.allocationId}
+        currentAllocation={reallocationModal.currentAllocation}
+        onReallocate={handleReallocate}
+        pending={reallocating}
       />
     </>
   );
