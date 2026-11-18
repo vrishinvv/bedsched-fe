@@ -194,7 +194,7 @@ function UserAccountsContent() {
               </select>
               <p className="mt-1.5 text-xs text-gray-500">
                 {form.role === 'location_user' && 'Can manage bookings only for the selected locations.'}
-                {form.role === 'dashboard' && 'Can view the dashboard and use smart reserve.'}
+                {form.role === 'dashboard' && 'Can view the dashboard and analytics, and use smart reserve.'}
                 {form.role === 'admin' && 'Has full access, including creating other accounts.'}
               </p>
             </div>

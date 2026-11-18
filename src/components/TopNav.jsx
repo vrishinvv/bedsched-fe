@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { getMe, logout } from '@/lib/api';
+import { canViewAnalytics } from '@/lib/permissions.mjs';
 
 export default function TopNav() {
   const pathname = usePathname();
@@ -36,6 +37,7 @@ export default function TopNav() {
 
   const isAdmin = user?.role === 'admin';
   const isLocationUser = user?.role === 'location_user';
+  const hasAnalyticsAccess = canViewAnalytics(user);
 
   // Hide nav on the login page
   if (pathname === '/login') return null;
@@ -143,14 +145,16 @@ export default function TopNav() {
                         Accommodation Setup
                       </Link>
                     </li>
-                    <li>
-                      <Link onClick={() => setOpen(false)} href="/admin/analytics" className="block px-3 py-2 rounded-md text-gray-200 hover:bg-white/10 hover:text-white transition-colors">
-                        Analytics
-                      </Link>
-                    </li>
                   </>
                 )}
               </>
+            )}
+            {hasAnalyticsAccess && (
+              <li>
+                <Link onClick={() => setOpen(false)} href="/admin/analytics" className="block px-3 py-2 rounded-md text-gray-200 hover:bg-white/10 hover:text-white transition-colors">
+                  Analytics
+                </Link>
+              </li>
             )}
             <li className="pt-2">
               <button

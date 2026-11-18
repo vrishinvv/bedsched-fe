@@ -15,6 +15,8 @@ import {
   percent,
 } from "@/lib/analytics.mjs";
 
+const ANALYTICS_ROLES = ["admin", "dashboard"];
+
 const EVENT_YEAR = BOOKING_MIN_DATE.slice(0, 4);
 const DEFAULT_FILTERS = Object.freeze({
   startDate: `${EVENT_YEAR}-10-01`,
@@ -467,5 +469,5 @@ function AnalyticsContent() {
 }
 
 export default function AnalyticsPage() {
-  return <ProtectedRoute requiredRole="admin"><AnalyticsContent /></ProtectedRoute>;
+  return <ProtectedRoute allowedRoles={ANALYTICS_ROLES}><AnalyticsContent /></ProtectedRoute>;
 }

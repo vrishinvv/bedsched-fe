@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getMe } from '@/lib/api';
 
-export default function ProtectedRoute({ children, adminOnly = false, requiredRole = null }) {
+export default function ProtectedRoute({ children, adminOnly = false, requiredRole = null, allowedRoles = null }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
@@ -30,6 +30,11 @@ export default function ProtectedRoute({ children, adminOnly = false, requiredRo
           return;
         }
 
+        if (allowedRoles && !allowedRoles.includes(me.user.role)) {
+          router.push('/');
+          return;
+        }
+
         // Existing admin pages are also used by location users.
         if (adminOnly && !['admin', 'location_user'].includes(me.user.role)) {
           router.push('/');
@@ -43,7 +48,7 @@ export default function ProtectedRoute({ children, adminOnly = false, requiredRo
         setLoading(false);
       }
     })();
-  }, [router, adminOnly, requiredRole]);
+  }, [router, adminOnly, requiredRole, allowedRoles]);
 
   if (loading) {
     return (

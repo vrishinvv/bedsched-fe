@@ -51,6 +51,23 @@ async function mockAuthenticatedApi(page, user) {
       await route.fulfill({ status: 200, headers, json: { locations: [] } });
       return;
     }
+    if (path === '/api/admin/analytics') {
+      await route.fulfill({
+        status: 200,
+        headers,
+        json: {
+          data: {
+            totalAllocations: 0,
+            categoryGenderBreakdown: [],
+            locationCategoryGenderBreakdown: [],
+            dailyAllocations: [],
+            dailyDepartures: [],
+            allocatorTotals: [],
+          },
+        },
+      });
+      return;
+    }
 
     await route.fulfill({ status: 404, headers, json: { error: 'Unexpected mocked request' } });
   });
@@ -106,4 +123,26 @@ test('an admin can reach the account and accommodation setup screens', async ({ 
   await page.goto('/admin/structure');
   await expect(page.getByRole('heading', { name: 'Accommodation Setup' })).toBeVisible();
   await expect(page.getByText('No locations found.')).toBeVisible();
+});
+
+test('a dashboard user can view analytics without gaining other admin screens', async ({ page }) => {
+  await mockAuthenticatedApi(page, {
+    id: 2,
+    username: 'dashboard',
+    role: 'dashboard',
+    locationId: null,
+  });
+
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Global Overview' })).toBeVisible();
+  await page.getByRole('button', { name: 'Open menu' }).click();
+  await expect(page.getByRole('link', { name: 'Analytics' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'User Accounts' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Accommodation Setup' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Departures' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'All Allocations' })).toHaveCount(0);
+
+  await page.getByRole('link', { name: 'Analytics' }).click();
+  await expect(page).toHaveURL(/\/admin\/analytics$/);
+  await expect(page.getByRole('heading', { name: 'Analytics' })).toBeVisible();
 });
