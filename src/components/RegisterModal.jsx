@@ -1,19 +1,24 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Notification from './Notification';
-import { BOOKING_MAX_DATE as MAX_DATE, BOOKING_MIN_DATE as MIN_DATE, BOOKING_WINDOW_LABEL, isWithinBookingWindow } from '@/lib/bookingWindow.mjs';
+import { BOOKING_MAX_DATE as MAX_DATE, BOOKING_MIN_DATE as MIN_DATE, BOOKING_WINDOW_LABEL, getDefaultBookingDates, isWithinBookingWindow } from '@/lib/bookingWindow.mjs';
 
-export default function RegisterModal({ open, onClose, onSuccess, defaultValues = {} , smartReserveFn, locationNames = {} }) {
-  const [form, setForm] = useState({
+function buildInitialForm(defaultValues) {
+  const defaultDates = getDefaultBookingDates();
+  return {
     contactName: defaultValues.contactName || '',
     phone: defaultValues.phone || '',
     aadharNumber: '',
     isFamily: defaultValues.isFamily ?? false,
     maleCount: defaultValues.maleCount || 0,
     femaleCount: defaultValues.femaleCount || 0,
-    startDate: defaultValues.startDate || '',
-    endDate: defaultValues.endDate || '',
-  });
+    startDate: defaultValues.startDate || defaultDates.startDate,
+    endDate: defaultValues.endDate || defaultDates.endDate,
+  };
+}
+
+export default function RegisterModal({ open, onClose, onSuccess, defaultValues = {} , smartReserveFn, locationNames = {} }) {
+  const [form, setForm] = useState(() => buildInitialForm(defaultValues));
   const [pending, setPending] = useState(false);
   const [notification, setNotification] = useState(null);
   const [confirmCtx, setConfirmCtx] = useState(null); // { type: 'mixed-blocks'|'split', preview: [...] }
@@ -24,16 +29,7 @@ export default function RegisterModal({ open, onClose, onSuccess, defaultValues 
   // Reset modal state on reopen so it doesn't retain old state
   useEffect(() => {
     if (open) {
-      setForm({
-        contactName: defaultValues.contactName || '',
-        phone: defaultValues.phone || '',
-        aadharNumber: '',
-        isFamily: defaultValues.isFamily ?? false,
-        maleCount: defaultValues.maleCount || 0,
-        femaleCount: defaultValues.femaleCount || 0,
-        startDate: defaultValues.startDate || '',
-        endDate: defaultValues.endDate || '',
-      });
+      setForm(buildInitialForm(defaultValues));
       setPending(false);
       setNotification(null);
       setConfirmCtx(null);

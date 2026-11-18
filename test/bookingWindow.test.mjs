@@ -5,6 +5,8 @@ import {
   BOOKING_MAX_DATE,
   BOOKING_MIN_DATE,
   BOOKING_WINDOW_LABEL,
+  getDefaultBookingDates,
+  getDateInIndia,
   isWithinBookingWindow,
 } from '../src/lib/bookingWindow.mjs';
 
@@ -33,4 +35,15 @@ test('rejects dates outside the booking window', () => {
   assert.equal(isWithinBookingWindow(''), false);
   assert.equal(isWithinBookingWindow(null), false);
   assert.equal(isWithinBookingWindow(undefined), false);
+});
+
+test('defaults new bookings to the current India date through November 24', () => {
+  const justBeforeMidnightInIndia = new Date('2026-11-17T18:29:59.000Z');
+  const justAfterMidnightInIndia = new Date('2026-11-17T18:30:00.000Z');
+
+  assert.equal(getDateInIndia(justBeforeMidnightInIndia), '2026-11-17');
+  assert.deepEqual(getDefaultBookingDates(justAfterMidnightInIndia), {
+    startDate: '2026-11-18',
+    endDate: '2026-11-24',
+  });
 });

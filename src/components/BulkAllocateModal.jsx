@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import Skeleton from '@/components/Skeleton';
-import { BOOKING_MAX_DATE as MAX_DATE, BOOKING_MIN_DATE as MIN_DATE, BOOKING_WINDOW_LABEL, isWithinBookingWindow } from '@/lib/bookingWindow.mjs';
+import { BOOKING_MAX_DATE as MAX_DATE, BOOKING_MIN_DATE as MIN_DATE, BOOKING_WINDOW_LABEL, getDefaultBookingDates, isWithinBookingWindow } from '@/lib/bookingWindow.mjs';
 
 export default function BulkAllocateModal({
   open,
@@ -9,15 +9,14 @@ export default function BulkAllocateModal({
   genderRestriction,
   onSave,
 }) {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState(() => ({
     name: '',
     phone: '',
     aadharNumber: '',
     maleCount: 0,
     femaleCount: 0,
-    startDate: '',
-    endDate: '',
-  });
+    ...getDefaultBookingDates(),
+  }));
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState(null); // { success: [], errors: [] }
   const ref = useRef(null);
@@ -44,14 +43,14 @@ export default function BulkAllocateModal({
 
   useEffect(() => {
     if (open) {
+      const defaultDates = getDefaultBookingDates();
       setForm({
         name: '',
         phone: '',
         aadharNumber: '',
         maleCount: 0,
         femaleCount: 0,
-        startDate: '',
-        endDate: '',
+        ...defaultDates,
       });
       setResult(null);
       setPending(false);

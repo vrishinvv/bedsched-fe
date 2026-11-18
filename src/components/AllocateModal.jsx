@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Skeleton from '@/components/Skeleton';
 import CameraCapture from '@/components/CameraCapture';
-import { BOOKING_MAX_DATE as MAX_DATE, BOOKING_MIN_DATE as MIN_DATE, BOOKING_WINDOW_LABEL, isWithinBookingWindow } from '@/lib/bookingWindow.mjs';
+import { BOOKING_MAX_DATE as MAX_DATE, BOOKING_MIN_DATE as MIN_DATE, BOOKING_WINDOW_LABEL, getDefaultBookingDates, isWithinBookingWindow } from '@/lib/bookingWindow.mjs';
 import { lookupSaiConnect } from '@/lib/api';
 import {
   ACCOMMODATION_CATEGORY_OPTIONS,
@@ -72,14 +72,13 @@ export default function AllocateModal({
       window.location.hostname,
     ));
   }, []);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState(() => ({
     name: '',
     phone: '',
     emergencyPhone: '',
     gender: 'Male',
-    startDate: '',
-    endDate: '',
-  });
+    ...getDefaultBookingDates(),
+  }));
   const [personPhoto, setPersonPhoto] = useState({ blob: null, dataUrl: null });
   const [aadhaarPhoto, setAadhaarPhoto] = useState({ blob: null, dataUrl: null });
   const [uploading, setUploading] = useState(false); // Local uploading state
@@ -188,6 +187,7 @@ export default function AllocateModal({
           dataUrl: initialData.aadhaarPhotoUrl || null 
         });
       } else {
+        const defaultDates = getDefaultBookingDates();
         // Set default gender based on restriction
         let defaultGender = 'Male';
         if (genderRestriction === 'female_only') {
@@ -201,8 +201,7 @@ export default function AllocateModal({
           phone: '',
           emergencyPhone: '',
           gender: defaultGender,
-          startDate: '',
-          endDate: '',
+          ...defaultDates,
         });
         setPersonPhoto({ blob: null, dataUrl: null });
         setAadhaarPhoto({ blob: null, dataUrl: null });
