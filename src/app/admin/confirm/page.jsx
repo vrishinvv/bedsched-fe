@@ -7,6 +7,7 @@ import Notification from '@/components/Notification';
 import SearchResultCard from '@/components/SearchResultCard';
 import { TreeSkeleton } from '@/components/Skeleton';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import { filterBatchesForUser } from '@/lib/locationAccess.mjs';
 
 function AdminConfirmContent() {
   const params = useSearchParams();
@@ -18,7 +19,6 @@ function AdminConfirmContent() {
   const [note, setNote] = useState(null);
   const [filter, setFilter] = useState({ locationId: '', tentIndex: '', blockIndex: '' });
   const [filterBatchId, setFilterBatchId] = useState(null);
-  const [userLocationId, setUserLocationId] = useState(null);
 
   const show = (type, message) => setNote({ type, message });
 
@@ -34,14 +34,7 @@ function AdminConfirmContent() {
       
       let batches = res.batches || [];
       
-      // Filter for location_user role
-      if (me?.user?.role === 'location_user' && me?.user?.locationId) {
-        setUserLocationId(me.user.locationId);
-        batches = batches.map(batch => ({
-          ...batch,
-          items: batch.items.filter(item => Number(item.locationId) === Number(me.user.locationId))
-        })).filter(batch => batch.items.length > 0);
-      }
+      batches = filterBatchesForUser(batches, me?.user);
       
       setResults({ ...res, batches });
       setSelectedIds([]);
@@ -78,14 +71,7 @@ function AdminConfirmContent() {
           
           let batches = res.batches || [];
           
-          // Filter for location_user role
-          if (me?.user?.role === 'location_user' && me?.user?.locationId) {
-            setUserLocationId(me.user.locationId);
-            batches = batches.map(batch => ({
-              ...batch,
-              items: batch.items.filter(item => Number(item.locationId) === Number(me.user.locationId))
-            })).filter(batch => batch.items.length > 0);
-          }
+          batches = filterBatchesForUser(batches, me?.user);
           
           setResults({ ...res, batches });
           setSelectedIds([]);

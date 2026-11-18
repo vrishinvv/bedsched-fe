@@ -6,6 +6,7 @@ import RegisterModal from '@/components/RegisterModal';
 import Link from 'next/link';
 import { fetchLocations, smartReserve, getMe } from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import { canAccessLocation } from '@/lib/locationAccess.mjs';
 
 export default function Page() {
   const router = useRouter();
@@ -14,7 +15,7 @@ export default function Page() {
   const [err, setErr] = useState('');
   const [regOpen, setRegOpen] = useState(false);
   const [role, setRole] = useState(null);
-  const [locationId, setLocationId] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const [adminSearch, setAdminSearch] = useState('');
 
   useEffect(() => {
@@ -30,7 +31,7 @@ export default function Page() {
           return;
         }
         setRole(me?.user?.role || null);
-        setLocationId(me?.user?.locationId || null);
+        setCurrentUser(me?.user || null);
         
         // Show all locations for all roles - filtering is only for clickability
         console.log('[Dashboard] Showing all locations:', data);
@@ -188,7 +189,7 @@ export default function Page() {
       {/* Location cards - visible to all, clickable based on role */}
       <section className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {locations.map((loc) => {
-          const isClickable = role === 'admin' || (role === 'location_user' && Number(loc.id) === Number(locationId));
+          const isClickable = canAccessLocation(currentUser, loc.id);
           return <LocationCard key={loc.id} location={loc} isClickable={isClickable} />;
         })}
       </section>

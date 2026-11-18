@@ -5,6 +5,7 @@ import { fetchReservedActive, getMe } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { TreeSkeleton } from "@/components/Skeleton";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { getUserLocationIds } from '@/lib/locationAccess.mjs';
 
 function ReservedActiveContent() {
   const [items, setItems] = useState([]);
@@ -22,8 +23,9 @@ function ReservedActiveContent() {
       
       // Filter for location_user role
       let filteredData = items || [];
-      if (me?.user?.role === 'location_user' && me?.user?.locationId) {
-        filteredData = filteredData.filter(item => Number(item.location_id) === Number(me.user.locationId));
+      if (me?.user?.role === 'location_user') {
+        const allowed = new Set(getUserLocationIds(me.user));
+        filteredData = filteredData.filter(item => allowed.has(Number(item.location_id)));
       }
       
       setItems(filteredData);

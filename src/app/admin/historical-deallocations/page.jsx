@@ -47,7 +47,6 @@ function HistoricalDeallocationsContent() {
   const [sendingCSV, setSendingCSV] = useState(false);
   const [notification, setNotification] = useState({ show: false, type: '', message: '' });
   const [userRole, setUserRole] = useState(null);
-  const [userLocationId, setUserLocationId] = useState(null);
   const [locations, setLocations] = useState([]);
   const [tents, setTents] = useState([]);
   const [blocks, setBlocks] = useState([]);
@@ -106,10 +105,6 @@ function HistoricalDeallocationsContent() {
       .then(res => res.json())
       .then(data => {
         setUserRole(data?.user?.role);
-        if (data?.user?.role === 'location_user' && data?.user?.locationId) {
-          setUserLocationId(data.user.locationId);
-          setFilters(prev => ({ ...prev, location_id: String(data.user.locationId) }));
-        }
       })
       .catch(() => {});
   }, []);
@@ -290,7 +285,6 @@ function HistoricalDeallocationsContent() {
             <select
               value={filters.location_id}
               onChange={(e) => setFilters(prev => ({ ...prev, location_id: e.target.value }))}
-              disabled={userRole === 'location_user'}
               className="w-full rounded-lg border border-gray-600 px-3 py-2 bg-gray-800 text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">All Locations</option>

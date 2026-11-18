@@ -7,6 +7,7 @@ import Notification from "@/components/Notification";
 import { TreeSkeleton } from '@/components/Skeleton';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { BOOKING_MAX_DATE as MAX_DATE, BOOKING_MIN_DATE as MIN_DATE, BOOKING_WINDOW_LABEL, isWithinBookingWindow } from '@/lib/bookingWindow.mjs';
+import { filterBatchesForUser } from '@/lib/locationAccess.mjs';
 
 const hasSaiVerifiedProfile = (item) =>
   item?.categorySource === 'sai_connect' || (Array.isArray(item?.verifiedCategories) && item.verifiedCategories.length > 0);
@@ -25,7 +26,6 @@ function EditByPhoneContent() {
   const [expanded, setExpanded] = useState({});
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [filterBatchId, setFilterBatchId] = useState(null);
-  const [userLocationId, setUserLocationId] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
 
   const load = async (ph) => {
@@ -37,14 +37,7 @@ function EditByPhoneContent() {
       
       let batches = res.batches || [];
       
-      // Filter for location_user role
-      if (me?.user?.role === 'location_user' && me?.user?.locationId) {
-        setUserLocationId(me.user.locationId);
-        batches = batches.map(batch => ({
-          ...batch,
-          items: batch.items.filter(item => Number(item.locationId) === Number(me.user.locationId))
-        })).filter(batch => batch.items.length > 0);
-      }
+      batches = filterBatchesForUser(batches, me?.user);
       
       setData(batches);
       const matchedPhone = batches.flatMap((batch) => batch.items || []).find((item) => item.phone)?.phone || '';
