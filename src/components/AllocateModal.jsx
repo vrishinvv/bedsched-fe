@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import Skeleton from '@/components/Skeleton';
 import CameraCapture from '@/components/CameraCapture';
@@ -15,6 +16,10 @@ import {
   resolveRequireBookingPhotos,
   uploadOptionalPhotos,
 } from '@/lib/optionalPhotoUploads.mjs';
+import {
+  DEFAULT_BOOKING_PHOTO_URL,
+  loadDefaultBookingPhoto,
+} from '@/lib/defaultBookingPhoto.mjs';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -81,6 +86,7 @@ export default function AllocateModal({
   }));
   const [personPhoto, setPersonPhoto] = useState({ blob: null, dataUrl: null });
   const [aadhaarPhoto, setAadhaarPhoto] = useState({ blob: null, dataUrl: null });
+  const [defaultPhotoState, setDefaultPhotoState] = useState({ loading: false, selected: false, error: '' });
   const [uploading, setUploading] = useState(false); // Local uploading state
   const [uploadProgress, setUploadProgress] = useState(0); // Upload progress percentage
   const [displayProgress, setDisplayProgress] = useState(0); // Animated display progress
@@ -162,6 +168,7 @@ export default function AllocateModal({
       setDelegatePickerOpen(false);
       setActiveDelegateIndex(-1);
       setAgeWarningAcknowledged(false);
+      setDefaultPhotoState({ loading: false, selected: false, error: '' });
       setAccommodationCategory(initialData?.accommodationCategory || 'devotee');
       
       // Pre-fetch upload URLs in background (non-blocking)
@@ -210,6 +217,7 @@ export default function AllocateModal({
       // Reset photo state when modal closes to prevent stale data
       setPersonPhoto({ blob: null, dataUrl: null });
       setAadhaarPhoto({ blob: null, dataUrl: null });
+      setDefaultPhotoState({ loading: false, selected: false, error: '' });
     }
   }, [open, bedNumber, initialData, genderRestriction]);
 
@@ -412,6 +420,22 @@ export default function AllocateModal({
       return;
     }
     setForm((f) => ({ ...f, [name]: value }));
+  }
+
+  async function handleUseDefaultPhoto() {
+    setDefaultPhotoState({ loading: true, selected: false, error: '' });
+    try {
+      const photo = await loadDefaultBookingPhoto();
+      setPersonPhoto(photo);
+      setAadhaarPhoto(photo);
+      setDefaultPhotoState({ loading: false, selected: true, error: '' });
+    } catch {
+      setDefaultPhotoState({
+        loading: false,
+        selected: false,
+        error: 'The default photo could not be loaded. Please capture the photos instead.',
+      });
+    }
   }
 
   // Helper function to generate S3 key with format: {bedNumber}-{ddmmyyyy}-{hhmm}-{name}-{type}
@@ -1188,12 +1212,51 @@ export default function AllocateModal({
                     : 'You can save the booking without photos. If photo storage is unavailable, the booking will continue and show a warning.'}
                 </p>
               </div>
+
+              {!isEdit && (
+                <div className="mb-4 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleUseDefaultPhoto}
+                    disabled={isProcessing || defaultPhotoState.loading}
+                    aria-pressed={defaultPhotoState.selected}
+                    className="inline-flex min-h-10 items-center gap-2 rounded-full border border-orange-300 bg-orange-50 py-1.5 pl-1.5 pr-3 text-sm font-semibold text-orange-950 transition hover:border-orange-400 hover:bg-orange-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600 disabled:cursor-not-allowed disabled:opacity-60 aria-pressed:border-emerald-400 aria-pressed:bg-emerald-50 aria-pressed:text-emerald-900"
+                  >
+                    <Image
+                      src={DEFAULT_BOOKING_PHOTO_URL}
+                      alt="Sathya Sai Baba"
+                      width={32}
+                      height={32}
+                      className="h-8 w-8 rounded-full object-cover object-top"
+                    />
+                    {defaultPhotoState.loading
+                      ? 'Selecting default…'
+                      : defaultPhotoState.selected
+                        ? 'Default selected for both'
+                        : 'Use Baba default for both'}
+                  </button>
+                  <span className="text-xs text-gray-500">Person and identity photos</span>
+                  {defaultPhotoState.selected && (
+                    <span role="status" className="w-full text-xs font-medium text-emerald-700">
+                      Selected for both person and identity photos.
+                    </span>
+                  )}
+                  {defaultPhotoState.error && (
+                    <span role="alert" className="w-full text-xs font-medium text-red-700">
+                      {defaultPhotoState.error}
+                    </span>
+                  )}
+                </div>
+              )}
               
               <CameraCapture
                 key={`person-${bedNumber}-${open}-${initialData?.personPhotoUrl || 'new'}`}
                 label={`${isCaretaker ? 'Caretaker Photo' : 'Person Photo'}${photosRequired ? ' *' : ''}`}
-                onCapture={(blob, dataUrl) => setPersonPhoto({ blob, dataUrl })}
-                existingPhotoUrl={initialData?.personPhotoUrl || null}
+                onCapture={(blob, dataUrl) => {
+                  setPersonPhoto({ blob, dataUrl });
+                  setDefaultPhotoState((current) => ({ ...current, selected: false }));
+                }}
+                existingPhotoUrl={personPhoto.dataUrl || initialData?.personPhotoUrl || null}
                 autoOpen={false}
               />
               
@@ -1201,8 +1264,11 @@ export default function AllocateModal({
                 <CameraCapture
                   key={`aadhaar-${bedNumber}-${open}-${initialData?.aadhaarPhotoUrl || 'new'}`}
                   label={`${isCaretaker ? 'Caretaker Aadhaar / Identity Photo' : 'Identity Card Photo'}${photosRequired ? ' *' : ''}`}
-                  onCapture={(blob, dataUrl) => setAadhaarPhoto({ blob, dataUrl })}
-                  existingPhotoUrl={initialData?.aadhaarPhotoUrl || null}
+                  onCapture={(blob, dataUrl) => {
+                    setAadhaarPhoto({ blob, dataUrl });
+                    setDefaultPhotoState((current) => ({ ...current, selected: false }));
+                  }}
+                  existingPhotoUrl={aadhaarPhoto.dataUrl || initialData?.aadhaarPhotoUrl || null}
                   autoOpen={false}
                 />
               </div>
