@@ -1213,7 +1213,7 @@ export default function AllocateModal({
                 </p>
               </div>
 
-              {!isEdit && !isAdmin && (
+              {!isEdit && isAdmin && (
                 <div className="mb-4 flex flex-wrap items-center gap-2">
                   <button
                     type="button"

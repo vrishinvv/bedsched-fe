@@ -20,7 +20,7 @@ test('uses the Sathya Sai Baba default for both booking photos and uploads both'
     const path = new URL(request.url()).pathname;
     if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
     if (path === '/api/auth/me') {
-      return route.fulfill({ status: 200, headers, json: { user: { id: 10, username: 'location-user', role: 'location_user', locationId: 61 } } });
+      return route.fulfill({ status: 200, headers, json: { user: { id: 1, username: 'admin', role: 'admin', locationId: null } } });
     }
     if (path === '/api/locations/61/tents/1/blocks/1') {
       return route.fulfill({
@@ -75,7 +75,7 @@ test('uses the Sathya Sai Baba default for both booking photos and uploads both'
   expect(uploadedTypes.sort()).toEqual(['aadhaar', 'person']);
 });
 
-test('hides the default booking photo option from admins', async ({ page }) => {
+test('hides the default booking photo option from non-admins', async ({ page }) => {
   const headers = {
     'access-control-allow-credentials': 'true',
     'access-control-allow-headers': 'authorization,content-type',
@@ -88,7 +88,7 @@ test('hides the default booking photo option from admins', async ({ page }) => {
     const path = new URL(request.url()).pathname;
     if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
     if (path === '/api/auth/me') {
-      return route.fulfill({ status: 200, headers, json: { user: { id: 1, username: 'admin', role: 'admin', locationId: null } } });
+      return route.fulfill({ status: 200, headers, json: { user: { id: 10, username: 'location-user', role: 'location_user', locationId: 61 } } });
     }
     if (path === '/api/locations/61/tents/1/blocks/1') {
       return route.fulfill({
