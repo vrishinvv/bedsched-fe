@@ -403,6 +403,15 @@ export async function fetchReservedActive() {
   return handle(res, 'Failed to fetch active reserved');
 }
 
+export async function fetchRoomStatus(signal) {
+  const res = await fetch(`${API_BASE_URL}/api/room-status`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+    signal,
+  });
+  return handle(res, 'Failed to fetch room status');
+}
+
 export async function fetchAnalytics(filters = {}) {
   const url = new URL(`${API_BASE_URL}/api/admin/analytics`);
   if (filters.startDate) url.searchParams.set('startDate', filters.startDate);

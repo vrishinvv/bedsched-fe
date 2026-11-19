@@ -94,6 +94,13 @@ export default function TopNav() {
                 Search
               </Link>
             </li>
+            {(hasAnalyticsAccess || isLocationUser) && (
+              <li>
+                <Link onClick={() => setOpen(false)} href="/room-status" aria-current={pathname === '/room-status' ? 'page' : undefined} className="block px-3 py-2 rounded-md text-gray-200 hover:bg-white/10 hover:text-white transition-colors aria-[current=page]:font-semibold aria-[current=page]:text-white">
+                  Room Status
+                </Link>
+              </li>
+            )}
             {(isAdmin || isLocationUser) && (
               <>
                 {/* Search & Confirm link - commented out
