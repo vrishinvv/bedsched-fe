@@ -412,6 +412,15 @@ export async function fetchRoomStatus(signal) {
   return handle(res, 'Failed to fetch room status');
 }
 
+export async function updateRoomStateAssignment(blockId, stateCode) {
+  const res = await fetch(`${API_BASE_URL}/api/room-status/${blockId}/state`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ stateCode: stateCode || null }),
+  });
+  return handle(res, 'Failed to save the room state');
+}
+
 export async function fetchAnalytics(filters = {}) {
   const url = new URL(`${API_BASE_URL}/api/admin/analytics`);
   if (filters.startDate) url.searchParams.set('startDate', filters.startDate);
