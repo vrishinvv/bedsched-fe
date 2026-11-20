@@ -412,13 +412,39 @@ export async function fetchRoomStatus(signal) {
   return handle(res, 'Failed to fetch room status');
 }
 
-export async function updateRoomStateAssignment(blockId, stateCode) {
+export async function updateRoomStateAssignment(blockId, stateOptionId) {
   const res = await fetch(`${API_BASE_URL}/api/room-status/${blockId}/state`, {
     method: 'PATCH',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ stateCode: stateCode || null }),
+    body: JSON.stringify({ stateOptionId: stateOptionId || null }),
   });
   return handle(res, 'Failed to save the room state');
+}
+
+export async function createRoomStateOption(name) {
+  const res = await fetch(`${API_BASE_URL}/api/room-state-options`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ name }),
+  });
+  return handle(res, 'Failed to add the option');
+}
+
+export async function renameRoomStateOption(optionId, name) {
+  const res = await fetch(`${API_BASE_URL}/api/room-state-options/${optionId}`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ name }),
+  });
+  return handle(res, 'Failed to rename the option');
+}
+
+export async function deleteRoomStateOption(optionId) {
+  const res = await fetch(`${API_BASE_URL}/api/room-state-options/${optionId}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  return handle(res, 'Failed to delete the option');
 }
 
 export async function fetchAnalytics(filters = {}) {
