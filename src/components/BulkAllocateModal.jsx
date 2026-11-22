@@ -1,228 +1,219 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
-import Skeleton from '@/components/Skeleton';
-import { BOOKING_MAX_DATE as MAX_DATE, BOOKING_MIN_DATE as MIN_DATE, BOOKING_WINDOW_LABEL, getDefaultBookingDates, isWithinBookingWindow } from '@/lib/bookingWindow.mjs';
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import CameraCapture from '@/components/CameraCapture';
+import { complementBulkGenderCounts } from '@/lib/bulkBooking.mjs';
+import {
+  BOOKING_MAX_DATE as MAX_DATE,
+  BOOKING_MIN_DATE as MIN_DATE,
+  BOOKING_WINDOW_LABEL,
+  getDefaultBookingDates,
+  isWithinBookingWindow,
+} from '@/lib/bookingWindow.mjs';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+function getToken() {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage.getItem('bs_token');
+  } catch {
+    return null;
+  }
+}
+
+function authHeaders(extra = {}) {
+  const token = getToken();
+  return { ...extra, ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+}
+
+function initialForm(selectedCount, genderRestriction) {
+  return {
+    name: '',
+    phone: '',
+    maleCount: genderRestriction === 'female_only' ? 0 : selectedCount,
+    femaleCount: genderRestriction === 'female_only' ? selectedCount : 0,
+    ...getDefaultBookingDates(),
+  };
+}
+
+function formatBedSelection(bedNumbers) {
+  if (!bedNumbers.length) return '';
+  const ranges = [];
+  let start = bedNumbers[0];
+  let end = start;
+  for (let index = 1; index <= bedNumbers.length; index += 1) {
+    const current = bedNumbers[index];
+    if (current === end + 1) {
+      end = current;
+      continue;
+    }
+    ranges.push(start === end ? String(start) : `${start}–${end}`);
+    start = current;
+    end = current;
+  }
+  return ranges.join(', ');
+}
 
 export default function BulkAllocateModal({
   open,
   onClose,
-  genderRestriction,
+  genderRestriction = 'both',
   onSave,
+  selectedBedNumbers = [],
+  locationId,
+  tentIndex,
+  blockIndex,
 }) {
-  const [form, setForm] = useState(() => ({
-    name: '',
-    phone: '',
-    aadharNumber: '',
-    maleCount: 0,
-    femaleCount: 0,
-    ...getDefaultBookingDates(),
-  }));
+  const normalizedBeds = useMemo(
+    () => Array.from(new Set(selectedBedNumbers.map(Number))).sort((left, right) => left - right),
+    [selectedBedNumbers],
+  );
+  const selectedCount = normalizedBeds.length;
+  const [form, setForm] = useState(() => initialForm(selectedCount, genderRestriction));
+  const [personPhoto, setPersonPhoto] = useState({ blob: null, dataUrl: null });
+  const [aadhaarPhoto, setAadhaarPhoto] = useState({ blob: null, dataUrl: null });
   const [pending, setPending] = useState(false);
-  const [result, setResult] = useState(null); // { success: [], errors: [] }
-  const ref = useRef(null);
+  const [result, setResult] = useState(null);
+  const dialogRef = useRef(null);
 
-  // Helper function to get today's date in YYYY-MM-DD format (IST)
-  const getTodayDate = () => {
-    const now = new Date();
-    const istOffset = 5.5 * 60;
-    const istTime = new Date(now.getTime() + (istOffset * 60 * 1000));
-    
-    const year = istTime.getUTCFullYear();
-    const month = String(istTime.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(istTime.getUTCDate()).padStart(2, '0');
-    
-    return `${year}-${month}-${day}`;
-  };
-
-  // Helper function to format date for display as dd/mm/yyyy
-  const formatDateForDisplay = (dateString) => {
-    if (!dateString) return '';
-    const [year, month, day] = dateString.split('-');
-    return `${day}/${month}/${year}`;
-  };
+  const isMaleOnly = genderRestriction === 'male_only';
+  const isFemaleOnly = genderRestriction === 'female_only';
+  const isGenderRestricted = isMaleOnly || isFemaleOnly;
+  const totalPeople = Number(form.maleCount) + Number(form.femaleCount);
+  const selectionLabel = formatBedSelection(normalizedBeds);
 
   useEffect(() => {
-    if (open) {
-      const defaultDates = getDefaultBookingDates();
-      setForm({
-        name: '',
-        phone: '',
-        aadharNumber: '',
-        maleCount: 0,
-        femaleCount: 0,
-        ...defaultDates,
-      });
-      setResult(null);
-      setPending(false);
+    if (!open) return;
+    setForm(initialForm(selectedCount, genderRestriction));
+    setPersonPhoto({ blob: null, dataUrl: null });
+    setAadhaarPhoto({ blob: null, dataUrl: null });
+    setPending(false);
+    setResult(null);
+  }, [open, selectedCount, genderRestriction]);
+
+  useEffect(() => {
+    function handleKeyDown(event) {
+      if (event.key === 'Escape' && !pending) onClose();
     }
-  }, [open]);
-
-  useEffect(() => {
-    function onKey(e) { if (e.key === 'Escape' && !pending) onClose(); }
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose, pending]);
 
   if (!open) return null;
 
-  const isMaleOnly = genderRestriction === 'male_only';
-  const isFemaleOnly = genderRestriction === 'female_only';
-  const isMixed = genderRestriction === 'both';
-
-  function handleChange(e) {
-    const { name, value } = e.target;
+  function handleChange(event) {
+    const { name, value } = event.target;
     if (name === 'phone') {
-      const digits = value.replace(/\D/g, '').slice(0, 10);
-      setForm(f => ({ ...f, phone: digits }));
+      setForm((current) => ({ ...current, phone: value.replace(/\D/g, '').slice(0, 10) }));
       return;
     }
-    if (name === 'aadharNumber') {
-      const digits = value.replace(/\D/g, '').slice(0, 12);
-      const formatted = digits.replace(/(\d{4})(\d{0,4})(\d{0,4})/, (match, g1, g2, g3) => {
-        return [g1, g2, g3].filter(Boolean).join(' ');
-      });
-      setForm(f => ({ ...f, aadharNumber: formatted }));
-      return;
-    }
-    setForm((f) => ({ ...f, [name]: value }));
+    setForm((current) => ({ ...current, [name]: value }));
   }
 
-  function handleNumberChange(e) {
-    const { name, value } = e.target;
-    setForm((f) => ({ ...f, [name]: Math.max(0, parseInt(value) || 0) }));
+  function handleCountChange(event) {
+    const { name, value } = event.target;
+    setForm((current) => ({
+      ...current,
+      ...complementBulkGenderCounts(name, value, selectedCount),
+    }));
   }
+
+  function generatePhotoKey(photoType) {
+    const safeName = (form.name || 'representative')
+      .replace(/[^a-zA-Z0-9\s]/g, '')
+      .replace(/\s+/g, '-')
+      .toLowerCase();
+    const firstBed = normalizedBeds[0] || 'selected';
+    const suffix = photoType === 'person' ? 'person' : 'identity';
+    return `location-${locationId}/tent-${tentIndex}/block-${blockIndex}/bulk-${firstBed}-${Date.now()}-${safeName}-${suffix}.jpg`;
+  }
+
+  async function uploadPhoto(blob, photoType, key) {
+    const response = await fetch(`${API_BASE_URL}/api/upload-url`, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ photoType, locationId, tentIndex, blockIndex, key }),
+    });
+    if (!response.ok) throw new Error(`Could not prepare the ${photoType} photo upload.`);
+    const { uploadUrl } = await response.json();
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'image/jpeg' },
+      body: blob,
+    });
+    if (!uploadResponse.ok) throw new Error(`Could not upload the ${photoType} photo.`);
+    return key;
+  }
+
+  const validationErrors = [];
+  if (!form.name.trim()) validationErrors.push('Representative name is required');
+  if (!/^\d{10}$/.test(form.phone)) validationErrors.push('Enter a valid 10-digit phone number');
+  if (!personPhoto.blob) validationErrors.push('Representative photo is required');
+  if (!aadhaarPhoto.blob) validationErrors.push('Aadhaar or identity photo is required');
+  if (!form.startDate || !isWithinBookingWindow(form.startDate)) validationErrors.push(`Start date must be ${BOOKING_WINDOW_LABEL}`);
+  if (!form.endDate || !isWithinBookingWindow(form.endDate)) validationErrors.push(`End date must be ${BOOKING_WINDOW_LABEL}`);
+  if (form.startDate && form.endDate && form.endDate < form.startDate) validationErrors.push('End date cannot be before start date');
+  if (selectedCount === 0) validationErrors.push('Select at least one bed');
+  if (selectedCount > 250) validationErrors.push('Select no more than 250 beds');
+  if (totalPeople !== selectedCount) validationErrors.push(`Male and female counts must total ${selectedCount}`);
+  if (isMaleOnly && Number(form.femaleCount) > 0) validationErrors.push('This block is male only');
+  if (isFemaleOnly && Number(form.maleCount) > 0) validationErrors.push('This block is female only');
+  const canBook = validationErrors.length === 0 && !pending && !result;
 
   async function handleSave() {
-    if (!form.name || !form.startDate || !form.endDate || !form.phone) {
-      return alert('Name, phone, start & end dates are required');
-    }
-
-    if (!/^\d{10}$/.test(form.phone)) {
-      return alert('Please enter a valid 10-digit phone number.');
-    }
-
-    // Validate Aadhar: if provided, must be exactly 12 digits
-    const aadharDigits = form.aadharNumber.replace(/\D/g, '');
-    if (form.aadharNumber && aadharDigits.length !== 12) {
-      return alert('Aadhar number must be exactly 12 digits.');
-    }
-
-    const today = getTodayDate();
-    
-    if (form.endDate < today) {
-      return alert('End date must be today or in the future.');
-    }
-    
-    if (form.endDate < form.startDate) {
-      return alert('End date cannot be before start date.');
-    }
-
-    const totalCount = (isMixed ? (form.maleCount + form.femaleCount) : (isMaleOnly ? form.maleCount : form.femaleCount));
-    
-    if (totalCount <= 0) {
-      return alert('Please specify at least one person to book.');
-    }
-
+    if (!canBook) return;
     setPending(true);
     try {
-      const result = await onSave({
-        name: form.name,
+      const [personPhotoKey, aadhaarPhotoKey] = await Promise.all([
+        uploadPhoto(personPhoto.blob, 'person', generatePhotoKey('person')),
+        uploadPhoto(aadhaarPhoto.blob, 'aadhaar', generatePhotoKey('aadhaar')),
+      ]);
+      const saveResult = await onSave({
+        name: form.name.trim(),
         phone: form.phone,
-        aadharNumber: aadharDigits || undefined,
-        maleCount: isMaleOnly || isMixed ? form.maleCount : 0,
-        femaleCount: isFemaleOnly || isMixed ? form.femaleCount : 0,
+        maleCount: Number(form.maleCount),
+        femaleCount: Number(form.femaleCount),
         startDate: form.startDate,
         endDate: form.endDate,
+        personPhotoKey,
+        aadhaarPhotoKey,
+        bedNumbers: normalizedBeds,
       });
-      
-      setResult(result);
-    } catch (e) {
-      setResult({ success: [], errors: [{ message: e.message }] });
+      setResult(saveResult);
+    } catch (error) {
+      setResult({ success: [], errors: [{ message: error.message || 'Bulk booking failed.' }] });
     } finally {
       setPending(false);
     }
   }
 
-  const todayDate = getTodayDate();
-
-  // Explain disabled state and pre-validate inputs
-  const validationErrors = (() => {
-    const errs = [];
-    if (!form.name || !form.name.trim()) errs.push('Name is required');
-    if (!/^\d{10}$/.test(form.phone)) errs.push('Enter a valid 10-digit phone number');
-    if (!form.startDate) errs.push('Start date is required');
-    if (!form.endDate) errs.push('End date is required');
-    if (form.startDate && !isWithinBookingWindow(form.startDate)) errs.push(`Start date must be ${BOOKING_WINDOW_LABEL}`);
-    if (form.endDate && !isWithinBookingWindow(form.endDate)) errs.push(`End date must be ${BOOKING_WINDOW_LABEL}`);
-    if (form.startDate && form.endDate && form.endDate < form.startDate) errs.push('End date cannot be before start date');
-    const totalCount = (isMixed ? (form.maleCount + form.femaleCount) : (isMaleOnly ? form.maleCount : form.femaleCount));
-    if (totalCount <= 0) errs.push('Specify at least 1 person to book');
-    return errs;
-  })();
-  const canBook = validationErrors.length === 0 && !pending && !result;
-
-  // Show results
   if (result) {
-    const hasSuccess = result.success && result.success.length > 0;
-    const hasErrors = result.errors && result.errors.length > 0;
-    
+    const successfulBookings = result.success || [];
+    const errors = result.errors || [];
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" data-preserve-selection="true" onClick={(e) => e.stopPropagation()}>
-        <div className="absolute inset-0 bg-black/40" onClick={onClose} data-preserve-selection="true" />
-        <div ref={ref} className="relative w-full max-w-lg max-h-[90vh] rounded-2xl bg-white shadow-xl flex flex-col overflow-hidden" data-preserve-selection="true" onClick={(e) => e.stopPropagation()}>
-          <div className="flex-shrink-0 p-4 sm:p-6 border-b border-gray-200">
-            <h3 className="text-xl font-semibold text-gray-900">
-              Booking Results
-            </h3>
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" data-preserve-selection="true">
+        <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="bulk-result-title" className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+          <div className="border-b border-gray-200 p-5">
+            <h3 id="bulk-result-title" className="text-xl font-semibold text-gray-950">Bulk booking result</h3>
           </div>
-
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 min-h-0">
-            {hasSuccess && (
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <h4 className="text-lg font-semibold text-green-700">Successfully Booked ({result.success.length})</h4>
-                </div>
-                <div className="space-y-2 bg-green-50 border border-green-200 rounded-lg p-4 max-h-80 overflow-y-auto">
-                  {result.success.map((booking, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-green-900">Bed {booking.bedNumber}</span>
-                      <span className="text-green-700">{booking.gender} - {booking.name}</span>
-                    </div>
-                  ))}
-                </div>
+          <div className="flex-1 overflow-y-auto p-5">
+            {successfulBookings.length > 0 && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
+                <p className="font-semibold">Booked all {successfulBookings.length} selected beds</p>
+                <p className="mt-1 text-sm">Beds {formatBedSelection(successfulBookings.map((item) => item.bedNumber))}</p>
               </div>
             )}
-
-            {hasErrors && (
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <h4 className="text-lg font-semibold text-red-700">Errors ({result.errors.length})</h4>
-                </div>
-                <div className="space-y-2 bg-red-50 border border-red-200 rounded-lg p-4 max-h-80 overflow-y-auto">
-                  {result.errors.map((error, idx) => (
-                    <div key={idx} className="text-sm text-red-700">
-                      {error.bedNumber && <span className="font-medium">Bed {error.bedNumber}: </span>}
-                      {error.message}
-                    </div>
-                  ))}
-                </div>
+            {errors.length > 0 && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-950">
+                <p className="font-semibold">No beds were booked</p>
+                {errors.map((error, index) => <p className="mt-1 text-sm" key={`${error.message}-${index}`}>{error.message}</p>)}
               </div>
             )}
           </div>
-
-          <div className="flex-shrink-0 bg-white p-4 sm:p-6 border-t border-gray-200">
-            <button 
-              onClick={onClose}
-              className="w-full sm:w-auto rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black"
-            >
-              Close
-            </button>
+          <div className="flex justify-end border-t border-gray-200 p-4">
+            <button type="button" onClick={onClose} className="min-h-11 rounded-lg bg-gray-950 px-4 text-sm font-medium text-white hover:bg-black">Close</button>
           </div>
         </div>
       </div>
@@ -230,199 +221,90 @@ export default function BulkAllocateModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center" data-preserve-selection="true">
-      <div className="absolute inset-0 bg-black/40" onClick={!pending ? onClose : undefined} data-preserve-selection="true" />
-      <div ref={ref} className="relative w-full h-full sm:h-auto sm:max-w-lg rounded-none sm:rounded-2xl bg-white p-4 sm:p-5 shadow-xl overflow-y-auto" data-preserve-selection="true">
-        {/* Loading overlay */}
+    <div className="fixed inset-0 z-[100] flex items-stretch justify-center sm:items-center sm:p-4" data-preserve-selection="true">
+      <div className="absolute inset-0 bg-black/50" onClick={pending ? undefined : onClose} />
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="bulk-booking-title" className="relative h-full w-full overflow-y-auto bg-white shadow-xl sm:max-h-[94vh] sm:max-w-2xl sm:rounded-2xl">
         {pending && (
-          <div className="absolute inset-0 bg-white/95 rounded-2xl flex flex-col items-center justify-center z-10 p-8">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-6 h-6 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-              <span className="text-gray-700 font-medium">Booking beds...</span>
-            </div>
-            
-            <div className="w-full space-y-4">
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-10 w-full" />
-              <div className="grid grid-cols-2 gap-3">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </div>
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/95 p-6 text-center">
+            <div>
+              <div className="mx-auto h-7 w-7 animate-spin rounded-full border-2 border-gray-300 border-t-gray-950" />
+              <p className="mt-3 text-sm font-medium text-gray-800">Uploading photos and booking {selectedCount} beds…</p>
+              <p className="mt-1 text-xs text-gray-600">The selected range is locked until this finishes.</p>
             </div>
           </div>
         )}
 
-        <h3 className="mb-4 text-lg font-semibold text-gray-900">
-          Bulk Book Beds
-        </h3>
-
-        {/* Tent restriction info */}
-        <div className={`mb-4 p-3 rounded-lg border ${
-          isMaleOnly ? 'bg-blue-50 border-blue-200' :
-          isFemaleOnly ? 'bg-pink-50 border-pink-200' :
-          'bg-green-50 border-green-200'
-        }`}>
-          <div className={`text-sm font-medium ${
-            isMaleOnly ? 'text-blue-800' :
-            isFemaleOnly ? 'text-pink-800' :
-            'text-green-800'
-          }`}>
-            {isMaleOnly ? '♂️ Male Only Tent' :
-             isFemaleOnly ? '♀️ Female Only Tent' :
-             '👫 All Genders Accepted'}
-          </div>
-        </div>
-        
-        {/* Current date info */}
-        <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <div className="text-sm text-blue-800">
-            <div className="font-medium">Today&apos;s date (IST): {formatDateForDisplay(todayDate)}</div>
-            <div className="text-blue-600 mt-1">(End date must be today or later)</div>
-          </div>
+        <div className="border-b border-gray-200 px-5 py-4 sm:px-6">
+          <h3 id="bulk-booking-title" className="text-xl font-semibold text-gray-950">Book selected beds</h3>
+          <p className="mt-1 text-sm text-gray-600">One representative’s details and both photos will be stored on every booking in this group.</p>
         </div>
 
-        <div className="grid grid-cols-1 gap-3">
-          {/* Name */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Name*</label>
-            <input 
-              name="name" 
-              value={form.name} 
-              onChange={handleChange} 
-              disabled={pending}
-              className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
-              placeholder="Full name (same for all bookings)" 
-            />
-          </div>
+        <div className="space-y-5 p-5 sm:p-6">
+          <section className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <p className="text-sm font-medium text-gray-950">{selectedCount} selected beds</p>
+            <p className="mt-1 text-sm tabular-nums text-gray-600">Beds {selectionLabel}</p>
+          </section>
 
-          {/* Phone */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Phone*</label>
-            <input 
-              name="phone" 
-              value={form.phone} 
-              onChange={handleChange} 
-              disabled={pending}
-              type="tel"
-              inputMode="numeric"
-              pattern="\\d{10}"
-              maxLength={10}
-              className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
-              placeholder="10-digit phone" 
-            />
-          </div>
-
-          {/* Aadhar */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Aadhar Number</label>
-            <input 
-              name="aadharNumber" 
-              value={form.aadharNumber} 
-              onChange={handleChange} 
-              disabled={pending}
-              type="tel"
-              inputMode="numeric"
-              maxLength={14}
-              className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
-              placeholder="1234 5678 9012" 
-            />
-            <p className="text-xs text-gray-500 mt-1">12 digits (optional)</p>
-          </div>
-
-          {/* Count inputs */}
-          <div className="grid grid-cols-2 gap-3">
-            {(isMaleOnly || isMixed) && (
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Male Count*</label>
-                <input 
-                  type="number"
-                  name="maleCount" 
-                  value={form.maleCount} 
-                  onChange={handleNumberChange} 
-                  min="0"
-                  step="1"
-                  inputMode="numeric"
-                  disabled={pending}
-                  className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
-                />
-              </div>
-            )}
-            {(isFemaleOnly || isMixed) && (
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Female Count*</label>
-                <input 
-                  type="number"
-                  name="femaleCount" 
-                  value={form.femaleCount} 
-                  onChange={handleNumberChange} 
-                  min="0"
-                  step="1"
-                  inputMode="numeric"
-                  disabled={pending}
-                  className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Dates */}
-          <div className="grid grid-cols-2 gap-3">
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Start date*</label>
-              <input 
-                type="date" 
-                name="startDate" 
-                value={form.startDate} 
-                onChange={handleChange}
-                min={MIN_DATE}
-                max={MAX_DATE}
-                disabled={pending}
-                className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
-              />
-              <p className="text-xs text-gray-500 mt-1">{BOOKING_WINDOW_LABEL}</p>
+              <label htmlFor="bulk-name" className="mb-2 block text-sm font-medium text-gray-800">Representative name</label>
+              <input id="bulk-name" name="name" value={form.name} onChange={handleChange} disabled={pending} className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-950 placeholder:text-gray-500 focus:border-gray-700 focus:outline-none" placeholder="Full name" />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">End date*</label>
-              <input 
-                type="date" 
-                name="endDate" 
-                value={form.endDate} 
-                onChange={handleChange}
-                min={MIN_DATE}
-                max={MAX_DATE}
-                disabled={pending}
-                className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" 
-              />
-              <p className="text-xs text-gray-500 mt-1">{BOOKING_WINDOW_LABEL}</p>
+              <label htmlFor="bulk-phone" className="mb-2 block text-sm font-medium text-gray-800">Representative phone</label>
+              <input id="bulk-phone" name="phone" value={form.phone} onChange={handleChange} disabled={pending} type="tel" inputMode="numeric" maxLength={10} className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-950 placeholder:text-gray-500 focus:border-gray-700 focus:outline-none" placeholder="10-digit phone" />
             </div>
-          </div>
+          </section>
+
+          <section>
+            <div className="mb-3 flex items-end justify-between gap-4">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-950">Group count</h4>
+                <p className="mt-1 text-xs text-gray-600">Changing either count automatically updates the other.</p>
+              </div>
+              <p className="text-sm font-medium tabular-nums text-emerald-700">{selectedCount} of {selectedCount} assigned</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="bulk-male-count" className="mb-2 block text-sm font-medium text-gray-800">Male count</label>
+                <input id="bulk-male-count" name="maleCount" type="number" inputMode="numeric" min={0} max={selectedCount} value={form.maleCount} onChange={handleCountChange} disabled={pending || isGenderRestricted} className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-950 disabled:bg-gray-100 disabled:text-gray-600" />
+              </div>
+              <div>
+                <label htmlFor="bulk-female-count" className="mb-2 block text-sm font-medium text-gray-800">Female count</label>
+                <input id="bulk-female-count" name="femaleCount" type="number" inputMode="numeric" min={0} max={selectedCount} value={form.femaleCount} onChange={handleCountChange} disabled={pending || isGenderRestricted} className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-950 disabled:bg-gray-100 disabled:text-gray-600" />
+              </div>
+            </div>
+          </section>
+
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="bulk-start-date" className="mb-2 block text-sm font-medium text-gray-800">Start date</label>
+              <input id="bulk-start-date" type="date" name="startDate" value={form.startDate} onChange={handleChange} min={MIN_DATE} max={MAX_DATE} disabled={pending} className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-950" />
+              <p className="mt-1 text-xs text-gray-600">{BOOKING_WINDOW_LABEL}</p>
+            </div>
+            <div>
+              <label htmlFor="bulk-end-date" className="mb-2 block text-sm font-medium text-gray-800">End date</label>
+              <input id="bulk-end-date" type="date" name="endDate" value={form.endDate} onChange={handleChange} min={MIN_DATE} max={MAX_DATE} disabled={pending} className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-950" />
+              <p className="mt-1 text-xs text-gray-600">{BOOKING_WINDOW_LABEL}</p>
+            </div>
+          </section>
+
+          <section className="border-t border-gray-200 pt-5">
+            <h4 className="text-sm font-semibold text-gray-950">Representative photos</h4>
+            <p className="mb-4 mt-1 text-xs text-gray-600">The same person and identity images will represent all {selectedCount} people.</p>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <CameraCapture label="Representative Photo *" onCapture={(blob, dataUrl) => setPersonPhoto({ blob, dataUrl })} existingPhotoUrl={personPhoto.dataUrl} />
+              <CameraCapture label="Aadhaar / Identity Photo *" onCapture={(blob, dataUrl) => setAadhaarPhoto({ blob, dataUrl })} existingPhotoUrl={aadhaarPhoto.dataUrl} />
+            </div>
+          </section>
         </div>
-        
-        <div className="mt-5 sticky bottom-0 bg-white pt-3 pb-3 flex items-center justify-between gap-2 border-t">
-          {!canBook && !result && (
-            <div className="text-xs text-red-600 space-y-1">
-              <div className="font-medium">Can’t book yet:</div>
-              <ul className="list-disc pl-4">
-                {validationErrors.map((e, i) => (<li key={i}>{e}</li>))}
-              </ul>
-            </div>
-          )}
-          <button 
-            onClick={onClose} 
-            disabled={pending}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Cancel
-          </button>
-          <button 
-            onClick={handleSave} 
-            disabled={!canBook}
-            title={!canBook ? validationErrors[0] : undefined}
-            className="rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {pending && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
-            Book Beds
-          </button>
+
+        <div className="sticky bottom-0 border-t border-gray-200 bg-white px-5 py-4 sm:px-6">
+          {validationErrors.length > 0 && <p className="mb-3 text-sm text-red-700">{validationErrors[0]}</p>}
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={onClose} disabled={pending} className="min-h-11 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-60">Cancel</button>
+            <button type="button" onClick={handleSave} disabled={!canBook} title={!canBook ? validationErrors[0] : undefined} className="min-h-11 rounded-lg bg-gray-950 px-4 text-sm font-medium text-white hover:bg-black disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-600">Book {selectedCount} beds</button>
+          </div>
         </div>
       </div>
     </div>

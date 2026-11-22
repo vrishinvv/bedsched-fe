@@ -41,6 +41,25 @@ function categoryPresetValue(categories) {
   return ['delegate', 'sevadal', 'devotee'].filter((category) => selected.has(category)).join(',');
 }
 
+function formatSelectedBedNumbers(bedNumbers) {
+  if (!Array.isArray(bedNumbers) || bedNumbers.length === 0) return '';
+  const sorted = Array.from(new Set(bedNumbers.map(Number))).sort((left, right) => left - right);
+  const ranges = [];
+  let start = sorted[0];
+  let end = start;
+  for (let index = 1; index <= sorted.length; index += 1) {
+    const current = sorted[index];
+    if (current === end + 1) {
+      end = current;
+      continue;
+    }
+    ranges.push(start === end ? String(start) : `${start}–${end}`);
+    start = current;
+    end = current;
+  }
+  return ranges.join(', ');
+}
+
 export default function BlockBedsPage({ params }) {
   const { id, tent, block } = use(params);
   const [meta, setMeta] = useState(null); // { location, tent, block }
@@ -134,6 +153,23 @@ export default function BlockBedsPage({ params }) {
       .map((n) => ({ bedNumber: n, data: bedsState.beds[n] }))
       .filter((x) => x.data != null);
   }, [selectedBeds, bedsState]);
+
+  const selectedUnavailableBeds = useMemo(() => (
+    selectedBeds
+      .filter((bedNumber) => bedsState?.beds?.[bedNumber] != null)
+      .sort((left, right) => left - right)
+  ), [selectedBeds, bedsState]);
+
+  const bulkBookingIssue = useMemo(() => {
+    if (selectedBeds.length === 0) return 'Select beds first';
+    if (selectedBeds.length > 250) return 'Select no more than 250 beds at a time';
+    if (selectedUnavailableBeds.length > 0) {
+      return `Remove occupied bed${selectedUnavailableBeds.length === 1 ? '' : 's'} ${formatSelectedBedNumbers(selectedUnavailableBeds)}`;
+    }
+    if (!allowedCategories.includes('devotee')) return 'This block does not allow Devotee bookings';
+    if (Number(minimumAge) !== 0) return 'Bulk booking is unavailable in age-restricted blocks';
+    return '';
+  }, [allowedCategories, minimumAge, selectedBeds.length, selectedUnavailableBeds]);
 
   const eligibleDelegates = useMemo(
     () => eligibleDelegateAllocations(bedsState?.beds || {}),
@@ -662,41 +698,21 @@ export default function BlockBedsPage({ params }) {
   // Reallocate flow removed per request
 
   async function handleBulkBooking(formData) {
-    const { name, phone, maleCount, femaleCount, startDate, endDate } = formData;
-    
     try {
-      const result = await bulkAllocateBeds(id, Number(tent), Number(block), {
-        name,
-        phone: phone || null,
-        maleCount,
-        femaleCount,
-        startDate,
-        endDate,
-      });
-
-      // Update local state with successful allocations
-      if (result.success && result.success.length > 0) {
-        setBedsState((s) => {
-          const updatedBeds = { ...s.beds };
-          result.success.forEach(booking => {
-            updatedBeds[booking.bedNumber] = {
-              name,
-              phone,
-              gender: booking.gender,
-              startDate,
-              endDate,
-              status: 'confirmed'
-            };
-          });
-          return { ...s, beds: updatedBeds };
-        });
-      }
-
+      const result = await bulkAllocateBeds(id, Number(tent), Number(block), formData);
+      await refreshBlockData();
+      setSelectedBeds([]);
+      showNotification('success', `Booked all ${result.allocated} selected beds`);
       return result;
     } catch (e) {
+      const errorData = e.response?.data || {};
+      if (e.response?.status === 409) await refreshBlockData();
       return {
         success: [],
-        errors: [{ message: e.message || 'Failed to bulk allocate beds' }]
+        errors: [{
+          message: errorData.message || e.message || 'Failed to bulk allocate beds',
+          conflictingBeds: errorData.conflictingBeds || [],
+        }],
       };
     }
   }
@@ -1012,6 +1028,44 @@ export default function BlockBedsPage({ params }) {
         */}
       </section>
 
+      {selectedBeds.length > 0 && (
+        <section
+          className="flex flex-col gap-3 rounded-xl border border-gray-600 bg-gray-800 p-3 sm:flex-row sm:items-center sm:justify-between"
+          data-preserve-selection="true"
+          aria-label="Selected-bed actions"
+        >
+          <div>
+            <p className="text-sm font-semibold text-white">
+              {selectedBeds.length} bed{selectedBeds.length === 1 ? '' : 's'} selected
+            </p>
+            <p className="mt-1 text-xs tabular-nums text-gray-300">
+              Beds {formatSelectedBedNumbers(selectedBeds)}
+            </p>
+            {bulkBookingIssue && <p className="mt-1 text-xs text-amber-300">{bulkBookingIssue}</p>}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedBeds([])}
+              className="min-h-11 rounded-lg border border-gray-500 px-3 text-sm font-medium text-gray-100 hover:bg-gray-700"
+              data-preserve-selection="true"
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              onClick={() => setBulkModal(true)}
+              disabled={Boolean(bulkBookingIssue)}
+              title={bulkBookingIssue || undefined}
+              className="min-h-11 rounded-lg bg-white px-4 text-sm font-semibold text-gray-950 hover:bg-gray-100 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:text-gray-300"
+              data-preserve-selection="true"
+            >
+              Book selected beds
+            </button>
+          </div>
+        </section>
+      )}
+
       <BedGrid
         capacity={bedsState.capacity}
         beds={bedsState.beds}
@@ -1046,6 +1100,10 @@ export default function BlockBedsPage({ params }) {
         onClose={() => setBulkModal(false)}
         genderRestriction={genderRestriction}
         onSave={handleBulkBooking}
+        selectedBedNumbers={selectedBeds}
+        locationId={id}
+        tentIndex={Number(tent)}
+        blockIndex={Number(block)}
       />
 
       <Notification 
