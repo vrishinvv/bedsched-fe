@@ -1,6 +1,13 @@
 import { expect, test } from '@playwright/test';
 
 test('opens bulk booking for the exact selected range and keeps gender counts complementary', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: () => new Promise(() => {}) },
+    });
+  });
+
   const headers = {
     'access-control-allow-credentials': 'true',
     'access-control-allow-headers': 'authorization,content-type',
@@ -63,6 +70,13 @@ test('opens bulk booking for the exact selected range and keeps gender counts co
   await expect(femaleCount).toHaveValue('2');
   await expect(page.getByText('4 of 4 assigned')).toBeVisible();
   await expect(page.getByText(/Sai Connect/i)).toHaveCount(0);
+
+  await page.getByLabel('Representative name').fill('Photo State Test');
+  await page.getByLabel('Representative phone').fill('9876543210');
+  await page.getByRole('button', { name: '📷 Capture Representative Photo *' }).click();
+  await expect(page.getByText('4 selected beds', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Representative name')).toHaveValue('Photo State Test');
+  await expect(page.getByLabel('Representative phone')).toHaveValue('9876543210');
 
   await page.screenshot({ path: 'test-results/bulk-selected-booking.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });

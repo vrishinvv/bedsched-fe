@@ -145,10 +145,20 @@ export default function BedGrid({
             if (!Array.isArray(selectedBeds) || selectedBeds.length === 0) return;
             const node = containerRef.current;
             if (!node) return;
-            // Don't clear if clicking on elements that preserve selection (e.g., toolbar buttons)
-            const preserve = ev.target && typeof ev.target.closest === 'function' && ev.target.closest('[data-preserve-selection="true"]');
+            // A clicked control may replace itself before this document listener runs
+            // (for example, the camera button becomes an "Opening camera" state).
+            // composedPath keeps the original ancestry even after that DOM update.
+            const eventPath = typeof ev.composedPath === 'function' ? ev.composedPath() : [];
+            const preserve = eventPath.some((pathNode) => (
+                pathNode?.matches?.('[data-preserve-selection="true"]')
+            )) || (
+                ev.target
+                && typeof ev.target.closest === 'function'
+                && ev.target.closest('[data-preserve-selection="true"]')
+            );
             if (preserve) return;
-            if (!node.contains(ev.target)) {
+            const originatedInsideGrid = eventPath.includes(node) || node.contains(ev.target);
+            if (!originatedInsideGrid) {
                 setAnchor(null);
                 emitSelection([]);
             }
